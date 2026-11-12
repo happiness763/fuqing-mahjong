@@ -1,0 +1,16 @@
+# Godot cache and local export credentials
+.godot/
+export_credentials.cfg
+
+# Local Windows builds
+/release/*.exe
+/release/*.pck
+/release/*.zip
+
+# Local environment and desktop metadata
+.env
+.env.*
+!.env.example
+node_modules/
+Thumbs.db
+.DS_Store

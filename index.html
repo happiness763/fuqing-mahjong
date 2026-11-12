@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f2e9">
+  <title>福清麻将 · 融城牌桌</title>
+  <link rel="stylesheet" href="src/styles.css">
+  <script defer src="src/mahjong.js"></script>
+  <script defer src="src/ai.js"></script>
+  <script defer src="src/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">福</span>
+        <div><strong>福清麻将</strong><span class="brand-caption">FUQING MAHJONG</span></div>
+      </div>
+      <div class="topbar-actions">
+        <button type="button" class="button button-quiet" id="open-rules">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.5C9 3.5 6.5 3.5 3 4.5v14c3.5-1 6-1 9 1 3-2 5.5-2 9-1v-14c-3.5-1-6-1-9 1Zm0 0v14"/></svg>
+          玩法规则
+        </button>
+        <button type="button" class="button button-outline" id="open-reset">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 7m-1-7V4m0 6h6"/></svg>
+          重新开桌
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell page">
+    <section class="page-heading" aria-labelledby="page-title">
+      <div>
+        <div class="eyebrow"><span></span> 融城牌桌 <span class="eyebrow-en"> / RONGCHENG</span></div>
+        <h1 id="page-title">单机牌桌</h1>
+        <p>福清休闲规则 · 与三位 AI 牌友同桌</p>
+      </div>
+      <div class="mode"><span></span> 四人局 <i></i> 离线可玩</div>
+    </section>
+
+    <div class="game-layout">
+      <section class="game" aria-label="麻将牌桌">
+        <div class="table-frame">
+          <div class="table">
+            <div class="table-corner table-corner-tl" aria-hidden="true"></div>
+            <div class="table-corner table-corner-tr" aria-hidden="true"></div>
+            <div class="table-corner table-corner-bl" aria-hidden="true"></div>
+            <div class="table-corner table-corner-br" aria-hidden="true"></div>
+            <div class="table-info"><span>第 <b id="round-number">01</b> 局</span><span>可摸 <b id="remaining">–</b> 张</span></div>
+            <div class="seat seat-top" id="seat-2"></div>
+            <div class="seat seat-left" id="seat-3"></div>
+            <div class="seat seat-right" id="seat-1"></div>
+            <div class="center" aria-label="公共牌区">
+              <div class="river river-top" id="river-2" aria-label="对家弃牌"></div>
+              <div class="river river-left" id="river-3" aria-label="左家弃牌"></div>
+              <div class="gold-display" id="gold-display"></div>
+              <div class="river river-right" id="river-1" aria-label="右家弃牌"></div>
+              <div class="river river-bottom" id="river-0" aria-label="你的弃牌"></div>
+            </div>
+            <div class="player">
+              <div class="player-meta">
+                <div class="seat" id="seat-0"></div>
+                <div class="player-melds" id="player-melds"></div>
+              </div>
+              <div class="hand" id="hand" aria-label="你的手牌"></div>
+            </div>
+          </div>
+        </div>
+        <div class="control-bar">
+          <div class="turn-copy" role="status">
+            <span class="turn-icon" id="turn-icon" aria-hidden="true"></span>
+            <div><strong id="status-title"></strong><span id="status-detail"></span></div>
+          </div>
+          <div class="action-buttons" id="actions"></div>
+        </div>
+      </section>
+
+      <aside class="sidebar" aria-label="牌桌信息">
+        <section class="panel score-panel" aria-labelledby="score-title">
+          <div class="panel-heading"><h2 id="score-title">本桌积分</h2><span>累计</span></div>
+          <div id="scores" class="score-list"></div>
+        </section>
+        <section class="panel feed-panel" aria-labelledby="feed-title">
+          <div class="panel-heading"><h2 id="feed-title">行牌动态</h2><span class="live-mark">实况</span></div>
+          <ol id="feed" class="feed"></ol>
+        </section>
+        <section class="desk-tip" aria-label="出牌提示">
+          <span class="tip-mark" aria-hidden="true">牌</span>
+          <div><strong>出牌提示</strong><p>点选手牌后，再点一次或按「出牌」确认。<span class="mobile-tip">可左右滑动查看手牌。</span></p></div>
+        </section>
+      </aside>
+    </div>
+    <footer class="footer"><span>融城牌桌</span><span>福清麻将休闲规则 · 144 张 · 四人局</span></footer>
+    <noscript>请启用 JavaScript 以开始对局。</noscript>
+  </main>
+
+  <dialog id="rules-dialog" class="dialog" aria-labelledby="rules-title">
+    <div class="dialog-heading">
+      <div><div class="eyebrow">融城牌桌</div><h2 id="rules-title">玩法规则</h2></div>
+      <form method="dialog"><button class="close-button" aria-label="关闭规则">×</button></form>
+    </div>
+    <div class="rule-body">
+      <h3>开局与行牌</h3>
+      <p>四人逆时针行牌，庄家 17 张，闲家 16 张。全副 144 张，东南西北中发白和春夏秋冬梅兰竹菊都算花。补花和杠后从牌尾补。牌墙保留 18 张，无法摸补即流局。庄家胜或流局连庄，闲家胜则原庄家的下家接庄。</p>
+      <h3>开金与要牌</h3>
+      <p>补花后亮一张万、筒或条作为金。翻到花先归庄家，再翻。其余三张同牌是万能牌，可打出，出金者本局只能自摸，打出的金不能被认领。只吃上家的牌。胡优先于碰杠，碰杠优先于吃，同级由出牌者下家起依次优先。</p>
+      <h3>胡牌与结算</h3>
+      <p>普通胡是五组加一对将。单金作将、任意摸牌都能胡的闲金只可自摸。起手三金倒优先于抢金，同类从庄家起取一人。抢金时庄家用一张手牌换金，闲家直接加金，须凑成普通胡牌结构。</p>
+      <table class="rule-table">
+        <thead><tr><th scope="col">胡法</th><th scope="col">倍数</th><th scope="col">判定</th></tr></thead>
+        <tbody>
+          <tr><td>点炮</td><td>×1</td><td>由出牌者支付</td></tr>
+          <tr><td>自摸</td><td>×2</td><td>其余三家各付</td></tr>
+          <tr><td>三金倒</td><td>×3</td><td>起手或摸补后有三张金</td></tr>
+          <tr><td>金雀</td><td>×4</td><td>两张金作将，其余五组成立</td></tr>
+          <tr><td>抢金</td><td>×5</td><td>开局仅判一次，其余三家各付</td></tr>
+        </tbody>
+      </table>
+      <p>每家应付分 =（3 + 胡家花数 + 胡家金数 + 明杠和补杠数 + 2 × 暗杠数）× 胡法倍率。</p>
+    </div>
+  </dialog>
+
+  <dialog id="reset-dialog" class="dialog compact-dialog" aria-labelledby="reset-title">
+    <div class="dialog-heading">
+      <div><div class="eyebrow">融城牌桌</div><h2 id="reset-title">重新开桌？</h2></div>
+      <form method="dialog"><button class="close-button" aria-label="关闭">×</button></form>
+    </div>
+    <p>当前牌局和累计积分将清空，你会重新坐庄。</p>
+    <div class="dialog-actions">
+      <form method="dialog"><button class="button button-outline" autofocus>继续本桌</button></form>
+      <button type="button" class="button button-primary" id="confirm-reset">重新开桌</button>
+    </div>
+  </dialog>
+
+  <dialog id="result-dialog" class="dialog result-dialog" aria-labelledby="result-title">
+    <div class="dialog-heading">
+      <div><div class="eyebrow" id="result-round"></div><h2 id="result-title"></h2></div>
+      <form method="dialog"><button class="close-button" aria-label="查看牌桌">×</button></form>
+    </div>
+    <div id="result-body"></div>
+    <div class="dialog-actions">
+      <form method="dialog"><button class="button button-outline">查看牌桌</button></form>
+      <button type="button" class="button button-primary" id="result-next">下一局</button>
+    </div>
+  </dialog>
+</body>
+</html>
