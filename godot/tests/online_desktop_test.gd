@@ -117,7 +117,7 @@ func run() -> void:
 	check(desk.header.visible and not screen.visible and desk.online_view.seat == 0, "online table opens in local perspective")
 	check(desk.player_name(0) == ("玉兰" if host else "海棠"), "local seat nickname")
 	check(desk.online_view.players[0].has("hand") and not desk.online_view.players[1].has("hand"), "hand privacy through UI")
-	check(is_instance_valid(desk.countdown_label) and room.seconds_left() in range(0, 16), "countdown displays from server state")
+	check(is_instance_valid(desk.countdown_label) and room.seconds_left() in range(0, 76), "countdown displays from server state")
 	room.state_changed.connect(func(): check_action_banner(desk, room))
 	await create_timer(0.60).timeout
 	await capture("table-" + role)

@@ -79,6 +79,8 @@ func run() -> void:
 	desk.lobby.round_field.text_changed.emit("2")
 	check(desk.lobby.slider.value == 2, "input updates slider")
 	click(desk.lobby.start_button)
+	check(is_instance_valid(desk.dealer_roll_panel), "dealer roll opens on start")
+	desk.finish_dealer_roll()
 	check(desk.game != null and desk.game.round_limit == 2, "starts with selected round count")
 	desk.close_modal(false)
 	desk.skip_intro()
@@ -162,6 +164,7 @@ func run() -> void:
 		click(by_text(desk.modal, "返回首页"))
 		check(desk.game == null and desk.lobby.round_field.text == "2", "lobby preserves settings")
 		click(desk.lobby.start_button)
+		desk.finish_dealer_roll()
 	desk.skip_intro()
 	desk.ai_timer.stop()
 	click(desk.menu_button)
@@ -177,6 +180,16 @@ func run() -> void:
 	test_waiting_presentation(desk)
 	await test_scoring_presentation(desk)
 	test_dense_board(desk)
+	var roll := {"winner": 2, "dice": [[1, 2], [3, 4], [5, 6], [2, 2]], "sums": [3, 7, 11, 4], "rerolls": 0}
+	desk.show_dealer_roll(roll, Callable())
+	check(is_instance_valid(desk.dealer_roll_panel), "dealer roll panel opens")
+	var roll_labels: Array = desk.dealer_roll_panel.find_children("*", "Label", true, false).map(
+		func(node): return node.text)
+	check(roll_labels.any(func(text): return text.contains("阿榕"))
+		and roll_labels.any(func(text): return text.contains("11")),
+		"winner and sums are shown")
+	desk.finish_dealer_roll()
+	check(desk.dealer_roll_panel == null, "dealer roll closes")
 	desk.game = Game.new(43, 2)
 	desk.start_intro()
 	check(desk.intro_active() and desk.local_moves().is_empty(), "intro blocks moves")

@@ -12,6 +12,8 @@ func _initialize() -> void:
 	game.scores = [8, -4, -8, 4]
 	var seats := [{"name": "甲"}, {"name": "乙"}, {"name": "丙"}, {"name": "丁"}]
 	var state := {"view": game.view(2), "my_seat": 2, "actor": 2, "seats": seats}
+	state.view.dealer_rolls = {"winner": 1, "dice": [[1, 2], [3, 4], [5, 6], [2, 2]],
+		"sums": [3, 7, 11, 4], "rerolls": 0}
 	var view := TableView.from_room(state)
 	var valid: bool = (
 		view.seat == 0 and view.current == 0 and view.dealer == 2 and view.actor == 0
@@ -19,6 +21,8 @@ func _initialize() -> void:
 		and view.players[0].has("hand") and not view.players[1].has("hand")
 		and view.players[0].melds[0].from == 3 and view.last_discard.seat == 1
 		and state.view.players[2].melds[0].from == 1
+		and view.dealer_rolls.winner == 3 and view.dealer_rolls.dice[0] == [5, 6]
+		and view.dealer_rolls.sums[0] == 11
 	)
 	game.finish({"kind": "discard", "winner": 1, "from": 0, "payers": [0], "deltas": [-3, 3, 0, 0]})
 	state.view = game.view(2)

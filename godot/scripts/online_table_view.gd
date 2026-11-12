@@ -36,4 +36,10 @@ static func from_room(state: Dictionary) -> Dictionary:
 		view.result.deltas = rotate_seats(view.result.deltas, viewer)
 		if view.result.has("payers"):
 			view.result.payers = view.result.payers.map(func(seat): return local_seat(seat, viewer))
+	if view.get("dealer_rolls", {}).size() > 0:
+		var roll: Dictionary = view.dealer_rolls.duplicate(true)
+		roll.dice = rotate_seats(roll.dice, viewer)
+		roll.sums = rotate_seats(roll.sums, viewer)
+		roll.winner = local_seat(roll.winner, viewer)
+		view.dealer_rolls = roll
 	return view

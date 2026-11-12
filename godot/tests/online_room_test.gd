@@ -214,6 +214,12 @@ func run() -> void:
 	if not await wait_for(func(): return client.state.get("phase") == "playing", "mixed table starts for both peers"):
 		quit(failures)
 		return
+	check(not host.state.view.dealer_rolls.is_empty(), "host publishes the dealer roll")
+	check(client.state.view.dealer_rolls.winner == host.state.view.dealer_rolls.winner,
+		"both peers see the same dealer")
+	check(host.state.view.gold_dice.size() == 2 and client.state.view.gold_dice == host.state.view.gold_dice,
+		"gold dice are part of the snapshot")
+	check(host._deadline_ms - Time.get_ticks_msec() >= 5000, "first stage includes the intro grace")
 	for room in [host, client]:
 		for seat in range(4):
 			check(room.state.view.players[seat].has("hand") == (seat == room.state.my_seat), "live hand is private to its seat")

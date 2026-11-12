@@ -5,6 +5,7 @@ signal notice(message: String)
 
 const Game = preload("res://scripts/game.gd")
 const Opponent = preload("res://scripts/opponent.gd")
+const Rules = preload("res://scripts/rules.gd")
 const VERSION := "1.2.3"
 const SERVER := 1
 const DEFAULT_PORT := 36712
@@ -12,6 +13,8 @@ const CONNECT_MS := 8000
 const RESUME_MS := 60000
 const RETRY_MS := 800
 const AI_DELAY_MS := 320
+const INTRO_MS := 4500
+const ROLL_MS := 1800
 const TURN_OPTIONS := [0, 15, 30, 60]
 const DIFFICULTIES := ["easy", "normal", "hard"]
 
@@ -38,9 +41,11 @@ var _local_deadline_ms := -1
 var _connect_until_ms := -1
 var _resume_until_ms := -1
 var _retry_at_ms := -1
+var _roll_rng := RandomNumberGenerator.new()
 
 
 func _ready() -> void:
+	_roll_rng.randomize()
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
@@ -471,8 +476,10 @@ func _apply_request(seat: int, op: String, data: Dictionary, received_at: int) -
 			for player in _seats:
 				if player.is_empty() or (player.kind == "human" and player.peer == 0):
 					return "请等真人到齐或用 AI 补满四个座位。"
-			_game = Game.new(-1, _rounds, "normal", true)
-			_begin_stage()
+			var roll := Rules.roll_dealer(_roll_rng)
+			_game = Game.new(-1, _rounds, "normal", true, int(roll.winner))
+			_game.dealer_rolls = roll
+			_begin_stage(INTRO_MS + ROLL_MS)
 		"add_ai", "update_ai":
 			if not has_target:
 				return "请选择有效座位。"
@@ -593,7 +600,7 @@ func _after_result(op: String, data: Dictionary) -> String:
 	if op == "next":
 		if not _game.next_round():
 			return "本桌已打完。"
-		_begin_stage()
+		_begin_stage(INTRO_MS)
 		return ""
 	if not _game.is_table_finished():
 		return "整桌结束后可返回等候室。"
@@ -606,12 +613,12 @@ func _after_result(op: String, data: Dictionary) -> String:
 	return ""
 
 
-func _begin_stage() -> void:
+func _begin_stage(intro_ms := 0) -> void:
 	_stage += 1
 	var actor := _game.online_actor()
 	var now := Time.get_ticks_msec()
-	_deadline_ms = now + _turn_seconds * 1000 if actor >= 0 and _turn_seconds > 0 else -1
-	_ai_due_ms = now + AI_DELAY_MS if actor >= 0 and _seats[actor].kind == "ai" else -1
+	_deadline_ms = now + intro_ms + _turn_seconds * 1000 if actor >= 0 and _turn_seconds > 0 else -1
+	_ai_due_ms = now + intro_ms + AI_DELAY_MS if actor >= 0 and _seats[actor].kind == "ai" else -1
 
 
 func _process_stage(now: int) -> void:

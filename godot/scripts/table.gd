@@ -55,6 +55,10 @@ var intro_timer: Timer
 var intro_visible_hand := -1
 var intro_flowers := true
 var intro_gold := true
+var dealer_roll_panel: Panel
+var dealer_roll_timer: Timer
+var dealer_roll_callback: Callable
+var dealer_roll_shown_round := -1
 var session_font: Font
 var title_font: Font
 var faces: Array[Texture2D] = []
@@ -99,6 +103,10 @@ func _ready() -> void:
 	intro_timer.one_shot = true
 	add_child(intro_timer)
 	intro_timer.timeout.connect(advance_intro)
+	dealer_roll_timer = Timer.new()
+	dealer_roll_timer.one_shot = true
+	add_child(dealer_roll_timer)
+	dealer_roll_timer.timeout.connect(finish_dealer_roll)
 	audio = AudioStreamPlayer.new()
 	audio.volume_db = -12.0
 	add_child(audio)
@@ -294,6 +302,8 @@ func toggle_sound() -> void:
 func show_lobby() -> void:
 	close_modal(false)
 	close_menu()
+	cancel_dealer_roll()
+	dealer_roll_shown_round = -1
 	intro = null
 	intro_timer.stop()
 	ai_timer.stop()
@@ -340,6 +350,8 @@ func exit_online() -> void:
 		remove_child(online_lobby)
 		online_lobby.queue_free()
 		online_lobby = null
+	cancel_dealer_roll()
+	dealer_roll_shown_round = -1
 	online_view = {}
 	online_stage = -1
 	online_owner = -1
@@ -355,6 +367,8 @@ func room_state_changed() -> void:
 	var snapshot: Dictionary = room.state
 	if snapshot.get("phase") != "playing":
 		if not online_view.is_empty():
+			cancel_dealer_roll()
+			dealer_roll_shown_round = -1
 			close_modal(false)
 			clear_board()
 			clear_action_banner()
@@ -408,7 +422,12 @@ func room_state_changed() -> void:
 		log_lines.clear()
 	transfer_button.visible = is_room_owner() and not reconnecting
 	if round_changed and next_view.phase != "result" and next_view.latest.type == "start":
-		start_intro()
+		var roll: Dictionary = next_view.get("dealer_rolls", {})
+		if next_view.round == 1 and not roll.is_empty() and dealer_roll_shown_round != 1:
+			refresh(entering or stage_changed)
+			show_dealer_roll(roll, start_intro)
+		else:
+			start_intro()
 	else:
 		refresh(entering or stage_changed)
 
@@ -436,7 +455,7 @@ func board_view() -> Dictionary:
 
 
 func local_moves() -> Array:
-	if intro_active():
+	if intro_active() or is_instance_valid(dealer_roll_panel):
 		return []
 	if not online_view.is_empty():
 		if online_reconnecting or pending_stage == online_stage:
@@ -467,14 +486,64 @@ func begin_game(selections: Dictionary) -> void:
 	lobby.queue_free()
 	lobby = null
 	header.show()
-	game = Game.new(-1, settings.rounds, settings.luck)
-	_dice_round = 0
-	log_lines.clear()
-	last_revision = -1
-	last_remaining = -1
-	shown_round = -1
-	clear_selection()
-	start_intro()
+	dealer_roll_shown_round = -1
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var roll := Rules.roll_dealer(rng)
+	show_dealer_roll(roll, func():
+		game = Game.new(-1, settings.rounds, settings.luck, false, int(roll.winner))
+		game.dealer_rolls = roll
+		_dice_round = 0
+		log_lines.clear()
+		last_revision = -1
+		last_remaining = -1
+		shown_round = -1
+		clear_selection()
+		start_intro())
+
+
+func show_dealer_roll(roll: Dictionary, on_done: Callable) -> void:
+	cancel_dealer_roll()
+	dealer_roll_shown_round = 1
+	dealer_roll_callback = on_done
+	var dialog := panel(self, Rect2(390, 250, 500, 280), Color("#233c30"), Color("#ab8852"), 16)
+	dialog.z_index = 30
+	dealer_roll_panel = dialog
+	label(dialog, "掷骰定庄", Rect2(24, 14, 300, 36), 26, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
+	label(dialog, "点数最大者坐庄", Rect2(24, 48, 300, 22), 14, MUTED)
+	for seat in range(4):
+		var y := 82 + seat * 34
+		var winner: bool = seat == int(roll.winner)
+		var color := GOLD if winner else INK
+		var caption := player_name(seat) + ("  ·  庄" if winner else "")
+		var name_label := label(dialog, caption, Rect2(24, y, 150, 28), 17, color)
+		set_player_font(name_label)
+		var pair: Array = roll.dice[seat]
+		label(dialog, "%d + %d = %d" % [int(pair[0]), int(pair[1]), int(roll.sums[seat])],
+			Rect2(180, y, 200, 28), 17, color)
+	if int(roll.get("rerolls", 0)) > 0:
+		label(dialog, "平局重掷 %d 次" % int(roll.rerolls), Rect2(24, 238, 220, 22), 13, MUTED)
+	button(dialog, "开始发牌", Rect2(366, 236, 110, 32), finish_dealer_roll, "primary")
+	dealer_roll_timer.stop()
+	dealer_roll_timer.start(1.8)
+
+
+func cancel_dealer_roll() -> void:
+	if is_instance_valid(dealer_roll_panel):
+		dealer_roll_panel.queue_free()
+	dealer_roll_panel = null
+	dealer_roll_callback = Callable()
+	if is_instance_valid(dealer_roll_timer):
+		dealer_roll_timer.stop()
+
+
+func finish_dealer_roll() -> void:
+	if not is_instance_valid(dealer_roll_panel):
+		return
+	var callback := dealer_roll_callback
+	cancel_dealer_roll()
+	if callback.is_valid():
+		callback.call()
 
 
 func start_intro() -> void:
@@ -1284,6 +1353,9 @@ func close_modal(resume := true) -> void:
 
 
 func show_reset() -> void:
+	if game == null and online_view.is_empty():
+		show_lobby()
+		return
 	if not online_view.is_empty():
 		var dialog := open_modal("退出房间？", 440, 192)
 		var explanation := "关闭承载端会结束当前房间。" if room.state.my_seat == 0 else "退出后由 AI 接管你的座位。"
