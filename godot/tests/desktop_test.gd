@@ -262,6 +262,8 @@ func run() -> void:
 	desk.advance_intro()
 	check(desk.flower_active and desk.flower_preview, "opening flower preview starts")
 	check(desk.flower_status_text == "摸到花", "opening flower shows the initial draw")
+	check(desk.flower_preview_hand == [27, 10], "raw hand keeps the dealt flowers")
+	desk.advance_flower()
 	check(desk.flower_preview_hand == [10], "initial flower leaves the raw hand")
 	desk.advance_flower()
 	check(desk.flower_preview_hand.has(22), "replacement slides into the raw hand")
@@ -278,8 +280,10 @@ func run() -> void:
 	desk.last_flower_revision = 0
 	desk.refresh()
 	check(desk.draw_flower_active and desk.flower_active, "draw flower animation starts")
-	check(desk.flower_status_text == "第 1 次补花", "draw flower shows the replacement round")
+	check(desk.flower_status_text == "摸到花", "draw flower shows the drawn flower first")
 	check(desk.local_moves().is_empty(), "draw flower animation blocks moves")
+	desk.advance_flower()
+	check(desk.flower_status_text == "第 1 次补花", "draw flower shows the replacement round")
 	desk._finish_flower_sequence()
 	check(not desk.draw_flower_active and not desk.flower_active, "draw flower animation ends")
 	if DisplayServer.get_name() != "headless":

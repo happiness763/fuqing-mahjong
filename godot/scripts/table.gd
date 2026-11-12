@@ -860,8 +860,9 @@ func start_flower_sequence(sequence: Array, mode: String, preview_hand: Array, o
 	if flower_sequence.is_empty():
 		_finish_flower_sequence()
 		return
-	_show_flower_step()
-	flower_timer.start(0.22)
+	flower_index = -1
+	refresh()
+	flower_timer.start(0.45)
 
 
 func _show_flower_step() -> void:
