@@ -429,15 +429,15 @@ for n in Ton Nan Shaa Pei Chun Hatsu Haku; do
 done
 ```
 
-- [ ] **Step 3: 原创 8 张花牌 SVG**
+- [ ] **Step 3: 采用碧海风花牌素材**
 
-以 300×400 viewBox 制作，象牙白牌面由 `tile_view` 绘制，SVG 只含墨线/朱红/青绿图案。建议用 Noto Sans SC（OFL）字形路径 + 折枝/花瓣/竹叶线稿，避免依赖系统字体；文件与 `CREDITS.md` 一并更新。
+从 mahjonggame.hk 的 `/tiles/hk/flower-1..4.svg`、`season-1..4.svg` 取得碧海风（Wikimedia Commons）的 CC BY-SA 4.0 剪纸风格牌面。对每张 SVG：把 120×160 的根尺寸改为 300×400，删除自带象牙牌体的 `<g><rect fill="#FFFFF0"/></g>`，用 `<g transform="scale(2.5)">` 包住剩余画面，保存为 `Spring/Summer/Autumn/Winter` 与 `Plum/Orchid/Bamboo/Chrysanthemum`。注意 flower-3 是菊、flower-4 是竹。修改版本同样以 CC BY-SA 4.0 发布。
 
 - [ ] **Step 4: 接入与导入**
 
 - `table.gd`：`faces` 追加 15 张（顺序 27→41）；`tile()` 的 `if number >= Rules.NUMBERED:` 改为仅当 `face == null` 时加文字。
 - 用 4.7.2 运行 `--import` 生成 `.import`。
-- 更新 CREDITS：7 张字牌来自 FluffyStuff（CC0），8 张花牌原创（CC0）。
+- 更新 CREDITS：7 张字牌来自 FluffyStuff（CC0），白板为项目绘制的空白双框（CC0），8 张花牌来自碧海风（CC BY-SA 4.0，修改版本同样 CC BY-SA）；同时添加 `release/licenses/CC-BY-SA-4.0.txt` 与 `release/licenses/TILE-ART-ATTRIBUTION.md`。
 
 - [ ] **Step 5: 运行测试并提交**
 

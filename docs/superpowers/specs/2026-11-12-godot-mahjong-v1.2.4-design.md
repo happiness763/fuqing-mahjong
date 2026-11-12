@@ -198,19 +198,19 @@
 ### 6.2 素材来源与风格
 
 - 万、筒、条沿用仓库现有牌面。字牌复用 FluffyStuff 的 [riichi-mahjong-tiles](https://github.com/FluffyStuff/riichi-mahjong-tiles) 同套素材中的 `Ton`、`Nan`、`Shaa`、`Pei`、`Chun`、`Hatsu`、`Haku`（东、南、西、北、中、发、白）；该套素材采用 CC0 1.0 公共领域许可。
-- 四季与梅兰竹菊该套素材没有，按同套素材的线条、配色和牌面边界原创 8 张；建议同样以 CC0 发布，保持整副牌许可一致。
-- 风格与现有万/筒/条一致：象牙白牌面、墨线为主，朱红与青绿点缀，简洁几何纹样；避免写实插画风。
+- 四季与梅兰竹菊采用 碧海风（[Wikimedia Commons 用户页](https://commons.wikimedia.org/wiki/user:%E7%A2%A7%E6%B5%B7%E9%A3%8E)）的剪纸风格矢量素材，许可为 CC BY-SA 4.0；为适配本项目，移除原图自带的象牙牌体并按 300×400 缩放，修改版本同样以 CC BY-SA 4.0 发布。
+- 花牌采用剪纸风格（红、青、金配色），字牌沿用源素材的毛笔字形；统一放在象牙白牌面上。
 - SVG 内用矢量路径绘制字形与图案，不依赖系统字体，保证不同机器显示一致。
 - 尺寸与现有牌面一致（沿用现有 viewBox 与导出尺寸），最终在 52–76px 高度下清晰可辨。
-- 「白」直接使用同套的 `Haku.svg`（空白牌面加双线框），不使用文字。
-- 风牌建议以风格化字形为主，辅以方位/云纹；花牌以折枝、花瓣、竹叶等简洁线稿呈现。
+- 「白」使用项目绘制的空白牌面加双线框（CC0），不使用文字。
+- 风牌建议以风格化字形为主，辅以方位/云纹；花牌以折枝、花瓣、竹叶等图案呈现。
 
 ### 6.3 命名与接入
 
-- 复用文件沿用源仓库命名：`Ton.svg`、`Nan.svg`、`Shaa.svg`、`Pei.svg`、`Chun.svg`、`Hatsu.svg`、`Haku.svg`；原创花牌命名 `Spring.svg`、`Summer.svg`、`Autumn.svg`、`Winter.svg`、`Plum.svg`、`Orchid.svg`、`Bamboo.svg`、`Chrysanthemum.svg`。注意 `Chun.svg` 是同套的红中，原创的春使用 `Spring.svg`，避免混淆。
+- 复用文件沿用源仓库命名：`Ton.svg`、`Nan.svg`、`Shaa.svg`、`Pei.svg`、`Chun.svg`、`Hatsu.svg`、`Haku.svg`；花牌命名 `Spring.svg`、`Summer.svg`、`Autumn.svg`、`Winter.svg`、`Plum.svg`、`Orchid.svg`、`Bamboo.svg`、`Chrysanthemum.svg`。注意 `Chun.svg` 是同套的红中，春使用 `Spring.svg`，避免混淆。
 - `table.gd` 的 `faces` 从 27 张扩展到 42 张；有纹理时不再叠加文字标签，只有缺图时才回退文字。
 - `tile_view.gd` 的金牌角标、选中、悬停样式保持不变。
-- 更新 `godot/assets/tiles/CREDITS.md`：万筒条与字牌注明来自 FluffyStuff（CC0 1.0），四季与花牌注明为项目原创（CC0）；新增的 `.import` 文件随仓库提交。
+- 更新 `godot/assets/tiles/CREDITS.md`：万筒条与字牌注明来自 FluffyStuff（CC0 1.0）；四季与花牌注明来自碧海风（CC BY-SA 4.0），修改版本同样 CC BY-SA；白板与去牌体处理注明为项目修改。新增的 `.import` 文件与 `release/licenses/CC-BY-SA-4.0.txt`、`release/licenses/TILE-ART-ATTRIBUTION.md` 随仓库提交。
 - 网页版 `src/app.js` 本次不同步；后续可复用同一批 SVG。
 
 ### 6.4 验收
@@ -232,7 +232,7 @@
 - **发牌演出**：默认约 3–4 秒，点击、空格或回车可跳过；本期不绘制牌墙。
 - **菜单键**：包含声音、玩法规则、移交房主、返回首页/退出房间；原「出牌操作」提示直接删除，不设操作说明入口；菜单用自绘下拉。
 - **首局庄家**：四家各掷两枚骰子比总点数，最大者坐庄；平局重掷；仅整桌第一局使用，之后沿用现有连庄/轮庄规则。
-- **牌面素材**：万筒条与字牌复用 FluffyStuff/riichi-mahjong-tiles（CC0 1.0）；四季与梅兰竹菊原创，建议同样以 CC0 发布；「白」使用同套 `Haku.svg`。
+- **牌面素材**：万筒条与字牌复用 FluffyStuff/riichi-mahjong-tiles（CC0 1.0）；四季与梅兰竹菊采用碧海风（Wikimedia Commons）的 CC BY-SA 4.0 剪纸风格素材，移除牌体并缩放，修改版本同样 CC BY-SA；白板为项目绘制的空白双框（CC0）。
 - **版本号**：v1.2.4。
 
 ## 9. 实施顺序建议
