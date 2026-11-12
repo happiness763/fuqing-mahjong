@@ -700,6 +700,10 @@ func refresh(animate := false) -> void:
 	intro_gold = not intro_running or intro.stage in ["gold", "flowers", "done"]
 	if intro_running and view.players.size() > 0 and view.players[0].has("hand"):
 		intro_visible_hand = intro.visible_count(0, view.players[0].hand.size())
+	var render_view := view
+	if intro_running and not intro_gold:
+		render_view = view.duplicate(true)
+		render_view.gold = -1
 	clear_board()
 	dynamic = Control.new()
 	dynamic.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -720,7 +724,7 @@ func refresh(animate := false) -> void:
 	last_remaining = view.remaining
 	if fresh:
 		record(view)
-	render_board(view, moves, deal, animate and fresh, draw_seat_index)
+	render_board(render_view, moves, deal, animate and fresh, draw_seat_index)
 	render_sidebar(view)
 	render_controls(view, moves)
 	if is_instance_valid(modal):

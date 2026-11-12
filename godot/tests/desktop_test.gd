@@ -195,6 +195,8 @@ func run() -> void:
 	desk.finish_dealer_roll()
 	check(desk.dealer_roll_panel == null, "dealer roll closes")
 	desk.game = Game.new(43, 2)
+	desk.game.gold = desk.game.players[0].hand[0]
+	desk.game.indicator = desk.game.gold
 	desk.start_intro()
 	check(desk.intro_active() and desk.local_moves().is_empty(), "intro blocks moves")
 	check(desk.status_label.text.begins_with("发牌"), "intro status is visible")
@@ -203,6 +205,13 @@ func run() -> void:
 		desk.intro.advance()
 		desk.refresh()
 	check(desk.human_buttons.size() == 16, "four rounds reveal sixteen tiles")
+	check(desk.human_buttons.all(func(button): return not button.golden), "gold stays hidden before the dice reveal")
+	desk.intro.advance()
+	desk.intro.advance()
+	desk.refresh()
+	check(desk.dynamic.has_node("GoldDisplay"), "gold appears after the dice reveal")
+	check(desk.human_buttons.any(func(button): return button.number == desk.game.gold and button.golden),
+		"hand marks the gold after the reveal")
 	desk.skip_intro()
 	check(not desk.intro_active() and desk.human_buttons.size() == desk.game.players[0].hand.size(),
 		"skip restores the full hand")
