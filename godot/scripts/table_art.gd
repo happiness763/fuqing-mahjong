@@ -1,11 +1,11 @@
 extends Control
 
-const FRAME := Rect2(28, 94, 1042, 612)
-const FELT := Rect2(41, 107, 1016, 586)
-const CENTER := Vector2(549, 371)
+const FRAME := Rect2(28, 16, 1042, 768)
+const FELT := Rect2(41, 29, 1016, 742)
+const CENTER := Vector2(549, 400)
 const RIVERS := [
-	Rect2(352, 443, 394, 101), Rect2(647, 302, 250, 132),
-	Rect2(352, 207, 394, 101), Rect2(201, 302, 250, 132),
+	Rect2(352, 505, 394, 101), Rect2(647, 330, 250, 132),
+	Rect2(352, 150, 394, 101), Rect2(201, 330, 250, 132),
 ]
 const BRASS := Color("#c49a61")
 const DIE_PIPS := [
@@ -46,8 +46,6 @@ func set_dice(faces: Vector2i) -> void:
 
 func _draw() -> void:
 	gradient(Rect2(0, 0, 1280, 800), Color("#253a30"), Color("#10231d"))
-	draw_line(Vector2(28, 83), Vector2(1252, 83), Color("#5b6550"), 1.0, true)
-	draw_line(Vector2(28, 83), Vector2(204, 83), BRASS, 2.0, true)
 	draw_style_box(box(Color("#0c1814"), Color("#0c1814"), 24), Rect2(FRAME.position + Vector2(0, 7), FRAME.size).grow(3))
 	draw_style_box(box(Color("#784830"), Color("#9d6946"), 23, 2), FRAME)
 	draw_style_box(box(Color("#815137"), Color("#b18151"), 20), FRAME.grow(-4))
@@ -59,7 +57,7 @@ func _draw() -> void:
 	for point in _flecks:
 		draw_line(point, point + Vector2(2, -1), Color(0.81, 0.86, 0.68, 0.08), 1.0)
 	draw_style_box(box(Color.TRANSPARENT, Color("#638064"), 11), FELT.grow(-6))
-	for corner in [Vector2(57, 123), Vector2(1041, 123), Vector2(57, 677), Vector2(1041, 677)]:
+	for corner in [Vector2(57, 45), Vector2(1041, 45), Vector2(57, 755), Vector2(1041, 755)]:
 		var horizontal := -1.0 if corner.x > 500 else 1.0
 		var vertical := -1.0 if corner.y > 400 else 1.0
 		var points := PackedVector2Array()
@@ -79,10 +77,9 @@ func _draw() -> void:
 	if dice.x > 0:
 		draw_die(center + Vector2(-27, 2), -0.15, dice.x)
 		draw_die(center + Vector2(28, -5), 0.18, dice.y)
-	draw_style_box(box(Color("#102c23"), Color("#496451"), 10), Rect2(53, 618, 992, 73))
-	draw_line(Vector2(62, 622), Vector2(1036, 622), Color("#314e3c"), 1.0)
-	for panel in [Rect2(1083, 94, 169, 300), Rect2(1083, 411, 169, 181), Rect2(1083, 609, 169, 162),
-			Rect2(28, 716, 1042, 55)]:
+	draw_style_box(box(Color("#102c23"), Color("#496451"), 10), Rect2(53, 690, 992, 90))
+	draw_line(Vector2(62, 694), Vector2(1036, 694), Color("#314e3c"), 1.0)
+	for panel in [Rect2(1083, 72, 169, 272), Rect2(1083, 360, 169, 188), Rect2(1083, 564, 169, 220)]:
 		draw_style_box(box(Color("#1d3329"), Color("#4b624e"), 11), panel)
 
 

@@ -20,12 +20,16 @@ const MUTED := Color("#b0bd9e")
 const GOLD := Color("#edc780")
 const BUTTON := Color("#294638")
 const FONT_DARK := Color("#202e25")
-const GOLD_AREA := Rect2(842, 132, 194, 112)
+const GOLD_AREA := Rect2(842, 52, 194, 112)
 
 var game
 var board_art: Control
 var lobby: Control
 var header: Control
+var menu_button: Button
+var menu_panel: Panel
+var menu_backdrop: Control
+var status_label: Label
 var room
 var online_lobby: Control
 var online_view := {}
@@ -198,16 +202,76 @@ func build_header() -> void:
 	header = Control.new()
 	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(header)
-	panel(header, Rect2(36, 20, 52, 49), Color("#9b4133"), Color("#d78569"))
-	panel(header, Rect2(40, 24, 44, 41), Color.TRANSPARENT, Color("#e6a483"), 5)
-	label(header, "福", Rect2(36, 20, 52, 49), 28, INK, HORIZONTAL_ALIGNMENT_CENTER, true)
-	label(header, "福清麻将", Rect2(104, 13, 205, 50), 42, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
-	label(header, "融城茶馆", Rect2(107, 61, 360, 17), 12, GOLD)
-	sound_button = button(header, "声音  开", Rect2(854, 29, 104, 38), toggle_sound)
-	button(header, "玩法规则", Rect2(969, 29, 126, 38), show_rules)
-	transfer_button = button(header, "移交房主", Rect2(714, 29, 127, 38), show_transfer)
+	menu_button = button(header, "菜单", Rect2(1083, 16, 169, 44), toggle_menu)
+	menu_button.z_index = 20
+	menu_panel = panel(header, Rect2(1083, 64, 169, 188), Color("#203a2e"), Color("#ab8852"), 12)
+	menu_panel.visible = false
+	menu_panel.z_index = 21
+	sound_button = menu_row(menu_panel, 0, "声音  开", _menu_sound)
+	menu_row(menu_panel, 1, "玩法规则", _menu_rules)
+	transfer_button = menu_row(menu_panel, 2, "移交房主", _menu_transfer)
 	transfer_button.hide()
-	leave_button = button(header, "返回首页", Rect2(1107, 29, 137, 38), show_reset)
+	leave_button = menu_row(menu_panel, 3, "返回首页", _menu_leave)
+
+
+func menu_row(parent: Control, index: int, copy: String, handler: Callable) -> Button:
+	var node := button(parent, copy, Rect2(10, 10 + index * 42, 149, 36), handler)
+	node.z_index = 22
+	return node
+
+
+func toggle_menu() -> void:
+	if menu_open():
+		close_menu()
+		return
+	menu_panel.visible = true
+	if not is_instance_valid(menu_backdrop):
+		menu_backdrop = Control.new()
+		menu_backdrop.size = Vector2(1280, 800)
+		menu_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+		menu_backdrop.z_index = 19
+		menu_backdrop.gui_input.connect(_menu_backdrop_input)
+		header.add_child(menu_backdrop)
+		header.move_child(menu_panel, header.get_child_count() - 1)
+	menu_button.grab_focus()
+
+
+func _menu_backdrop_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed:
+		close_menu()
+
+
+func close_menu() -> void:
+	if is_instance_valid(menu_backdrop):
+		menu_backdrop.get_parent().remove_child(menu_backdrop)
+		menu_backdrop.queue_free()
+		menu_backdrop = null
+	if is_instance_valid(menu_panel):
+		menu_panel.visible = false
+
+
+func menu_open() -> bool:
+	return is_instance_valid(menu_panel) and menu_panel.visible
+
+
+func _menu_sound() -> void:
+	toggle_sound()
+	close_menu()
+
+
+func _menu_rules() -> void:
+	close_menu()
+	show_rules()
+
+
+func _menu_transfer() -> void:
+	close_menu()
+	show_transfer()
+
+
+func _menu_leave() -> void:
+	close_menu()
+	show_reset()
 
 
 func toggle_sound() -> void:
@@ -219,6 +283,7 @@ func toggle_sound() -> void:
 
 func show_lobby() -> void:
 	close_modal(false)
+	close_menu()
 	ai_timer.stop()
 	game = null
 	clear_selection()
@@ -241,6 +306,7 @@ func clear_board() -> void:
 	controls.clear()
 	countdown_label = null
 	room_notice_label = null
+	status_label = null
 
 
 func show_online() -> void:
@@ -631,13 +697,13 @@ func slide(node: Control, offset: Vector2, delay := 0.0) -> void:
 
 
 func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: bool, draw_seat_index: int) -> void:
-	label(dynamic, "第 %02d / %02d 局" % [view.round, view.round_limit], Rect2(71, 131, 170, 27), 17, GOLD)
-	label(dynamic, "可摸 %02d 张" % view.remaining, Rect2(71, 158, 135, 25), 14, MUTED)
+	label(dynamic, "第 %02d / %02d 局" % [view.round, view.round_limit], Rect2(71, 40, 170, 27), 17, GOLD)
+	label(dynamic, "可摸 %02d 张" % view.remaining, Rect2(71, 67, 135, 25), 14, MUTED)
 	if not online_view.is_empty():
 		if view.phase != "result":
-			panel(dynamic, Rect2(65, 193, 136, 43), Color("#193d30"), Color("#75906d"))
-			countdown_label = label(dynamic, "", Rect2(65, 193, 136, 43), 20, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-		room_notice_label = label(dynamic, "", Rect2(216, 113, 230, 30), 13, GOLD)
+			panel(dynamic, Rect2(65, 100, 136, 43), Color("#193d30"), Color("#75906d"))
+			countdown_label = label(dynamic, "", Rect2(65, 100, 136, 43), 20, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+		room_notice_label = label(dynamic, "", Rect2(216, 30, 230, 30), 13, GOLD)
 		room_notice_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		update_online_clock()
 	var gold_display := panel(dynamic, GOLD_AREA, Color("#1d4938"), Color("#668064"), 9)
@@ -664,7 +730,7 @@ func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: b
 		label(offer, "可抢的补杠牌", Rect2(0, 3, 138, 22), 15, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 		tile(offer, rob_tile, Rect2(49, 28, 40, 53), view.gold, Callable(), false, true)
 
-	var seat_positions := [Vector2(63, 570), Vector2(915, 268), Vector2(472, 115), Vector2(58, 268)]
+	var seat_positions := [Vector2(63, 640), Vector2(915, 290), Vector2(472, 40), Vector2(58, 290)]
 	for seat in range(4):
 		draw_seat(view, seat, seat_positions[seat])
 		draw_river(view, seat, animate_discard)
@@ -699,12 +765,12 @@ func draw_seat(view: Dictionary, seat: int, origin: Vector2) -> void:
 	if not player.melds.is_empty():
 		var anchor := origin + Vector2(width * 0.5, 61 if wide else 112)
 		if seat == 0:
-			anchor = Vector2(228, 545 if player.melds.size() > 3 else 578)
+			anchor = Vector2(228, 615 if player.melds.size() > 3 else 648)
 		elif not wide and gold_gap.size() == 2 and player.has("hand"):
 			anchor.y += 17
 		draw_melds(player.melds, view.gold, anchor, seat)
 	if gold_gap.size() == 2:
-		var gap_origins := [Vector2(66, 524), Vector2(916, 337), Vector2(644, 115), Vector2(59, 337)]
+		var gap_origins := [Vector2(66, 594), Vector2(916, 359), Vector2(644, 40), Vector2(59, 359)]
 		var gap_origin: Vector2 = gap_origins[seat]
 		if not wide and player.has("hand"):
 			gap_origin.y += 14
@@ -808,7 +874,7 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool, drew: bool) -> void:
 	hand.sort()
 	if has_draw:
 		hand.append(view.drawn)
-	var cursor := 549.0 - (hand.size() * 55 - 3 + (10 if has_draw else 0)) * 0.5
+	var cursor := 549.0 - (hand.size() * 59 - 3 + (10 if has_draw else 0)) * 0.5
 	for index in range(hand.size()):
 		var number: int = hand[index]
 		var chosen := selected_index == index
@@ -816,7 +882,7 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool, drew: bool) -> void:
 		if drawn:
 			cursor += 10
 		var handler := choose_tile.bind(index, number) if playable.has(number) else Callable()
-		var node := tile(dynamic, number, Rect2(cursor, 620 - (9 if chosen else 0), 52, 70),
+		var node := tile(dynamic, number, Rect2(cursor, 700 - (9 if chosen else 0), 56, 76),
 			view.gold, handler, chosen, drawn)
 		node.name = "HandTile%d" % index
 		human_buttons.append(node)
@@ -824,14 +890,14 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool, drew: bool) -> void:
 			slide(node, Vector2(0, 18), index * 0.017)
 		elif drew and drawn:
 			slide(node, Vector2(20, 0))
-		cursor += 55
+		cursor += 59
 
 
 func render_sidebar(view: Dictionary) -> void:
-	label(dynamic, "本桌积分", Rect2(1094, 106, 100, 31), 21, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
-	label(dynamic, "累计", Rect2(1200, 111, 40, 22), 12, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
+	label(dynamic, "本桌积分", Rect2(1094, 80, 100, 31), 21, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
+	label(dynamic, "累计", Rect2(1200, 85, 40, 22), 12, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
 	for seat in range(4):
-		var y := 150 + seat * 55
+		var y := 120 + seat * 55
 		panel(dynamic, Rect2(1093, y, 149, 46), Color("#213c30"), Color("#395543"))
 		panel(dynamic, Rect2(1099, y + 9, 27, 28), PORTRAITS[seat], PORTRAITS[seat])
 		set_player_font(label(dynamic, player_mark(seat), Rect2(1099, y + 9, 27, 28), 16, FONT_DARK, HORIZONTAL_ALIGNMENT_CENTER, true))
@@ -850,15 +916,11 @@ func render_sidebar(view: Dictionary) -> void:
 		label(dynamic, status, Rect2(1133, y + 24, 62, 17), 11, MUTED)
 		label(dynamic, points(view.scores[seat]), Rect2(1190, y + 7, 45, 32), 16,
 			score_color(view.scores[seat]), HORIZONTAL_ALIGNMENT_RIGHT)
-	label(dynamic, "行牌动态", Rect2(1094, 425, 146, 28), 21, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
+	label(dynamic, "行牌动态", Rect2(1094, 368, 146, 28), 21, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
 	for index in range(log_lines.size()):
 		var shade := GOLD if index == 0 else MUTED
-		var line := label(dynamic, log_lines[index], Rect2(1096, 462 + index * 27, 143, 23), 13, shade)
+		var line := label(dynamic, log_lines[index], Rect2(1096, 400 + index * 27, 143, 23), 13, shade)
 		set_player_font(line)
-	label(dynamic, "出牌操作", Rect2(1094, 625, 146, 27), 20, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
-	label(dynamic, "双击手牌出牌", Rect2(1095, 658, 146, 21), 13, MUTED)
-	label(dynamic, "回车确认选牌", Rect2(1095, 681, 146, 21), 13, MUTED)
-	label(dynamic, "Esc 取消选择", Rect2(1095, 704, 146, 21), 13, MUTED)
 
 
 func points(value: int) -> String:
@@ -949,24 +1011,23 @@ func render_controls(view: Dictionary, moves: Array) -> void:
 		if discards:
 			options.append(["出牌", confirm_discard, "primary", "discard"])
 
-	var cursor := 1052.0
-	for index in range(options.size() - 1, -1, -1):
+	label(dynamic, "牌桌状态", Rect2(1094, 570, 149, 22), 16, MUTED)
+	status_label = label(dynamic, detail, Rect2(1093, 596, 149, 56), 15,
+		GOLD if not moves.is_empty() else INK)
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	set_player_font(status_label)
+	var cursor := 654.0
+	for index in range(options.size()):
 		var entry: Array = options[index]
-		var width := maxf(68.0, session_font.get_string_size(entry[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x + 20.0)
-		cursor -= width
-		var node := button(dynamic, entry[0], Rect2(cursor, 725, width, 37), entry[1], entry[2])
+		var node := button(dynamic, entry[0], Rect2(1093, cursor, 149, 36), entry[1], entry[2])
 		controls[entry[3]] = node
 		if entry[3] == "discard":
 			node.disabled = not moves.any(func(move): return move.type == "discard" and move.tile == selected_tile)
 		elif entry[3] == "gold_gap" and selected_declarations.is_empty():
 			node.disabled = true
 			node.tooltip_text = "所选牌无法报听。取消选择后可查看报听弃牌。"
-		cursor -= 7
-	var left_width := maxf(0.0, cursor - 54.0)
-	if left_width >= 80:
-		var title := label(dynamic, detail, Rect2(54, 724, left_width, 38), 17,
-			GOLD if not moves.is_empty() else INK)
-		set_player_font(title)
+		cursor += 40.0
 	render_floating(moves)
 
 
@@ -992,7 +1053,7 @@ func render_floating(moves: Array) -> void:
 		var entry: Array = entries[index]
 		var width := maxf(77.0, 24.0 * entry[0].length() + 30.0)
 		right -= width
-		var node := floating_button(entry[0], Rect2(right, 545, width, 64), entry[3], entry[4], entry[2])
+		var node := floating_button(entry[0], Rect2(right, 615, width, 64), entry[3], entry[4], entry[2])
 		controls[entry[1]] = node
 		right -= 9
 
@@ -1303,7 +1364,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if not event is InputEventKey or not event.pressed or event.echo:
 		return
 	if event.keycode == KEY_ESCAPE:
-		if is_instance_valid(modal):
+		if menu_open():
+			close_menu()
+		elif is_instance_valid(modal):
 			close_modal()
 		elif selected_tile >= 0:
 			cancel_selection()

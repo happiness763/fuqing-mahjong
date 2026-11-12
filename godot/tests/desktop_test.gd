@@ -56,6 +56,12 @@ func run() -> void:
 	root.add_child(desk)
 	check(ProjectSettings.get_setting("application/config/version") == "1.2.3", "project version")
 	check(desk.game == null and desk.lobby.round_field.text == "15", "lobby defaults to 15 rounds")
+	check(Art.FRAME == Rect2(28, 16, 1042, 768), "table frame fills the window")
+	check(Art.FELT == Rect2(41, 29, 1016, 742), "felt follows the frame")
+	check(Art.CENTER == Vector2(549, 400), "table center is recentered")
+	check(Art.RIVERS[0] == Rect2(352, 505, 394, 101), "bottom river fits above the hand")
+	check(is_instance_valid(desk.menu_button) and desk.menu_button.text == "菜单", "one menu button replaces the header row")
+	check(not desk.header.find_children("*", "Label", true, false).any(func(node): return node.text == "福清麻将"), "title block is removed")
 	check(desk.win_caption({"kind": "discard", "pattern": "sparrow"}) == "金雀", "win button names the big pattern")
 	check(desk.win_caption({"kind": "self", "pattern": "pengpeng"}) == "碰碰胡", "self-draw button names pengpeng")
 	check(desk.win_caption({"kind": "rob", "pattern": "sparrow"}) == "抢杠·金雀", "rob button names the method and pattern")
@@ -84,6 +90,12 @@ func run() -> void:
 	desk.refresh(true)
 	await create_timer(0.68).timeout
 	check(desk.human_buttons.size() == 17, "17 starting tiles visible")
+	check(desk.human_buttons[0].size == Vector2(56, 76), "hand grows to 56x76")
+	check(desk.human_buttons.back().position.x + 56 <= 1070, "17 tiles fit the frame width")
+	check(is_instance_valid(desk.status_label) and desk.status_label.text.contains("轮到你出牌"),
+		"turn status moves to the side panel")
+	check(not desk.dynamic.find_children("*", "Label", true, false).any(func(node): return node.text == "出牌操作"),
+		"operation hints are removed")
 	check(not desk.dynamic.get_children().any(func(node): return node.get_script() == Tile and node.number == -1),
 		"opponent hand counts have no face-down tile markers")
 	check(desk.faces.size() == 27, "27 tile images loaded")
@@ -99,13 +111,21 @@ func run() -> void:
 	check(first_roll.x in range(1, 7) and first_roll.y in range(1, 7), "two dice have legal faces")
 	await capture("desk.png")
 
-	click(by_text(desk, "玩法规则"))
+	click(desk.menu_button)
+	check(desk.menu_open(), "menu opens")
+	var menu_labels: Array = desk.menu_panel.find_children("*", "Button", true, false).map(func(node): return node.text)
+	check(menu_labels.has("声音  开") and menu_labels.has("玩法规则") and menu_labels.has("返回首页"),
+		"menu has sound, rules and leave")
+	check(not menu_labels.has("操作说明"), "the old operation hints are gone")
+	click(by_text(desk.menu_panel, "玩法规则"))
 	check(is_instance_valid(desk.modal), "rules opens")
 	click(by_text(desk.modal, "×"))
-	check(not is_instance_valid(desk.modal), "rules closes")
-	click(by_text(desk, "声音  开"))
+	check(not is_instance_valid(desk.modal) and not desk.menu_open(), "rules closes")
+	click(desk.menu_button)
+	click(by_text(desk.menu_panel, "声音  开"))
 	check(desk.muted, "sound can be muted")
-	click(by_text(desk, "声音  关"))
+	click(desk.menu_button)
+	click(by_text(desk.menu_panel, "声音  关"))
 	check(not desk.muted, "sound can be enabled")
 	click(desk.human_buttons[0])
 	check(desk.selected_index == 0 and not desk.controls.discard.disabled, "click selects a tile")
@@ -142,7 +162,8 @@ func run() -> void:
 		check(desk.game == null and desk.lobby.round_field.text == "2", "lobby preserves settings")
 		click(desk.lobby.start_button)
 	desk.ai_timer.stop()
-	click(by_text(desk, "返回首页"))
+	click(desk.menu_button)
+	click(by_text(desk.menu_panel, "返回首页"))
 	check(is_instance_valid(desk.modal), "leaving an active table asks for confirmation")
 	if is_instance_valid(desk.modal):
 		click(by_text(desk.modal, "继续本桌"))
@@ -172,7 +193,7 @@ func test_gold_display(desk) -> void:
 	check(is_instance_valid(gold_display), "gold display exists in the upper right")
 	if not is_instance_valid(gold_display):
 		return
-	check(Rect2(842, 132, 194, 112).encloses(gold_display.get_rect()), "gold display fits reference area")
+	check(Rect2(842, 52, 194, 112).encloses(gold_display.get_rect()), "gold display fits reference area")
 	var number: int = desk.game.gold
 	var tile: Button = gold_display.find_children("*", "Button", false, false)[0]
 	check(tile.number == number and tile.golden, "gold display uses actual gold tile")
