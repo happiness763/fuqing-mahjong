@@ -54,7 +54,7 @@ func capture(filename: String) -> void:
 func run() -> void:
 	var desk = Desk.instantiate()
 	root.add_child(desk)
-	check(ProjectSettings.get_setting("application/config/version") == "1.2.3", "project version")
+	check(ProjectSettings.get_setting("application/config/version") == "1.2.4", "project version")
 	check(desk.game == null and desk.lobby.round_field.text == "15", "lobby defaults to 15 rounds")
 	check(Art.FRAME == Rect2(28, 16, 1042, 768), "table frame fills the window")
 	check(Art.FELT == Rect2(41, 29, 1016, 742), "felt follows the frame")
