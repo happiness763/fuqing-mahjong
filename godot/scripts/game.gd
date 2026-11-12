@@ -197,7 +197,12 @@ func _uses_ordered_claims() -> bool:
 
 func claim_rank(seat: int, move: Dictionary) -> int:
 	var priority: int = Rules.PRIORITY[move.type]
-	return 0 if priority == 0 else priority * 4 + 3 - pending.eligible.find(seat)
+	if priority == 0:
+		return 0
+	var order_bonus: int = 3 - pending.eligible.find(seat)
+	if move.type == "win":
+		return Rules.win_rank(move.get("pattern", move.kind)) * 8 + order_bonus
+	return priority * 4 + order_bonus
 
 
 func _offer_next_claim() -> void:
@@ -298,6 +303,18 @@ func win_kind(seat: int, incoming := -1) -> String:
 	return ""
 
 
+func win_pattern(seat: int, hand: Array, incoming: int, method: String) -> String:
+	var player: Dictionary = players[seat]
+	var full: Array = hand if incoming < 0 else hand + [incoming]
+	var idle := false
+	if method == "self" and drawn >= 0 and not Rules.is_gold(drawn, gold):
+		var prior: Array = hand.duplicate()
+		prior.erase(drawn)
+		idle = Rules.idle_gold(prior, player.melds.size(), gold)
+	var base: int = Rules.base_value(full, player.flowers, player.melds, gold, seat, dealer).base
+	return Rules.best_pattern(full, player.melds, gold, method, base, idle)
+
+
 func listening_discards(hand: Array, open_count: int) -> Array:
 	var options := []
 	for discard_tile in Rules.unique(hand):
@@ -340,7 +357,9 @@ func _action_options(seat: int) -> Array:
 	var options: Array = []
 	var kind := win_kind(seat) if can_self_win and drawn >= 0 else ""
 	if not kind.is_empty():
-		options.append(action("win", {"kind": kind}))
+		var win_move := action("win", {"kind": kind})
+		win_move.pattern = win_pattern(seat, hand, -1, kind)
+		options.append(win_move)
 	if can_self_win and player.gold_gap.is_empty() and wall.size() > Rules.RESERVE:
 		var counts := Rules.counts(hand)
 		for tile in range(Rules.NUMBERED):
@@ -378,7 +397,9 @@ func reaction_actions(seat: int, source: int, tile: int) -> Array:
 	var options: Array = []
 	var kind := win_kind(seat, tile)
 	if not kind.is_empty():
-		options.append(action("win", {"kind": kind}))
+		var win_move := action("win", {"kind": kind})
+		win_move.pattern = win_pattern(seat, players[seat].hand, tile, kind)
+		options.append(win_move)
 	var player: Dictionary = players[seat]
 	if player.locked or not player.gold_gap.is_empty():
 		return options
@@ -468,12 +489,12 @@ func discard(seat: int, tile: int, declare_gap := false) -> void:
 
 func resolve_claims() -> void:
 	var winner := -1
-	var best_priority := 0
+	var best := 0
 	for seat in pending.eligible:
-		var priority: int = Rules.PRIORITY[pending.replies[seat].type]
-		if priority > best_priority:
+		var rank := claim_rank(seat, pending.replies[seat])
+		if rank > best:
 			winner = seat
-			best_priority = priority
+			best = rank
 	_resolve_claim(winner, pending.replies.get(winner, {}))
 
 
@@ -541,7 +562,9 @@ func open_rob_kong(seat: int, move: Dictionary) -> void:
 	var offers := {}
 	for other in order:
 		if not win_kind(other, move.tile).is_empty():
-			offers[other] = [action("win", {"kind": "rob"})]
+			var rob := action("win", {"kind": "rob"})
+			rob.pattern = win_pattern(other, players[other].hand, move.tile, "rob")
+			offers[other] = [rob]
 	if not begin_claims("robKong", order, offers, {"from": seat, "tile": move.tile, "kong_move": move}):
 		self_kong(seat, move)
 

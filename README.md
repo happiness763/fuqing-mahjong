@@ -12,6 +12,7 @@
 godot --headless --path godot --editor --import
 godot --headless --path godot --script res://tests/v122_game_test.gd
 godot --headless --path godot --script res://tests/v122_scoring_test.gd
+godot --headless --path godot --script res://tests/win_pattern_test.gd
 godot --headless --path godot --script res://tests/online_rules_test.gd
 godot --headless --path godot --script res://tests/online_room_test.gd
 ```

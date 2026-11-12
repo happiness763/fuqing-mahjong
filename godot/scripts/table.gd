@@ -877,6 +877,17 @@ func win_name(kind: String) -> String:
 	return Rules.WIN_NAMES.get(kind, "胡牌")
 
 
+func win_caption(move: Dictionary) -> String:
+	var method: String = move.get("kind", "self")
+	var pattern: String = move.get("pattern", method)
+	if method in ["self", "discard"]:
+		return "胡" if pattern == method else win_name(pattern)
+	var caption := win_name(method)
+	if pattern != method:
+		caption += "·" + win_name(pattern)
+	return caption
+
+
 func result_caption(result: Dictionary) -> String:
 	var method: String = result.get("method", result.kind)
 	var caption := "胡牌" if method == "discard" else win_name(method)
@@ -972,8 +983,8 @@ func render_floating(moves: Array) -> void:
 		if group.is_empty():
 			continue
 		var caption: String = entry[0]
-		if entry[1] == "win" and not group[0].kind in ["self", "discard"]:
-			caption = win_name(group[0].kind)
+		if entry[1] == "win":
+			caption = win_caption(group[0])
 		var handler := confirm_discard if group.any(is_swap) else choose_action.bind(entry[1], group)
 		entries.append([caption, entry[1], entry[3], handler, group.any(is_swap)])
 	var right := 1037.0
@@ -1206,7 +1217,7 @@ func show_rules() -> void:
 [color=#edc780]胡牌与结算[/color]
 平胡由五组加一对将组成。平胡分 P = 底分 ＋ 花分 ＋ 普通金张数 ＋ 2 × 花金张数。胡家为庄底分 3，闲家底分 1。每张实际花、每个明杠或补杠各计 1 花，暗杠计 2 花。
 
-平胡 P，自摸和抢杠 2P，闲金 2P＋10，三金倒和抢金 3P，金雀和金坎 4P＋40，金龙、天胡和正清 5P＋50。金雀用双金作将，金龙用三金作一组刻子，正清允许金代替同一花色的数牌。多种牌型成立时取最高分。点炮由出牌者付，抢杠由被抢杠者付，自摸及开局特殊胡法由其他三家各付。
+平胡 P，自摸和抢杠 2P，闲金 2P＋10，三金倒、抢金和碰碰胡 3P，金雀和金坎 4P＋40，金龙、天胡、正清和单吊 5P＋50。金雀用双金作将，金龙用三金作一组刻子，碰碰胡为五组刻子加一对将，单吊为五副明牌全部亮出、手中只留最后一张与来牌成将，按正清计分，正清允许金代替同一花色的数牌。多种牌型成立时取最高分。多家同时能胡同一张牌时，牌型大的优先，不能截胡；牌型相同时，从出牌者下家起按行牌顺序决定。点炮由出牌者付，抢杠由被抢杠者付，自摸及开局特殊胡法由其他三家各付。
 """.strip_edges()
 	dialog.add_child(body)
 
