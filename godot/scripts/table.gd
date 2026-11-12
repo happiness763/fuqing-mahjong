@@ -91,6 +91,9 @@ func _ready() -> void:
 	for suit in ["Man", "Pin", "Sou"]:
 		for rank in range(1, 10):
 			faces.append(load("res://assets/tiles/%s%d.svg" % [suit, rank]))
+	for name in ["Ton", "Nan", "Shaa", "Pei", "Chun", "Hatsu", "Haku",
+			"Spring", "Summer", "Autumn", "Winter", "Plum", "Orchid", "Bamboo", "Chrysanthemum"]:
+		faces.append(load("res://assets/tiles/%s.svg" % name))
 	_display_rng.randomize()
 	board_art = Art.new()
 	add_child(board_art)
@@ -829,7 +832,7 @@ func tile(parent: Node, number: int, rect: Rect2, gold: int, on_press := Callabl
 	if on_press.is_valid():
 		node.pressed.connect(on_press)
 	parent.add_child(node)
-	if number >= Rules.NUMBERED:
+	if number >= Rules.NUMBERED and face == null:
 		var face_rect := Rect2(Vector2.ZERO, rect.size * Vector2(1.0, 0.90))
 		label(node, Rules.tile_name(number), face_rect, maxi(9, int(rect.size.x * 0.64)),
 			Color("#954132"), HORIZONTAL_ALIGNMENT_CENTER, true)

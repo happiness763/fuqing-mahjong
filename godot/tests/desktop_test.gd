@@ -101,11 +101,15 @@ func run() -> void:
 		"operation hints are removed")
 	check(not desk.dynamic.get_children().any(func(node): return node.get_script() == Tile and node.number == -1),
 		"opponent hand counts have no face-down tile markers")
-	check(desk.faces.size() == 27, "27 tile images loaded")
+	check(desk.faces.size() == 42, "42 tile images loaded")
 	check(desk.session_font.has_char("酋".unicode_at(0)) and desk.session_font.has_char("址".unicode_at(0)),
 		"bundled font covers Chinese controls")
-	for face in desk.faces:
-		check(face != null and face.get_image().get_used_rect().has_area(), "tile has visible artwork")
+	for index in range(desk.faces.size()):
+		var face = desk.faces[index]
+		check(face != null and face.get_image().get_used_rect().has_area(), "tile has visible artwork %d" % index)
+	var honor: Button = desk.tile(desk, 27, Rect2(0, 0, 56, 76), 26)
+	check(not honor.find_children("*", "Label", false, false).size(), "honor tiles do not fall back to text")
+	honor.queue_free()
 	test_gold_display(desk)
 	var board_art: Control = desk.get("board_art")
 	var first_roll := Vector2i.ZERO
@@ -242,8 +246,7 @@ func test_flower_gold(desk) -> void:
 	var display: Panel = desk.dynamic.get_node("GoldDisplay")
 	var cards: Array = display.find_children("*", "Button", false, false)
 	check(cards.size() == 4 and cards.all(func(card): return card.golden), "spring indicator displays four flower golds")
-	var faces: Array = display.find_children("*", "Label", true, false)
-	check(faces.any(func(node): return node.text == "冬"), "flower gold has a readable face")
+	check(cards.any(func(card): return card.number == 37 and card.texture != null), "flower gold has a readable face")
 	check(not desk.human_buttons[0].golden and desk.human_buttons[1].golden,
 		"summer is gold and numbered tiles are ordinary with a spring indicator")
 	await capture("flower-gold.png")
