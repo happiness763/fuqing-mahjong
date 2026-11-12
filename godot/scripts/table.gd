@@ -9,6 +9,7 @@ const Lobby = preload("res://scripts/lobby.gd")
 const OnlineLobby = preload("res://scripts/online_lobby.gd")
 const OnlineRoom = preload("res://scripts/online_room.gd")
 const OnlineTableView = preload("res://scripts/online_table_view.gd")
+const OpeningIntro = preload("res://scripts/opening_intro.gd")
 const UI_FONT = preload("res://assets/fonts/NotoSansSC.woff2")
 const NAMES := ["你", "阿岚", "阿榕", "阿屿"]
 const MARKS := ["你", "岚", "榕", "屿"]
@@ -49,6 +50,11 @@ var nickname_font: Font
 var settings := {"rounds": 15, "difficulty": "normal", "luck": "normal"}
 var selected_index := -1
 var selected_tile := -1
+var intro
+var intro_timer: Timer
+var intro_visible_hand := -1
+var intro_flowers := true
+var intro_gold := true
 var session_font: Font
 var title_font: Font
 var faces: Array[Texture2D] = []
@@ -89,6 +95,10 @@ func _ready() -> void:
 	ai_timer.one_shot = true
 	add_child(ai_timer)
 	ai_timer.timeout.connect(run_ai)
+	intro_timer = Timer.new()
+	intro_timer.one_shot = true
+	add_child(intro_timer)
+	intro_timer.timeout.connect(advance_intro)
 	audio = AudioStreamPlayer.new()
 	audio.volume_db = -12.0
 	add_child(audio)
@@ -284,6 +294,8 @@ func toggle_sound() -> void:
 func show_lobby() -> void:
 	close_modal(false)
 	close_menu()
+	intro = null
+	intro_timer.stop()
 	ai_timer.stop()
 	game = null
 	clear_selection()
@@ -395,7 +407,10 @@ func room_state_changed() -> void:
 	if round_changed:
 		log_lines.clear()
 	transfer_button.visible = is_room_owner() and not reconnecting
-	refresh(entering or stage_changed)
+	if round_changed and next_view.phase != "result" and next_view.latest.type == "start":
+		start_intro()
+	else:
+		refresh(entering or stage_changed)
 
 
 func show_room_notice(message: String) -> void:
@@ -421,6 +436,8 @@ func board_view() -> Dictionary:
 
 
 func local_moves() -> Array:
+	if intro_active():
+		return []
 	if not online_view.is_empty():
 		if online_reconnecting or pending_stage == online_stage:
 			return []
@@ -457,7 +474,62 @@ func begin_game(selections: Dictionary) -> void:
 	last_remaining = -1
 	shown_round = -1
 	clear_selection()
+	start_intro()
+
+
+func start_intro() -> void:
+	var view := board_view()
+	if view.is_empty():
+		return
+	intro = OpeningIntro.new()
+	intro.start(int(view.get("dealer", 0)))
+	intro_timer.stop()
+	intro_timer.start(_intro_delay(intro.stage))
+	refresh()
+
+
+func _intro_delay(stage: String) -> float:
+	match stage:
+		"deal":
+			return 0.35
+		"dealer_extra":
+			return 0.35
+		"dice":
+			return 0.65
+		"gold":
+			return 0.55
+		"flowers":
+			return 0.6
+	return 0.0
+
+
+func advance_intro() -> void:
+	if not intro_active():
+		return
+	intro.advance()
+	if not intro.is_active():
+		finish_intro()
+		return
+	refresh()
+	intro_timer.start(_intro_delay(intro.stage))
+
+
+func finish_intro() -> void:
+	intro = null
+	intro_timer.stop()
 	refresh(true)
+
+
+func skip_intro() -> void:
+	if not is_instance_valid(intro):
+		return
+	intro = null
+	intro_timer.stop()
+	refresh(true)
+
+
+func intro_active() -> bool:
+	return is_instance_valid(intro) and intro.is_active()
 
 
 func clear_selection() -> void:
@@ -542,7 +614,7 @@ func next_round() -> void:
 	close_modal(false)
 	log_lines.clear()
 	clear_selection()
-	refresh(true)
+	start_intro()
 
 
 func refresh(animate := false) -> void:
@@ -550,6 +622,12 @@ func refresh(animate := false) -> void:
 	var view := board_view()
 	if view.is_empty():
 		return
+	var intro_running := intro_active()
+	intro_visible_hand = -1
+	intro_flowers = not intro_running or intro.stage in ["flowers", "done"]
+	intro_gold = not intro_running or intro.stage in ["gold", "flowers", "done"]
+	if intro_running and view.players.size() > 0 and view.players[0].has("hand"):
+		intro_visible_hand = intro.visible_count(0, view.players[0].hand.size())
 	clear_board()
 	dynamic = Control.new()
 	dynamic.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -559,6 +637,8 @@ func refresh(animate := false) -> void:
 	if _dice_round != view.round:
 		_dice_round = view.round
 		board_art.set_dice(Vector2i(_display_rng.randi_range(1, 6), _display_rng.randi_range(1, 6)))
+	if intro_running and intro.stage == "dice" and view.gold_dice.size() == 2:
+		board_art.set_dice(Vector2i(int(view.gold_dice[0]), int(view.gold_dice[1])))
 	var moves := local_moves()
 	var fresh: bool = last_revision != view.latest.revision
 	var deal: bool = animate and fresh and view.latest.type == "start"
@@ -576,7 +656,7 @@ func refresh(animate := false) -> void:
 	if not view.result.is_empty():
 		if shown_round != view.round and not is_instance_valid(modal):
 			show_result()
-	elif online_view.is_empty() and not is_instance_valid(modal):
+	elif online_view.is_empty() and not is_instance_valid(modal) and not intro_running:
 		for seat in range(1, 4):
 			if not game.actions(seat).is_empty():
 				ai_timer.start(0.54 if view.phase == "turn" else 0.25)
@@ -706,23 +786,24 @@ func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: b
 		room_notice_label = label(dynamic, "", Rect2(216, 30, 230, 30), 13, GOLD)
 		room_notice_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		update_online_clock()
-	var gold_display := panel(dynamic, GOLD_AREA, Color("#1d4938"), Color("#668064"), 9)
-	gold_display.name = "GoldDisplay"
-	label(gold_display, "本局金牌", Rect2(0, 4, 194, 22), 14, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	var golds: Array = Rules.gold_tiles(view.gold)
-	var gold_width := 44 if golds.size() == 1 else 35
-	var gold_step := gold_width + 5
-	var gold_left := (194.0 - (golds.size() * gold_step - 5)) * 0.5
-	for index in range(golds.size()):
-		tile(gold_display, golds[index], Rect2(gold_left + index * gold_step, 27, gold_width, 59),
-			view.gold, Callable(), false, golds.size() > 1 and golds[index] == view.gold)
-	var gold_name := Rules.tile_name(view.gold)
-	if golds.size() > 1:
-		gold_name = "花金 · 翻 " + gold_name
-	elif view.gold >= Rules.NUMBERED:
-		gold_name += " · 花金"
-	label(gold_display, gold_name + (" · 已抢" if view.indicator < 0 else ""),
-		Rect2(0, 87, 194, 22), 15, INK, HORIZONTAL_ALIGNMENT_CENTER)
+	if intro_gold:
+		var gold_display := panel(dynamic, GOLD_AREA, Color("#1d4938"), Color("#668064"), 9)
+		gold_display.name = "GoldDisplay"
+		label(gold_display, "本局金牌", Rect2(0, 4, 194, 22), 14, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+		var golds: Array = Rules.gold_tiles(view.gold)
+		var gold_width := 44 if golds.size() == 1 else 35
+		var gold_step := gold_width + 5
+		var gold_left := (194.0 - (golds.size() * gold_step - 5)) * 0.5
+		for index in range(golds.size()):
+			tile(gold_display, golds[index], Rect2(gold_left + index * gold_step, 27, gold_width, 59),
+				view.gold, Callable(), false, golds.size() > 1 and golds[index] == view.gold)
+		var gold_name := Rules.tile_name(view.gold)
+		if golds.size() > 1:
+			gold_name = "花金 · 翻 " + gold_name
+		elif view.gold >= Rules.NUMBERED:
+			gold_name += " · 花金"
+		label(gold_display, gold_name + (" · 已抢" if view.indicator < 0 else ""),
+			Rect2(0, 87, 194, 22), 15, INK, HORIZONTAL_ALIGNMENT_CENTER)
 	var rob_tile: int = view.get("rob_tile", -1)
 	if view.phase == "robKong" and rob_tile >= 0 and moves.any(func(move): return move.type == "win"):
 		var offer := panel(dynamic, Rect2(480, 322, 138, 88), Color("#1a3d31"), GOLD, 10)
@@ -750,7 +831,8 @@ func draw_seat(view: Dictionary, seat: int, origin: Vector2) -> void:
 	var wind: String = WINDS[(seat - view.dealer + 4) % 4]
 	set_player_font(label(dynamic, player_name(seat) + ("  ·  庄" if seat == view.dealer else ""),
 		Rect2(origin + Vector2(41, 2), Vector2(width - 42, 18)), 14, GOLD if active else INK))
-	label(dynamic, "%s风  ·  %d 花" % [wind, player.flowers.size()],
+	var flower_count: int = player.flowers.size() if intro_flowers else 0
+	label(dynamic, "%s风  ·  %d 花" % [wind, flower_count],
 		Rect2(origin + Vector2(41, 20), Vector2(width - 42, 16)), 12, MUTED)
 	var gold_gap: Array = player.get("gold_gap", [])
 	if seat != 0 and player.has("hand"):
@@ -868,6 +950,8 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool, drew: bool) -> void:
 	var playable := moves.filter(func(move): return move.type == "discard" or is_swap(move)).map(
 		func(move): return move.tile)
 	var hand: Array = view.players[0].hand.duplicate()
+	if intro_visible_hand >= 0:
+		hand = hand.slice(0, mini(intro_visible_hand, hand.size()))
 	var has_draw: bool = view.drawn >= 0
 	if has_draw:
 		hand.pop_back()
@@ -971,7 +1055,11 @@ func result_title(result: Dictionary) -> String:
 func render_controls(view: Dictionary, moves: Array) -> void:
 	var options: Array = []
 	var detail := ""
-	if not view.result.is_empty():
+	var intro_running := intro_active()
+	if intro_running:
+		detail = intro.status_text()
+		options = []
+	elif not view.result.is_empty():
 		detail = result_title(view.result)
 		options.append(["结算明细", show_result, "normal", "result"])
 		if not online_view.is_empty() and not is_room_owner():
@@ -1358,6 +1446,19 @@ func end_table() -> void:
 		show_lobby()
 	else:
 		room.request("lobby", {"stage": online_stage})
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not intro_active():
+		return
+	var skip := false
+	if event is InputEventMouseButton and event.pressed:
+		skip = true
+	elif event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_SPACE, KEY_ENTER]:
+		skip = true
+	if skip:
+		skip_intro()
+		get_viewport().set_input_as_handled()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:

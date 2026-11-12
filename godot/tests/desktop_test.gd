@@ -81,6 +81,7 @@ func run() -> void:
 	click(desk.lobby.start_button)
 	check(desk.game != null and desk.game.round_limit == 2, "starts with selected round count")
 	desk.close_modal(false)
+	desk.skip_intro()
 	for seed in range(43, 60):
 		desk.game = Game.new(seed, 2)
 		if desk.game.phase == "turn":
@@ -161,6 +162,7 @@ func run() -> void:
 		click(by_text(desk.modal, "返回首页"))
 		check(desk.game == null and desk.lobby.round_field.text == "2", "lobby preserves settings")
 		click(desk.lobby.start_button)
+	desk.skip_intro()
 	desk.ai_timer.stop()
 	click(desk.menu_button)
 	click(by_text(desk.menu_panel, "返回首页"))
@@ -175,6 +177,18 @@ func run() -> void:
 	test_waiting_presentation(desk)
 	await test_scoring_presentation(desk)
 	test_dense_board(desk)
+	desk.game = Game.new(43, 2)
+	desk.start_intro()
+	check(desk.intro_active() and desk.local_moves().is_empty(), "intro blocks moves")
+	check(desk.status_label.text.begins_with("发牌"), "intro status is visible")
+	check(not desk.dynamic.has_node("GoldDisplay"), "gold stays hidden while dealing")
+	for index in range(4):
+		desk.intro.advance()
+		desk.refresh()
+	check(desk.human_buttons.size() == 16, "four rounds reveal sixteen tiles")
+	desk.skip_intro()
+	check(not desk.intro_active() and desk.human_buttons.size() == desk.game.players[0].hand.size(),
+		"skip restores the full hand")
 	if DisplayServer.get_name() != "headless":
 		root.size = Vector2i(864, 540)
 		await create_timer(0.65).timeout
@@ -353,6 +367,7 @@ func test_scoring_presentation(desk) -> void:
 
 
 func finish_round(desk) -> void:
+	desk.skip_intro()
 	var steps := 0
 	while desk.game.phase != "result" and steps < 260:
 		desk.ai_timer.stop()
