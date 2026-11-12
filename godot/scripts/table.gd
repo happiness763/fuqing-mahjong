@@ -1409,6 +1409,9 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool, drew: bool) -> void:
 	else:
 		hand = view.players[0].hand.duplicate()
 		if intro_visible_hand >= 0:
+			var initial: Array = view.get("deal_initial_hand", [])
+			if not initial.is_empty():
+				hand = initial.duplicate()
 			hand = hand.slice(0, mini(intro_visible_hand, hand.size()))
 		if flower_hold_drawn and view.drawn >= 0:
 			hand.erase(view.drawn)

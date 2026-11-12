@@ -228,7 +228,7 @@ func run() -> void:
 	if desk.draw_flower_active:
 		desk._finish_flower_sequence()
 	desk.game = Game.new(43, 2)
-	desk.game.gold = desk.game.players[0].hand[0]
+	desk.game.gold = desk.game.deal_initial_hands[0][0]
 	desk.game.indicator = desk.game.gold
 	desk.start_intro()
 	check(desk.intro_active() and desk.local_moves().is_empty(), "intro blocks moves")
@@ -259,6 +259,8 @@ func run() -> void:
 	desk.intro.advance()
 	desk.refresh()
 	check(desk.intro.stage == "gold", "intro reaches the gold reveal")
+	check(desk.human_buttons.any(func(button): return button.number == 27),
+		"the dealing hand shows flowers before replacement")
 	desk.advance_intro()
 	check(desk.flower_active and desk.flower_preview, "opening flower preview starts")
 	check(desk.flower_status_text == "摸到花", "opening flower shows the initial draw")
