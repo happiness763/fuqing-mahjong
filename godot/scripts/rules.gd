@@ -10,13 +10,16 @@ const PLANTS := 38
 const TILE_TYPES := 42
 const WIN_NAMES := {
 	"discard": "点炮", "self": "自摸", "rob": "抢杠", "idle": "闲金", "three": "三金倒",
-	"grab": "抢金", "sparrow": "金雀", "dragon": "金龙", "goldGap": "金坎", "heaven": "天胡", "pure": "正清",
+	"grab": "抢金", "sparrow": "金雀", "dragon": "金龙", "goldGap": "金坎", "heaven": "天胡",
+	"pure": "正清", "pengpeng": "碰碰胡", "dandiao": "单吊",
 }
 const MULTIPLIERS := {
 	"discard": 1, "self": 2, "rob": 2, "idle": 2, "three": 3, "grab": 3,
 	"sparrow": 4, "dragon": 5, "goldGap": 4, "heaven": 5, "pure": 5,
+	"pengpeng": 3, "dandiao": 5,
 }
-const OFFSETS := {"idle": 10, "sparrow": 40, "dragon": 50, "goldGap": 40, "heaven": 50, "pure": 50}
+const OFFSETS := {"idle": 10, "sparrow": 40, "dragon": 50, "goldGap": 40, "heaven": 50, "pure": 50,
+	"dandiao": 50}
 const MELD_NAMES := {
 	"chow": "吃", "pong": "碰", "kong": "明杠", "addedKong": "补杠", "concealedKong": "暗杠",
 }
@@ -174,6 +177,29 @@ static func sequence_fit(natural: Array, tiles: Array, index: int, wilds: int, m
 
 
 static func score(winner: int, from: int, method: String, hand: Array, flowers: Array, melds: Array, gold: int, dealer := 0, qualifies_idle := false) -> Dictionary:
+	var totals := base_value(hand, flowers, melds, gold, winner, dealer)
+	var base: int = totals.base
+	var kind := best_pattern(hand, melds, gold, method, base, qualifies_idle)
+	var multiplier: int = MULTIPLIERS[kind]
+	var offset: int = OFFSETS.get(kind, 0)
+	var per_payer := base * multiplier + offset
+	var payers := [from] if from >= 0 else [0, 1, 2, 3].filter(func(seat): return seat != winner)
+	var deltas := [0, 0, 0, 0]
+	for payer in payers:
+		deltas[payer] = -per_payer
+	deltas[winner] = per_payer * payers.size()
+	return {
+		"kind": kind, "method": "self" if method == "goldGap" else method,
+		"winner": winner, "from": from, "base": base,
+		"base_points": totals.base_points, "flower_points": totals.flower_points, "gold_points": totals.gold_points,
+		"multiplier": multiplier, "offset": offset,
+		"per_payer": per_payer, "payers": payers, "deltas": deltas, "flowers": flowers.size(),
+		"golds": totals.total_golds, "normal_golds": totals.total_golds - totals.flower_golds,
+		"flower_golds": totals.flower_golds, "exposed": totals.exposed, "concealed": totals.concealed,
+	}
+
+
+static func base_value(hand: Array, flowers: Array, melds: Array, gold: int, winner: int, dealer: int) -> Dictionary:
 	var exposed := 0
 	var concealed := 0
 	for meld in melds:
@@ -186,40 +212,88 @@ static func score(winner: int, from: int, method: String, hand: Array, flowers: 
 	var base_points := 3 if winner == dealer else 1
 	var flower_points := flowers.size() + exposed + 2 * concealed
 	var gold_points := total_golds + flower_golds
-	var base := base_points + flower_points + gold_points
-	var kind := method
-	var candidates: Array[String] = []
-	if method == "self":
-		if qualifies_idle and winning(hand, melds.size(), gold):
-			candidates.append("idle")
-		if total_golds >= 3:
-			candidates.append("three")
-	if total_golds >= 2 and winning(hand, melds.size(), gold, true):
-		candidates.append("sparrow")
-	if total_golds >= 3 and gold_dragon(hand, melds.size(), gold):
-		candidates.append("dragon")
-	if pure_suit(hand, melds, gold) and winning(hand, melds.size(), gold):
-		candidates.append("pure")
-	for candidate in candidates:
-		if pattern_points(candidate, base) > pattern_points(kind, base):
-			kind = candidate
-	var multiplier: int = MULTIPLIERS[kind]
-	var offset: int = OFFSETS.get(kind, 0)
-	var per_payer := base * multiplier + offset
-	var payers := [from] if from >= 0 else [0, 1, 2, 3].filter(func(seat): return seat != winner)
-	var deltas := [0, 0, 0, 0]
-	for payer in payers:
-		deltas[payer] = -per_payer
-	deltas[winner] = per_payer * payers.size()
 	return {
-		"kind": kind, "method": "self" if method == "goldGap" else method,
-		"winner": winner, "from": from, "base": base,
+		"base": base_points + flower_points + gold_points,
 		"base_points": base_points, "flower_points": flower_points, "gold_points": gold_points,
-		"multiplier": multiplier, "offset": offset,
-		"per_payer": per_payer, "payers": payers, "deltas": deltas, "flowers": flowers.size(),
-		"golds": total_golds, "normal_golds": total_golds - flower_golds, "flower_golds": flower_golds,
+		"total_golds": total_golds, "flower_golds": flower_golds,
 		"exposed": exposed, "concealed": concealed,
 	}
+
+
+static func pattern_candidates(hand: Array, melds: Array, gold: int, method: String, qualifies_idle := false) -> Array[String]:
+	var open_count := melds.size()
+	var candidates: Array[String] = []
+	if method == "self":
+		if qualifies_idle and winning(hand, open_count, gold):
+			candidates.append("idle")
+		if gold_count(hand, gold) >= 3:
+			candidates.append("three")
+	if gold_count(hand, gold) >= 2 and winning(hand, open_count, gold, true):
+		candidates.append("sparrow")
+	if gold_count(hand, gold) >= 3 and gold_dragon(hand, open_count, gold):
+		candidates.append("dragon")
+	if winning(hand, open_count, gold):
+		if open_count == 5:
+			candidates.append("dandiao")
+		if all_triplets(hand, melds, gold):
+			candidates.append("pengpeng")
+		if pure_suit(hand, melds, gold):
+			candidates.append("pure")
+	return candidates
+
+
+static func best_pattern(hand: Array, melds: Array, gold: int, method: String, base: int, qualifies_idle := false) -> String:
+	var kind := method
+	for candidate in pattern_candidates(hand, melds, gold, method, qualifies_idle):
+		if pattern_points(candidate, base) > pattern_points(kind, base):
+			kind = candidate
+	return kind
+
+
+static func win_rank(kind: String) -> int:
+	return int(MULTIPLIERS.get(kind, 1)) * 1000 + int(OFFSETS.get(kind, 0))
+
+
+static func all_triplets(hand: Array, melds: Array, gold: int) -> bool:
+	var open_count := melds.size()
+	if open_count < 0 or open_count > 5 or hand.size() != (5 - open_count) * 3 + 2:
+		return false
+	for meld in melds:
+		if meld.type == "chow":
+			return false
+	if hand.any(func(tile): return tile < 0 or tile >= TILE_TYPES or is_flower(tile, gold)):
+		return false
+	var wilds := gold_count(hand, gold)
+	var natural := counts(hand.filter(func(tile): return not is_gold(tile, gold)))
+	var memo := {}
+	if wilds >= 2 and triplets_fit(natural, wilds - 2, memo):
+		return true
+	for tile in range(NUMBERED):
+		for used in range(mini(2, natural[tile]), maxi(1, 2 - wilds) - 1, -1):
+			natural[tile] -= used
+			var works := triplets_fit(natural, wilds - (2 - used), memo)
+			natural[tile] += used
+			if works:
+				return true
+	return false
+
+
+static func triplets_fit(natural: Array, wilds: int, memo: Dictionary) -> bool:
+	var tile := natural.find_custom(func(count): return count > 0)
+	if tile < 0:
+		return wilds % 3 == 0
+	var key := "%s:%s" % [PackedByteArray(natural).hex_encode(), wilds]
+	if memo.has(key):
+		return memo[key]
+	for used in range(mini(3, natural[tile]), maxi(1, 3 - wilds) - 1, -1):
+		natural[tile] -= used
+		var works := triplets_fit(natural, wilds - (3 - used), memo)
+		natural[tile] += used
+		if works:
+			memo[key] = true
+			return true
+	memo[key] = false
+	return false
 
 
 static func pattern_points(kind: String, base: int) -> int:

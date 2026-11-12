@@ -54,8 +54,12 @@ func capture(filename: String) -> void:
 func run() -> void:
 	var desk = Desk.instantiate()
 	root.add_child(desk)
-	check(ProjectSettings.get_setting("application/config/version") == "1.2.2", "project version")
+	check(ProjectSettings.get_setting("application/config/version") == "1.2.3", "project version")
 	check(desk.game == null and desk.lobby.round_field.text == "15", "lobby defaults to 15 rounds")
+	check(desk.win_caption({"kind": "discard", "pattern": "sparrow"}) == "金雀", "win button names the big pattern")
+	check(desk.win_caption({"kind": "self", "pattern": "pengpeng"}) == "碰碰胡", "self-draw button names pengpeng")
+	check(desk.win_caption({"kind": "rob", "pattern": "sparrow"}) == "抢杠·金雀", "rob button names the method and pattern")
+	check(desk.win_caption({"kind": "discard"}) == "胡", "a plain discard win keeps the plain caption")
 	check(not desk.lobby.online_button.disabled, "online mode is available")
 	check(desk.lobby.selections.difficulty == "normal" and desk.lobby.selections.luck == "normal",
 		"default difficulty and luck")
@@ -279,6 +283,20 @@ func test_waiting_presentation(desk) -> void:
 	check(is_instance_valid(offer) and offer.find_children("*", "Button", false, false)[0].number == 4
 		and desk.controls.win.text == "抢杠" and desk.controls.has("pass"),
 		"responder sees the physical tile and the rob or pass controls")
+
+	view.phase = "reaction"
+	view.actor = 0
+	view.last_discard = {"seat": 3, "tile": 4}
+	view.result = {}
+	var sparrow := Game.action("win", {"kind": "discard"})
+	sparrow.pattern = "sparrow"
+	var claim_moves := [sparrow, Game.action("pass")]
+	desk.clear_board()
+	desk.dynamic = Control.new()
+	desk.add_child(desk.dynamic)
+	desk.render_controls(view, claim_moves)
+	check(desk.controls.win.text == "金雀" and desk.controls.pass.text == "过",
+		"a big discard win shows its pattern on the claim button")
 
 
 func test_scoring_presentation(desk) -> void:
