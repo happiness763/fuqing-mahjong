@@ -221,21 +221,22 @@ func test_round_settings() -> void:
 	check(game.is_table_finished() and not game.next_round(), "single round limit")
 	check(game.standings().map(func(row): return row.rank) == [1, 1, 3, 4], "ties share rank")
 	for dealer in [0, 2]:
-		var rng := RandomNumberGenerator.new()
-		rng.seed = 54
-		var candidate = Game.new(1)
-		candidate.dealer = dealer
-		var ratings := []
-		var walls := []
-		for attempt in range(5):
-			candidate.deal(Rules.make_wall(rng))
-			ratings.append(AI.opening_value(candidate.players[0].hand, candidate.gold, dealer == 0))
-			walls.append(candidate.wall)
 		for mode in ["unlucky", "normal", "lucky"]:
 			var deal = Game.new(54, 2, mode)
 			deal.dealer = dealer
 			deal._rng.seed = 54
 			deal.start_round()
+			var candidate = Game.new(1)
+			candidate.dealer = dealer
+			var rng := RandomNumberGenerator.new()
+			rng.seed = 54
+			var ratings := []
+			var walls := []
+			for attempt in range(5):
+				candidate.gold_dice = deal.gold_dice.duplicate()
+				candidate.deal(Rules.make_wall(rng))
+				ratings.append(AI.opening_value(candidate.players[0].hand, candidate.gold, dealer == 0))
+				walls.append(candidate.wall)
 			var expected_index: int = 0
 			if mode == "unlucky":
 				expected_index = ratings.find(ratings.min())

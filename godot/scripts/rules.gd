@@ -300,6 +300,40 @@ static func pattern_points(kind: String, base: int) -> int:
 	return MULTIPLIERS[kind] * base + OFFSETS.get(kind, 0)
 
 
+static func roll_dealer(rng: RandomNumberGenerator, dice_roll := Callable()) -> Dictionary:
+	var dice: Array = []
+	var sums: Array = []
+	for seat in range(4):
+		var pair: Array = [roll_die(rng, dice_roll), roll_die(rng, dice_roll)]
+		dice.append(pair)
+		sums.append(int(pair[0]) + int(pair[1]))
+	var rerolls := 0
+	while true:
+		var best := -1
+		for value in sums:
+			best = maxi(best, int(value))
+		var tied: Array = []
+		for seat in range(4):
+			if int(sums[seat]) == best:
+				tied.append(seat)
+		if tied.size() == 1:
+			return {"winner": tied[0], "dice": dice, "sums": sums, "rerolls": rerolls}
+		rerolls += 1
+		for seat in tied:
+			var pair: Array = [roll_die(rng, dice_roll), roll_die(rng, dice_roll)]
+			dice[seat] = pair
+			sums[seat] = int(pair[0]) + int(pair[1])
+		if rerolls > 100:
+			return {"winner": tied[0], "dice": dice, "sums": sums, "rerolls": rerolls}
+	return {}
+
+
+static func roll_die(rng: RandomNumberGenerator, dice_roll := Callable()) -> int:
+	if dice_roll.is_valid():
+		return clampi(int(dice_roll.call()), 1, 6)
+	return rng.randi_range(1, 6)
+
+
 static func gold_dragon(hand: Array, open_count: int, gold: int) -> bool:
 	var remaining: Array = []
 	var removed := 0

@@ -22,38 +22,56 @@ var latest := {}
 var result := {}
 var revision := 0
 var action_revision := 0
+var gold_dice: Array = []
+var gold_index := -1
+var dealer_rolls: Dictionary = {}
 var _online := false
 var _claim_serial := 0
 var _rng := RandomNumberGenerator.new()
+var _dice_rng := RandomNumberGenerator.new()
+var _next_gold_dice: Array = []
 
 
-func _init(seed_value := -1, rounds := 15, luck_setting := "normal", online := false) -> void:
+func _init(seed_value := -1, rounds := 15, luck_setting := "normal", online := false, dealer_seat := 0) -> void:
 	round_limit = clampi(rounds, 1, 32)
 	_online = online
+	dealer = posmod(dealer_seat, 4)
 	luck = luck_setting if not _online and luck_setting in ["unlucky", "lucky"] else "normal"
 	if seed_value < 0:
 		_rng.randomize()
+		_dice_rng.randomize()
 	else:
 		_rng.seed = seed_value
+		_dice_rng.seed = seed_value + 104729
 	start_round()
+
+
+func set_next_gold_dice(dice: Array) -> void:
+	_next_gold_dice = dice.duplicate()
 
 
 func start_round() -> void:
 	action_revision += 1
+	if _next_gold_dice.size() == 2:
+		gold_dice = _next_gold_dice.duplicate()
+		_next_gold_dice = []
+	else:
+		gold_dice = [_dice_rng.randi_range(1, 6), _dice_rng.randi_range(1, 6)]
 	deal(Rules.make_wall(_rng))
 	if luck != "normal":
-		var best := {"players": players, "wall": wall, "gold": gold}
+		var best := {"players": players, "wall": wall, "gold": gold, "indicator": indicator, "gold_index": gold_index}
 		var best_score := Opponent.opening_value(players[0].hand, gold, dealer == 0)
 		for candidate in range(4):
 			deal(Rules.make_wall(_rng))
 			var value := Opponent.opening_value(players[0].hand, gold, dealer == 0)
 			if (luck == "lucky" and value > best_score) or (luck == "unlucky" and value < best_score):
-				best = {"players": players, "wall": wall, "gold": gold}
+				best = {"players": players, "wall": wall, "gold": gold, "indicator": indicator, "gold_index": gold_index}
 				best_score = value
 		players = best.players
 		wall = best.wall
 		gold = best.gold
-		indicator = gold
+		indicator = best.indicator
+		gold_index = best.gold_index
 	last_discard = {}
 	pending = {}
 	result = {}
@@ -75,8 +93,17 @@ func deal(shuffled: Array) -> void:
 		for seat in order:
 			players[seat].hand.append(wall.pop_front())
 	players[dealer].hand.append(wall.pop_front())
-	indicator = wall.pop_back()
-	gold = indicator
+	if wall.is_empty():
+		indicator = -1
+		gold = -1
+		gold_index = -1
+	else:
+		var sum := 2
+		if gold_dice.size() == 2:
+			sum = int(gold_dice[0]) + int(gold_dice[1])
+		gold_index = posmod(wall.size() - 1 - 2 * (sum - 1), wall.size())
+		indicator = wall.pop_at(gold_index)
+		gold = indicator
 	for player in players:
 		player.flowers = player.hand.filter(func(tile): return Rules.is_flower(tile, gold))
 		player.hand = player.hand.filter(func(tile): return not Rules.is_flower(tile, gold))
@@ -653,4 +680,6 @@ func view(seat: int) -> Dictionary:
 		"rob_tile": pending.tile if phase == "robKong" and sees_claim else -1,
 		"last_discard": last_discard, "latest": latest, "result": result,
 		"drawn": drawn if current == seat and phase == "turn" else -1, "players": public_players,
+		"gold_dice": gold_dice.duplicate(), "gold_index": gold_index,
+		"dealer_rolls": dealer_rolls.duplicate(true),
 	}

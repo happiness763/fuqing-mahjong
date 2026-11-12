@@ -67,12 +67,13 @@ func test_flower_gold_deal() -> void:
 	deck.fill(10)
 	deck[0] = 35
 	deck[1] = 38
-	deck[98] = 36
-	deck[99] = 34
+	deck[97] = 34
+	deck[99] = 22
+	game.gold_dice = [1, 1]
 	game.deal(deck)
 	check(game.gold == 34 and game.indicator == 34, "flip happens before replacement flowers")
 	check(35 in game.players[0].hand and 35 not in game.players[0].flowers, "dealt summer stays in hand")
-	check(36 in game.players[1].hand and game.players[1].flowers == [38], "winter group replacement is playable")
+	check(22 in game.players[1].hand and game.players[1].flowers == [38], "winter group replacement is playable")
 
 
 func test_opening(online: bool) -> void:
