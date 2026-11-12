@@ -1,6 +1,6 @@
 # 福清麻将 · 融城茶馆
 
-四人福清麻将小游戏。当前 Godot 版为 **v1.2.3**，可与三名 AI 单机对局，也可以通过局域网或 UDP 内网穿透和朋友开房。
+四人福清麻将小游戏。当前 Godot 版为 **v1.2.4**，可与三名 AI 单机对局，也可以通过局域网或 UDP 内网穿透和朋友开房。
 
 ## 运行和测试
 
@@ -13,6 +13,7 @@ godot --headless --path godot --editor --import
 godot --headless --path godot --script res://tests/v122_game_test.gd
 godot --headless --path godot --script res://tests/v122_scoring_test.gd
 godot --headless --path godot --script res://tests/win_pattern_test.gd
+godot --headless --path godot --script res://tests/v124_opening_test.gd
 godot --headless --path godot --script res://tests/online_rules_test.gd
 godot --headless --path godot --script res://tests/online_room_test.gd
 ```
@@ -21,11 +22,11 @@ godot --headless --path godot --script res://tests/online_room_test.gd
 
 - 从 `main` 创建功能分支，完成后向 `main` 提交 Pull Request。说明改动、复现或操作步骤，以及运行过的测试。
 - 牌型与计分在 `godot/scripts/rules.gd`，牌局流程在 `game.gd`，AI 在 `opponent.gd`，联机房间和同步在 `online_room.gd`。相关测试放在 `godot/tests/`。
-- 修改规则前查看 [v1.2.2 规则设计稿](docs/superpowers/specs/2026-11-12-godot-mahjong-v1.2.2-design.md)。修改争牌、抢杠或结算时，验证单机和联机两条入口。
+- 修改规则前查看 [v1.2.2 规则设计稿](docs/superpowers/specs/2026-11-12-godot-mahjong-v1.2.2-design.md)；界面与开局体验见 [v1.2.4 设计稿](docs/superpowers/specs/2026-11-12-godot-mahjong-v1.2.4-design.md)。修改争牌、抢杠或结算时，验证单机和联机两条入口。
 - 根目录的 `index.html`、`src/` 和 `test/` 是早期网页版，可用 `node --test` 运行测试。当前游戏开发入口是 `godot/`。
 
 ## 联机和资源
 
-- [v1.2.3 联机说明](release/联机说明-v1.2.3.md)
-- [v1.2.3 更新说明](release/更新说明-v1.2.3.md)
+- [v1.2.4 联机说明](release/联机说明-v1.2.4.md)
+- [v1.2.4 更新说明](release/更新说明-v1.2.4.md)
 - [牌面来源](godot/assets/tiles/CREDITS.md)及 [第三方许可](release/licenses/)

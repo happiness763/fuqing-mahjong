@@ -110,6 +110,14 @@ func run() -> void:
 		await capture("room-settings")
 		screen.start_button.pressed.emit()
 
+	var roll_guard := 0
+	while room.state.get("phase") == "rolling" and roll_guard < 500:
+		if is_instance_valid(desk.dealer_roll_button) and desk.dealer_roll_button.visible \
+				and not desk.dealer_roll_button.disabled:
+			desk.dealer_roll_button.pressed.emit()
+		await process_frame
+		roll_guard += 1
+
 	if not await wait_for(func(): return room.state.get("phase") == "playing", "table starts on both peers"):
 		quit(failures)
 		return
@@ -117,7 +125,7 @@ func run() -> void:
 	check(desk.header.visible and not screen.visible and desk.online_view.seat == 0, "online table opens in local perspective")
 	check(desk.player_name(0) == ("玉兰" if host else "海棠"), "local seat nickname")
 	check(desk.online_view.players[0].has("hand") and not desk.online_view.players[1].has("hand"), "hand privacy through UI")
-	check(is_instance_valid(desk.countdown_label) and room.seconds_left() in range(0, 16), "countdown displays from server state")
+	check(is_instance_valid(desk.countdown_label) and room.seconds_left() in range(0, 76), "countdown displays from server state")
 	room.state_changed.connect(func(): check_action_banner(desk, room))
 	await create_timer(0.60).timeout
 	await capture("table-" + role)

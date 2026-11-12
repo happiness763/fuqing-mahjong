@@ -1,6 +1,7 @@
 extends SceneTree
 
 const Game = preload("res://scripts/game.gd")
+const Rules = preload("res://scripts/rules.gd")
 const Desk = preload("res://table.tscn")
 const Tile = preload("res://scripts/tile_view.gd")
 const Art = preload("res://scripts/table_art.gd")
@@ -54,8 +55,14 @@ func capture(filename: String) -> void:
 func run() -> void:
 	var desk = Desk.instantiate()
 	root.add_child(desk)
-	check(ProjectSettings.get_setting("application/config/version") == "1.2.3", "project version")
+	check(ProjectSettings.get_setting("application/config/version") == "1.2.4", "project version")
 	check(desk.game == null and desk.lobby.round_field.text == "15", "lobby defaults to 15 rounds")
+	check(Art.FRAME == Rect2(28, 16, 1042, 768), "table frame fills the window")
+	check(Art.FELT == Rect2(41, 29, 1016, 742), "felt follows the frame")
+	check(Art.CENTER == Vector2(549, 400), "table center is recentered")
+	check(Art.RIVERS[0] == Rect2(352, 505, 394, 101), "bottom river fits above the hand")
+	check(is_instance_valid(desk.menu_button) and desk.menu_button.text == "菜单", "one menu button replaces the header row")
+	check(not desk.header.find_children("*", "Label", true, false).any(func(node): return node.text == "福清麻将"), "title block is removed")
 	check(desk.win_caption({"kind": "discard", "pattern": "sparrow"}) == "金雀", "win button names the big pattern")
 	check(desk.win_caption({"kind": "self", "pattern": "pengpeng"}) == "碰碰胡", "self-draw button names pengpeng")
 	check(desk.win_caption({"kind": "rob", "pattern": "sparrow"}) == "抢杠·金雀", "rob button names the method and pattern")
@@ -73,8 +80,11 @@ func run() -> void:
 	desk.lobby.round_field.text_changed.emit("2")
 	check(desk.lobby.slider.value == 2, "input updates slider")
 	click(desk.lobby.start_button)
+	check(is_instance_valid(desk.dealer_roll_panel), "dealer roll opens on start")
+	desk.finish_dealer_roll()
 	check(desk.game != null and desk.game.round_limit == 2, "starts with selected round count")
 	desk.close_modal(false)
+	desk.skip_intro()
 	for seed in range(43, 60):
 		desk.game = Game.new(seed, 2)
 		if desk.game.phase == "turn":
@@ -84,13 +94,23 @@ func run() -> void:
 	desk.refresh(true)
 	await create_timer(0.68).timeout
 	check(desk.human_buttons.size() == 17, "17 starting tiles visible")
+	check(desk.human_buttons[0].size == Vector2(56, 76), "hand grows to 56x76")
+	check(desk.human_buttons.back().position.x + 56 <= 1070, "17 tiles fit the frame width")
+	check(is_instance_valid(desk.status_label) and desk.status_label.text.contains("轮到你出牌"),
+		"turn status moves to the side panel")
+	check(not desk.dynamic.find_children("*", "Label", true, false).any(func(node): return node.text == "出牌操作"),
+		"operation hints are removed")
 	check(not desk.dynamic.get_children().any(func(node): return node.get_script() == Tile and node.number == -1),
 		"opponent hand counts have no face-down tile markers")
-	check(desk.faces.size() == 27, "27 tile images loaded")
+	check(desk.faces.size() == 42, "42 tile images loaded")
 	check(desk.session_font.has_char("酋".unicode_at(0)) and desk.session_font.has_char("址".unicode_at(0)),
 		"bundled font covers Chinese controls")
-	for face in desk.faces:
-		check(face != null and face.get_image().get_used_rect().has_area(), "tile has visible artwork")
+	for index in range(desk.faces.size()):
+		var face = desk.faces[index]
+		check(face != null and face.get_image().get_used_rect().has_area(), "tile has visible artwork %d" % index)
+	var honor: Button = desk.tile(desk, 27, Rect2(0, 0, 56, 76), 26)
+	check(not honor.find_children("*", "Label", false, false).size(), "honor tiles do not fall back to text")
+	honor.queue_free()
 	test_gold_display(desk)
 	var board_art: Control = desk.get("board_art")
 	var first_roll := Vector2i.ZERO
@@ -99,13 +119,21 @@ func run() -> void:
 	check(first_roll.x in range(1, 7) and first_roll.y in range(1, 7), "two dice have legal faces")
 	await capture("desk.png")
 
-	click(by_text(desk, "玩法规则"))
+	click(desk.menu_button)
+	check(desk.menu_open(), "menu opens")
+	var menu_labels: Array = desk.menu_panel.find_children("*", "Button", true, false).map(func(node): return node.text)
+	check(menu_labels.has("声音  开") and menu_labels.has("玩法规则") and menu_labels.has("返回首页"),
+		"menu has sound, rules and leave")
+	check(not menu_labels.has("操作说明"), "the old operation hints are gone")
+	click(by_text(desk.menu_panel, "玩法规则"))
 	check(is_instance_valid(desk.modal), "rules opens")
 	click(by_text(desk.modal, "×"))
-	check(not is_instance_valid(desk.modal), "rules closes")
-	click(by_text(desk, "声音  开"))
+	check(not is_instance_valid(desk.modal) and not desk.menu_open(), "rules closes")
+	click(desk.menu_button)
+	click(by_text(desk.menu_panel, "声音  开"))
 	check(desk.muted, "sound can be muted")
-	click(by_text(desk, "声音  关"))
+	click(desk.menu_button)
+	click(by_text(desk.menu_panel, "声音  关"))
 	check(not desk.muted, "sound can be enabled")
 	click(desk.human_buttons[0])
 	check(desk.selected_index == 0 and not desk.controls.discard.disabled, "click selects a tile")
@@ -141,8 +169,11 @@ func run() -> void:
 		click(by_text(desk.modal, "返回首页"))
 		check(desk.game == null and desk.lobby.round_field.text == "2", "lobby preserves settings")
 		click(desk.lobby.start_button)
+		desk.finish_dealer_roll()
+	desk.skip_intro()
 	desk.ai_timer.stop()
-	click(by_text(desk, "返回首页"))
+	click(desk.menu_button)
+	click(by_text(desk.menu_panel, "返回首页"))
 	check(is_instance_valid(desk.modal), "leaving an active table asks for confirmation")
 	if is_instance_valid(desk.modal):
 		click(by_text(desk.modal, "继续本桌"))
@@ -154,6 +185,109 @@ func run() -> void:
 	test_waiting_presentation(desk)
 	await test_scoring_presentation(desk)
 	test_dense_board(desk)
+	var roll_state := Rules.dealer_roll_state(RandomNumberGenerator.new())
+	roll_state.start = 2
+	roll_state.order = [2, 3, 0, 1]
+	roll_state.round_seats = [2, 3, 0, 1]
+	roll_state.dice = [[1, 2], [3, 4], [5, 6], [2, 2]]
+	roll_state.sums = [3, 7, 11, 4]
+	roll_state.winner = 2
+	roll_state.finished = true
+	desk.show_dealer_roll(roll_state, Callable())
+	check(is_instance_valid(desk.dealer_roll_panel), "dealer roll panel opens")
+	var roll_labels: Array = desk.dealer_roll_panel.find_children("*", "Label", true, false).map(
+		func(node): return node.text)
+	check(roll_labels.any(func(text): return text.contains("阿榕"))
+		and roll_labels.any(func(text): return text.contains("11")),
+		"winner and sums are shown")
+	desk.finish_dealer_roll()
+	check(desk.dealer_roll_panel == null, "dealer roll closes")
+	var live_roll := Rules.dealer_roll_state(RandomNumberGenerator.new())
+	desk.show_dealer_roll(live_roll, Callable())
+	check(desk.dealer_roll_status.text.contains("掷骰"), "live dealer roll waits for a seat")
+	while not live_roll.finished:
+		desk._dealer_roll_apply_now()
+	check(desk.dealer_roll_status.text.contains("坐庄"), "live dealer roll settles on a dealer")
+	desk.finish_dealer_roll()
+	check(desk.dealer_roll_panel == null, "live dealer roll panel closes")
+	var online_state := Rules.dealer_roll_state(RandomNumberGenerator.new())
+	online_state.start = 0
+	online_state.order = [0, 1, 2, 3]
+	online_state.round_seats = [0, 1, 2, 3]
+	online_state.index = 0
+	online_state.dice = [[], [], [], []]
+	online_state.sums = [-1, -1, -1, -1]
+	var online_snapshot := {"my_seat": 0, "seats": [
+		{"name": "甲"}, {"name": "乙"}, {"name": "丙"}, {"name": "丁"}], "roll": online_state}
+	desk.show_online_dealer_roll(online_snapshot)
+	check(desk.dealer_roll_online and is_instance_valid(desk.dealer_roll_panel), "online roll panel opens")
+	check(desk.dealer_roll_button.visible and desk.dealer_roll_status.text.contains("轮到你"),
+		"local human can press roll")
+	desk.close_online_dealer_roll()
+	check(not desk.dealer_roll_online and desk.dealer_roll_panel == null, "online roll panel closes")
+	if desk.draw_flower_active:
+		desk._finish_flower_sequence()
+	desk.game = Game.new(43, 2)
+	desk.game.gold = desk.game.deal_initial_hands[0][0]
+	desk.game.indicator = desk.game.gold
+	desk.start_intro()
+	check(desk.intro_active() and desk.local_moves().is_empty(), "intro blocks moves")
+	check(desk.status_label.text.begins_with("发牌"), "intro status is visible")
+	check(not desk.dynamic.has_node("GoldDisplay"), "gold stays hidden while dealing")
+	for index in range(4):
+		desk.intro.advance()
+		desk.refresh()
+	check(desk.human_buttons.size() == 16, "four rounds reveal sixteen tiles")
+	check(desk.human_buttons.all(func(button): return not button.golden), "gold stays hidden before the dice reveal")
+	desk.intro.advance()
+	desk.intro.advance()
+	desk.refresh()
+	check(desk.dynamic.has_node("GoldDisplay"), "gold appears after the dice reveal")
+	check(desk.human_buttons.any(func(button): return button.number == desk.game.gold and button.golden),
+		"hand marks the gold after the reveal")
+	desk.skip_intro()
+	check(not desk.intro_active() and desk.human_buttons.size() == desk.game.players[0].hand.size(),
+		"skip restores the full hand")
+	desk.game = Game.new(43, 2)
+	desk.game.deal_initial_hands = [[27, 10], [], [], []]
+	desk.game.deal_flowers = [{"round": 0, "seat": 0, "tile": 27}]
+	desk.game.deal_draws = [{"round": 1, "seat": 0, "tile": 22, "flower": false}]
+	desk.start_intro()
+	for index in range(4):
+		desk.intro.advance()
+	desk.intro.advance()
+	desk.intro.advance()
+	desk.refresh()
+	check(desk.intro.stage == "gold", "intro reaches the gold reveal")
+	check(desk.human_buttons.any(func(button): return button.number == 27),
+		"the dealing hand shows flowers before replacement")
+	desk.advance_intro()
+	check(desk.flower_active and desk.flower_preview, "opening flower preview starts")
+	check(desk.flower_status_text == "摸到花", "opening flower shows the initial draw")
+	check(desk.flower_preview_hand == [27, 10], "raw hand keeps the dealt flowers")
+	desk.advance_flower()
+	check(desk.flower_preview_hand == [10], "initial flower leaves the raw hand")
+	desk.advance_flower()
+	check(desk.flower_preview_hand.has(22), "replacement slides into the raw hand")
+	desk.advance_flower()
+	check(not desk.flower_active and desk.intro == null, "opening flower animation finishes the intro")
+	desk.game = Game.new(43)
+	desk.game.phase = "turn"
+	desk.game.current = 0
+	desk.game.gold = 26
+	desk.game.indicator = 26
+	desk.game.players[0].hand = [10]
+	desk.game.last_flowers = [{"round": 1, "seat": 0, "tile": 27}]
+	desk.game.flower_revision = 1
+	desk.last_flower_revision = 0
+	desk.refresh()
+	check(desk.draw_flower_active and desk.flower_active, "draw flower animation starts")
+	check(desk.flower_status_text == "摸到花", "draw flower shows the drawn flower first")
+	check(desk.local_moves().is_empty(), "draw flower animation blocks moves")
+	desk.advance_flower()
+	check(desk.flower_status_text == "第 1 次补花", "draw flower shows the replacement round")
+	desk._finish_flower_sequence()
+	check(not desk.draw_flower_active and not desk.flower_active, "draw flower animation ends")
 	if DisplayServer.get_name() != "headless":
 		root.size = Vector2i(864, 540)
 		await create_timer(0.65).timeout
@@ -172,7 +306,7 @@ func test_gold_display(desk) -> void:
 	check(is_instance_valid(gold_display), "gold display exists in the upper right")
 	if not is_instance_valid(gold_display):
 		return
-	check(Rect2(842, 132, 194, 112).encloses(gold_display.get_rect()), "gold display fits reference area")
+	check(Rect2(842, 52, 194, 112).encloses(gold_display.get_rect()), "gold display fits reference area")
 	var number: int = desk.game.gold
 	var tile: Button = gold_display.find_children("*", "Button", false, false)[0]
 	check(tile.number == number and tile.golden, "gold display uses actual gold tile")
@@ -194,8 +328,7 @@ func test_flower_gold(desk) -> void:
 	var display: Panel = desk.dynamic.get_node("GoldDisplay")
 	var cards: Array = display.find_children("*", "Button", false, false)
 	check(cards.size() == 4 and cards.all(func(card): return card.golden), "spring indicator displays four flower golds")
-	var faces: Array = display.find_children("*", "Label", true, false)
-	check(faces.any(func(node): return node.text == "冬"), "flower gold has a readable face")
+	check(cards.any(func(card): return card.number == 37 and card.texture != null), "flower gold has a readable face")
 	check(not desk.human_buttons[0].golden and desk.human_buttons[1].golden,
 		"summer is gold and numbered tiles are ordinary with a spring indicator")
 	await capture("flower-gold.png")
@@ -332,9 +465,14 @@ func test_scoring_presentation(desk) -> void:
 
 
 func finish_round(desk) -> void:
+	desk.skip_intro()
+	if desk.draw_flower_active:
+		desk._finish_flower_sequence()
 	var steps := 0
 	while desk.game.phase != "result" and steps < 260:
 		desk.ai_timer.stop()
+		if desk.draw_flower_active:
+			desk._finish_flower_sequence()
 		if desk.game.actions(0).is_empty():
 			desk.run_ai()
 		elif desk.controls.has("discard"):
@@ -408,6 +546,8 @@ func test_concealed_kong_prompt(desk) -> void:
 	desk.perform(0, discard)
 	game.draw_tile(0, false)
 	desk.refresh()
+	if desk.draw_flower_active:
+		desk._finish_flower_sequence()
 	check(desk.controls.has("kong") and desk.controls.kong.text == "杠", "deferred kong prompts on next turn")
 
 

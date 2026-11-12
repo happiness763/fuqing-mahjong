@@ -22,38 +22,61 @@ var latest := {}
 var result := {}
 var revision := 0
 var action_revision := 0
+var gold_dice: Array = []
+var gold_index := -1
+var dealer_rolls: Dictionary = {}
+var deal_flowers: Array = []
+var deal_initial_hands: Array = []
+var deal_draws: Array = []
+var last_flowers: Array = []
+var flower_revision := 0
 var _online := false
 var _claim_serial := 0
 var _rng := RandomNumberGenerator.new()
+var _dice_rng := RandomNumberGenerator.new()
+var _next_gold_dice: Array = []
 
 
-func _init(seed_value := -1, rounds := 15, luck_setting := "normal", online := false) -> void:
+func _init(seed_value := -1, rounds := 15, luck_setting := "normal", online := false, dealer_seat := 0) -> void:
 	round_limit = clampi(rounds, 1, 32)
 	_online = online
+	dealer = posmod(dealer_seat, 4)
 	luck = luck_setting if not _online and luck_setting in ["unlucky", "lucky"] else "normal"
 	if seed_value < 0:
 		_rng.randomize()
+		_dice_rng.randomize()
 	else:
 		_rng.seed = seed_value
+		_dice_rng.seed = seed_value + 104729
 	start_round()
+
+
+func set_next_gold_dice(dice: Array) -> void:
+	_next_gold_dice = dice.duplicate()
 
 
 func start_round() -> void:
 	action_revision += 1
+	if _next_gold_dice.size() == 2:
+		gold_dice = _next_gold_dice.duplicate()
+		_next_gold_dice = []
+	else:
+		gold_dice = [_dice_rng.randi_range(1, 6), _dice_rng.randi_range(1, 6)]
 	deal(Rules.make_wall(_rng))
 	if luck != "normal":
-		var best := {"players": players, "wall": wall, "gold": gold}
+		var best := {"players": players, "wall": wall, "gold": gold, "indicator": indicator, "gold_index": gold_index}
 		var best_score := Opponent.opening_value(players[0].hand, gold, dealer == 0)
 		for candidate in range(4):
 			deal(Rules.make_wall(_rng))
 			var value := Opponent.opening_value(players[0].hand, gold, dealer == 0)
 			if (luck == "lucky" and value > best_score) or (luck == "unlucky" and value < best_score):
-				best = {"players": players, "wall": wall, "gold": gold}
+				best = {"players": players, "wall": wall, "gold": gold, "indicator": indicator, "gold_index": gold_index}
 				best_score = value
 		players = best.players
 		wall = best.wall
 		gold = best.gold
-		indicator = gold
+		indicator = best.indicator
+		gold_index = best.gold_index
 	last_discard = {}
 	pending = {}
 	result = {}
@@ -75,24 +98,46 @@ func deal(shuffled: Array) -> void:
 		for seat in order:
 			players[seat].hand.append(wall.pop_front())
 	players[dealer].hand.append(wall.pop_front())
-	indicator = wall.pop_back()
-	gold = indicator
+	deal_initial_hands = players.map(func(player): return player.hand.duplicate())
+	deal_draws = []
+	if wall.is_empty():
+		indicator = -1
+		gold = -1
+		gold_index = -1
+	else:
+		var sum := 2
+		if gold_dice.size() == 2:
+			sum = int(gold_dice[0]) + int(gold_dice[1])
+		gold_index = posmod(wall.size() - 1 - 2 * (sum - 1), wall.size())
+		indicator = wall.pop_at(gold_index)
+		gold = indicator
 	for player in players:
 		player.flowers = player.hand.filter(func(tile): return Rules.is_flower(tile, gold))
 		player.hand = player.hand.filter(func(tile): return not Rules.is_flower(tile, gold))
 
+	deal_flowers = []
+	for seat in order:
+		for tile in players[seat].flowers:
+			deal_flowers.append({"round": 0, "seat": seat, "tile": tile})
+
 	var flower_debts := players.map(func(player): return player.flowers.size())
+	var flower_round := 0
 	while flower_debts.any(func(count): return count > 0):
+		flower_round += 1
 		var next_debts := [0, 0, 0, 0]
 		for seat in order:
 			for count in range(flower_debts[seat]):
 				var tile: int = wall.pop_back()
-				if Rules.is_flower(tile, gold):
+				var flower := Rules.is_flower(tile, gold)
+				deal_draws.append({"round": flower_round, "seat": seat, "tile": tile, "flower": flower})
+				if flower:
 					players[seat].flowers.append(tile)
+					deal_flowers.append({"round": flower_round, "seat": seat, "tile": tile})
 					next_debts[seat] += 1
 				else:
 					players[seat].hand.append(tile)
 		flower_debts = next_debts
+	last_flowers = []
 
 func next_round() -> bool:
 	if phase != "result" or is_table_finished():
@@ -589,6 +634,8 @@ func self_kong(seat: int, move: Dictionary) -> void:
 
 func draw_tile(seat: int, supplement: bool) -> void:
 	var player: Dictionary = players[seat]
+	last_flowers = []
+	var flower_round := 0
 	while wall.size() > Rules.RESERVE:
 		var tile: int = wall.pop_back() if supplement else wall.pop_front()
 		if not Rules.is_flower(tile, gold):
@@ -602,9 +649,15 @@ func draw_tile(seat: int, supplement: bool) -> void:
 				finish_win(seat, -1, "goldGap" if not player.gold_gap.is_empty() else "self")
 				if previous.type == "discard" or Rules.MELD_NAMES.has(previous.type):
 					latest.previous = previous
+			if not last_flowers.is_empty():
+				flower_revision += 1
 			return
+		flower_round += 1
 		player.flowers.append(tile)
+		last_flowers.append({"round": flower_round, "seat": seat, "tile": tile})
 		supplement = true
+	if not last_flowers.is_empty():
+		flower_revision += 1
 	finish({"kind": "draw", "winner": -1, "from": -1, "deltas": [0, 0, 0, 0]})
 
 
@@ -645,6 +698,10 @@ func view(seat: int) -> Dictionary:
 					meld.tiles = [-1, -1, -1, -1]
 		public_players.append(shown)
 	var sees_claim: bool = phase in ["opening", "robKong"] and online_actor() == seat
+	var visible_draws: Array = []
+	for draw in deal_draws:
+		if int(draw.seat) == seat or bool(draw.flower):
+			visible_draws.append(draw)
 	return {
 		"seat": seat, "dealer": dealer, "round": round_number, "gold": gold, "indicator": indicator,
 		"round_limit": round_limit, "table_finished": is_table_finished(),
@@ -653,4 +710,10 @@ func view(seat: int) -> Dictionary:
 		"rob_tile": pending.tile if phase == "robKong" and sees_claim else -1,
 		"last_discard": last_discard, "latest": latest, "result": result,
 		"drawn": drawn if current == seat and phase == "turn" else -1, "players": public_players,
+		"gold_dice": gold_dice.duplicate(), "gold_index": gold_index,
+		"dealer_rolls": dealer_rolls.duplicate(true),
+		"deal_flowers": deal_flowers.duplicate(true),
+		"deal_initial_hand": deal_initial_hands[seat].duplicate() if seat >= 0 and seat < deal_initial_hands.size() else [],
+		"deal_draws": visible_draws,
+		"last_flowers": last_flowers.duplicate(true), "flower_revision": flower_revision,
 	}

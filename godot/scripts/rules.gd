@@ -300,6 +300,91 @@ static func pattern_points(kind: String, base: int) -> int:
 	return MULTIPLIERS[kind] * base + OFFSETS.get(kind, 0)
 
 
+static func roll_dealer(rng: RandomNumberGenerator, dice_roll := Callable()) -> Dictionary:
+	var dice: Array = []
+	var sums: Array = []
+	for seat in range(4):
+		var pair: Array = [roll_die(rng, dice_roll), roll_die(rng, dice_roll)]
+		dice.append(pair)
+		sums.append(int(pair[0]) + int(pair[1]))
+	var rerolls := 0
+	while true:
+		var best := -1
+		for value in sums:
+			best = maxi(best, int(value))
+		var tied: Array = []
+		for seat in range(4):
+			if int(sums[seat]) == best:
+				tied.append(seat)
+		if tied.size() == 1:
+			return {"winner": tied[0], "dice": dice, "sums": sums, "rerolls": rerolls}
+		rerolls += 1
+		for seat in tied:
+			var pair: Array = [roll_die(rng, dice_roll), roll_die(rng, dice_roll)]
+			dice[seat] = pair
+			sums[seat] = int(pair[0]) + int(pair[1])
+		if rerolls > 100:
+			return {"winner": tied[0], "dice": dice, "sums": sums, "rerolls": rerolls}
+	return {}
+
+
+static func roll_die(rng: RandomNumberGenerator, dice_roll := Callable()) -> int:
+	if dice_roll.is_valid():
+		return clampi(int(dice_roll.call()), 1, 6)
+	return rng.randi_range(1, 6)
+
+
+static func dealer_roll_state(rng: RandomNumberGenerator) -> Dictionary:
+	var start := rng.randi_range(0, 3)
+	var order := order_from(start)
+	return {
+		"start": start, "order": order, "round": 1, "round_seats": order.duplicate(),
+		"index": 0, "dice": [[], [], [], []], "sums": [-1, -1, -1, -1],
+		"tied": [], "winner": -1, "finished": false,
+	}
+
+
+static func dealer_roll_current(state: Dictionary) -> int:
+	if state.get("finished", false):
+		return -1
+	var seats: Array = state.get("round_seats", [])
+	var index := int(state.get("index", 0))
+	if index < 0 or index >= seats.size():
+		return -1
+	return int(seats[index])
+
+
+static func dealer_roll_apply(state: Dictionary, rng: RandomNumberGenerator, dice_roll := Callable()) -> Dictionary:
+	if state.get("finished", false):
+		return state
+	var seats: Array = state.get("round_seats", [])
+	var index := int(state.get("index", 0))
+	if index < 0 or index >= seats.size():
+		return state
+	var seat := int(seats[index])
+	var pair: Array = [roll_die(rng, dice_roll), roll_die(rng, dice_roll)]
+	state.dice[seat] = pair
+	state.sums[seat] = int(pair[0]) + int(pair[1])
+	state.index = index + 1
+	if int(state.index) >= seats.size():
+		var best := -1
+		for value in state.sums:
+			best = maxi(best, int(value))
+		var tied: Array = []
+		for seat2 in state.order:
+			if int(state.sums[seat2]) == best:
+				tied.append(int(seat2))
+		state.tied = tied
+		if tied.size() == 1:
+			state.winner = tied[0]
+			state.finished = true
+		else:
+			state.round = int(state.round) + 1
+			state.round_seats = state.order.filter(func(entry): return int(entry) in tied)
+			state.index = 0
+	return state
+
+
 static func gold_dragon(hand: Array, open_count: int, gold: int) -> bool:
 	var remaining: Array = []
 	var removed := 0

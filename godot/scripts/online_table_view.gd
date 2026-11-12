@@ -9,6 +9,21 @@ static func rotate_seats(values: Array, viewer: int) -> Array:
 	return values.slice(viewer) + values.slice(0, viewer)
 
 
+static func rotate_roll(roll: Dictionary, viewer: int) -> Dictionary:
+	var result: Dictionary = roll.duplicate(true)
+	result.start = local_seat(int(result.get("start", 0)), viewer)
+	result.order = Array(result.get("order", [])).map(func(seat): return local_seat(int(seat), viewer))
+	result.round_seats = Array(result.get("round_seats", [])).map(func(seat): return local_seat(int(seat), viewer))
+	result.tied = Array(result.get("tied", [])).map(func(seat): return local_seat(int(seat), viewer))
+	result.winner = local_seat(int(result.get("winner", -1)), viewer)
+	result.dice = rotate_seats(result.get("dice", []), viewer)
+	result.sums = rotate_seats(result.get("sums", []), viewer)
+	var seats: Array = result.round_seats
+	var index := int(result.get("index", 0))
+	result.current = -1 if bool(result.get("finished", false)) or index >= seats.size() else int(seats[index])
+	return result
+
+
 static func from_room(state: Dictionary) -> Dictionary:
 	var viewer: int = state.my_seat
 	var view: Dictionary = state.view.duplicate(true)
@@ -36,4 +51,6 @@ static func from_room(state: Dictionary) -> Dictionary:
 		view.result.deltas = rotate_seats(view.result.deltas, viewer)
 		if view.result.has("payers"):
 			view.result.payers = view.result.payers.map(func(seat): return local_seat(seat, viewer))
+	if view.get("dealer_rolls", {}).size() > 0:
+		view.dealer_rolls = rotate_roll(view.dealer_rolls, viewer)
 	return view

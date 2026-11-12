@@ -5,13 +5,17 @@ signal notice(message: String)
 
 const Game = preload("res://scripts/game.gd")
 const Opponent = preload("res://scripts/opponent.gd")
-const VERSION := "1.2.3"
+const Rules = preload("res://scripts/rules.gd")
+const VERSION := "1.2.4"
 const SERVER := 1
 const DEFAULT_PORT := 36712
 const CONNECT_MS := 8000
 const RESUME_MS := 60000
 const RETRY_MS := 800
 const AI_DELAY_MS := 320
+const INTRO_MS := 4500
+const ROLL_AI_MS := 600
+const ROLL_HUMAN_MS := 8000
 const TURN_OPTIONS := [0, 15, 30, 60]
 const DIFFICULTIES := ["easy", "normal", "hard"]
 
@@ -31,6 +35,10 @@ var _pending_peers: Dictionary = {}
 var _rounds := 15
 var _turn_seconds := 60
 var _game: Game
+var _rolling := false
+var _roll_state: Dictionary = {}
+var _roll_deadline_ms := -1
+var _roll_ai_due_ms := -1
 var _stage := 0
 var _deadline_ms := -1
 var _ai_due_ms := -1
@@ -38,9 +46,11 @@ var _local_deadline_ms := -1
 var _connect_until_ms := -1
 var _resume_until_ms := -1
 var _retry_at_ms := -1
+var _roll_rng := RandomNumberGenerator.new()
 
 
 func _ready() -> void:
+	_roll_rng.randomize()
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
@@ -141,7 +151,7 @@ func _process(_delta: float) -> void:
 				if now >= _pending_peers[peer_id]:
 					_pending_peers.erase(peer_id)
 					_drain_peer(peer_id, "入房验证超时。")
-			_process_stage(now)
+			_process_stage(now) if not _rolling else _process_roll(now)
 		"connecting":
 			if now >= _connect_until_ms:
 				_finish_client("连接超时，请核对房主地址和 UDP 端口。")
@@ -204,6 +214,10 @@ func _reset_session() -> void:
 	_seats.clear()
 	_pending_peers.clear()
 	_game = null
+	_rolling = false
+	_roll_state = {}
+	_roll_deadline_ms = -1
+	_roll_ai_due_ms = -1
 	_deadline_ms = -1
 	_ai_due_ms = -1
 	_clear_state()
@@ -307,7 +321,7 @@ func _wire_hello(version: String, nick: String, token: String) -> void:
 			return
 		_drain_peer(sender, "原座位已释放或托管，请重新加入。")
 		return
-	if _game != null:
+	if _game != null or _rolling:
 		_drain_peer(sender, "本桌已开局，请等结算后加入。")
 		return
 	var seat := _seats.find({})
@@ -395,12 +409,15 @@ func _seat_for_peer(peer_id: int) -> int:
 
 
 func _release_seat(seat: int) -> void:
-	if _game == null:
+	if _game == null and not _rolling:
 		_seats[seat] = {}
 	else:
-		_seats[seat] = {"name": _seats[seat].name, "kind": "ai", "difficulty": "normal", "managed": true}
-		if _game.online_actor() == seat:
+		var old_name: String = _seats[seat].get("name", "AI")
+		_seats[seat] = {"name": old_name, "kind": "ai", "difficulty": "normal", "managed": true}
+		if _game != null and _game.online_actor() == seat:
 			_ai_due_ms = Time.get_ticks_msec() + AI_DELAY_MS
+		elif _rolling and Rules.dealer_roll_current(_roll_state) == seat:
+			_schedule_roll()
 	if seat == _owner:
 		_reassign_owner()
 
@@ -440,8 +457,17 @@ func _handle_request(peer_id: int, op: String, data: Dictionary) -> void:
 
 
 func _apply_request(seat: int, op: String, data: Dictionary, received_at: int) -> String:
+	if op == "roll":
+		if not _rolling:
+			return "当前不在掷骰阶段。"
+		if seat != Rules.dealer_roll_current(_roll_state):
+			return "还没轮到你掷骰。"
+		_roll_apply(seat)
+		return ""
 	if op == "play":
 		return _play(seat, data, received_at)
+	if _rolling:
+		return "正在掷骰定庄，请稍候。"
 	if op == "rename":
 		return "本桌已开局，结算后可修改昵称。" if _game != null else _rename(seat, data)
 	if seat != _owner:
@@ -471,8 +497,7 @@ func _apply_request(seat: int, op: String, data: Dictionary, received_at: int) -
 			for player in _seats:
 				if player.is_empty() or (player.kind == "human" and player.peer == 0):
 					return "请等真人到齐或用 AI 补满四个座位。"
-			_game = Game.new(-1, _rounds, "normal", true)
-			_begin_stage()
+			_start_rolling()
 		"add_ai", "update_ai":
 			if not has_target:
 				return "请选择有效座位。"
@@ -593,7 +618,7 @@ func _after_result(op: String, data: Dictionary) -> String:
 	if op == "next":
 		if not _game.next_round():
 			return "本桌已打完。"
-		_begin_stage()
+		_begin_stage(INTRO_MS)
 		return ""
 	if not _game.is_table_finished():
 		return "整桌结束后可返回等候室。"
@@ -606,12 +631,74 @@ func _after_result(op: String, data: Dictionary) -> String:
 	return ""
 
 
-func _begin_stage() -> void:
+func _start_rolling() -> void:
+	_game = null
+	_stage = 0
+	_rolling = true
+	_roll_state = Rules.dealer_roll_state(_roll_rng)
+	_roll_deadline_ms = -1
+	_roll_ai_due_ms = -1
+	_schedule_roll()
+
+
+func _schedule_roll() -> void:
+	_roll_deadline_ms = -1
+	_roll_ai_due_ms = -1
+	if not _rolling:
+		return
+	var seat := Rules.dealer_roll_current(_roll_state)
+	if seat < 0:
+		return
+	var now := Time.get_ticks_msec()
+	if _seats[seat].get("kind", "ai") == "ai":
+		_roll_ai_due_ms = now + ROLL_AI_MS
+	else:
+		_roll_deadline_ms = now + ROLL_HUMAN_MS
+
+
+func _process_roll(now: int) -> void:
+	if _roll_ai_due_ms >= 0 and now >= _roll_ai_due_ms:
+		_roll_current()
+	elif _roll_deadline_ms >= 0 and now >= _roll_deadline_ms:
+		_roll_current()
+
+
+func _roll_current() -> void:
+	var seat := Rules.dealer_roll_current(_roll_state)
+	if seat < 0:
+		return
+	_roll_apply(seat)
+	_publish()
+
+
+func _roll_apply(_seat: int) -> void:
+	if not _rolling:
+		return
+	Rules.dealer_roll_apply(_roll_state, _roll_rng)
+	if _roll_state.get("finished", false):
+		_finish_rolling()
+	else:
+		_schedule_roll()
+
+
+func _finish_rolling() -> void:
+	_rolling = false
+	_roll_deadline_ms = -1
+	_roll_ai_due_ms = -1
+	_game = Game.new(-1, _rounds, "normal", true, int(_roll_state.winner))
+	_game.dealer_rolls = _roll_state.duplicate(true)
+	var view := _game.view(0)
+	var flowers: int = view.get("deal_flowers", []).size()
+	var draws: int = view.get("deal_draws", []).size()
+	_begin_stage(INTRO_MS + (flowers + draws) * 250 + 500)
+
+
+func _begin_stage(intro_ms := 0) -> void:
 	_stage += 1
 	var actor := _game.online_actor()
 	var now := Time.get_ticks_msec()
-	_deadline_ms = now + _turn_seconds * 1000 if actor >= 0 and _turn_seconds > 0 else -1
-	_ai_due_ms = now + AI_DELAY_MS if actor >= 0 and _seats[actor].kind == "ai" else -1
+	_deadline_ms = now + intro_ms + _turn_seconds * 1000 if actor >= 0 and _turn_seconds > 0 else -1
+	_ai_due_ms = now + intro_ms + AI_DELAY_MS if actor >= 0 and _seats[actor].kind == "ai" else -1
 
 
 func _process_stage(now: int) -> void:
@@ -640,10 +727,15 @@ func _snapshot(seat: int) -> Dictionary:
 		else:
 			public_seats.append({"name": player.name, "kind": player.kind, "difficulty": player.difficulty,
 				"connected": player.kind == "ai" or player.get("peer", 0) != 0, "managed": player.get("managed", false)})
-	var snapshot := {"phase": "lobby" if _game == null else "playing", "my_seat": seat, "owner": _owner,
-		"seats": public_seats, "rounds": _rounds, "turn_seconds": _turn_seconds, "port": _port}
+	var snapshot := {"phase": "rolling" if _rolling else ("lobby" if _game == null else "playing"),
+		"my_seat": seat, "owner": _owner, "seats": public_seats, "rounds": _rounds,
+		"turn_seconds": _turn_seconds, "port": _port}
 	if seat == _owner:
 		snapshot.local_addresses = _local_addresses.duplicate()
+	if _rolling:
+		snapshot.roll = _roll_state.duplicate(true)
+		snapshot.roll_remaining_ms = -1 if _roll_deadline_ms < 0 else maxi(0, _roll_deadline_ms - Time.get_ticks_msec())
+		return snapshot
 	if _game != null:
 		var actor := _game.online_actor()
 		snapshot.view = _game.view(seat).duplicate(true)
