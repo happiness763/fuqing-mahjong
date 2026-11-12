@@ -25,6 +25,9 @@ var action_revision := 0
 var gold_dice: Array = []
 var gold_index := -1
 var dealer_rolls: Dictionary = {}
+var deal_flowers: Array = []
+var last_flowers: Array = []
+var flower_revision := 0
 var _online := false
 var _claim_serial := 0
 var _rng := RandomNumberGenerator.new()
@@ -108,18 +111,27 @@ func deal(shuffled: Array) -> void:
 		player.flowers = player.hand.filter(func(tile): return Rules.is_flower(tile, gold))
 		player.hand = player.hand.filter(func(tile): return not Rules.is_flower(tile, gold))
 
+	deal_flowers = []
+	for seat in order:
+		for tile in players[seat].flowers:
+			deal_flowers.append({"round": 0, "seat": seat, "tile": tile})
+
 	var flower_debts := players.map(func(player): return player.flowers.size())
+	var flower_round := 0
 	while flower_debts.any(func(count): return count > 0):
+		flower_round += 1
 		var next_debts := [0, 0, 0, 0]
 		for seat in order:
 			for count in range(flower_debts[seat]):
 				var tile: int = wall.pop_back()
 				if Rules.is_flower(tile, gold):
 					players[seat].flowers.append(tile)
+					deal_flowers.append({"round": flower_round, "seat": seat, "tile": tile})
 					next_debts[seat] += 1
 				else:
 					players[seat].hand.append(tile)
 		flower_debts = next_debts
+	last_flowers = []
 
 func next_round() -> bool:
 	if phase != "result" or is_table_finished():
@@ -616,6 +628,8 @@ func self_kong(seat: int, move: Dictionary) -> void:
 
 func draw_tile(seat: int, supplement: bool) -> void:
 	var player: Dictionary = players[seat]
+	last_flowers = []
+	var flower_round := 0
 	while wall.size() > Rules.RESERVE:
 		var tile: int = wall.pop_back() if supplement else wall.pop_front()
 		if not Rules.is_flower(tile, gold):
@@ -629,9 +643,15 @@ func draw_tile(seat: int, supplement: bool) -> void:
 				finish_win(seat, -1, "goldGap" if not player.gold_gap.is_empty() else "self")
 				if previous.type == "discard" or Rules.MELD_NAMES.has(previous.type):
 					latest.previous = previous
+			if not last_flowers.is_empty():
+				flower_revision += 1
 			return
+		flower_round += 1
 		player.flowers.append(tile)
+		last_flowers.append({"round": flower_round, "seat": seat, "tile": tile})
 		supplement = true
+	if not last_flowers.is_empty():
+		flower_revision += 1
 	finish({"kind": "draw", "winner": -1, "from": -1, "deltas": [0, 0, 0, 0]})
 
 
@@ -682,4 +702,6 @@ func view(seat: int) -> Dictionary:
 		"drawn": drawn if current == seat and phase == "turn" else -1, "players": public_players,
 		"gold_dice": gold_dice.duplicate(), "gold_index": gold_index,
 		"dealer_rolls": dealer_rolls.duplicate(true),
+		"deal_flowers": deal_flowers.duplicate(true),
+		"last_flowers": last_flowers.duplicate(true), "flower_revision": flower_revision,
 	}

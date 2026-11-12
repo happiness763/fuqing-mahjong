@@ -110,6 +110,14 @@ func run() -> void:
 		await capture("room-settings")
 		screen.start_button.pressed.emit()
 
+	var roll_guard := 0
+	while room.state.get("phase") == "rolling" and roll_guard < 500:
+		if is_instance_valid(desk.dealer_roll_button) and desk.dealer_roll_button.visible \
+				and not desk.dealer_roll_button.disabled:
+			desk.dealer_roll_button.pressed.emit()
+		await process_frame
+		roll_guard += 1
+
 	if not await wait_for(func(): return room.state.get("phase") == "playing", "table starts on both peers"):
 		quit(failures)
 		return

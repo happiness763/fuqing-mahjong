@@ -55,10 +55,34 @@ var intro_timer: Timer
 var intro_visible_hand := -1
 var intro_flowers := true
 var intro_gold := true
+var flower_timer: Timer
+var flower_panel: Panel
+var flower_slot: Control
+var flower_title: Label
+var flower_seat_label: Label
+var flower_queue: Array = []
+var flower_index := 0
+var flower_mode := ""
+var flower_done: Callable
+var flower_active := false
+var draw_flower_active := false
+var last_flower_revision := -1
 var dealer_roll_panel: Panel
 var dealer_roll_timer: Timer
 var dealer_roll_callback: Callable
 var dealer_roll_shown_round := -1
+var dealer_roll_state: Dictionary = {}
+var dealer_roll_rows: Array = []
+var dealer_roll_status: Label
+var dealer_roll_button: Button
+var dealer_roll_start_button: Button
+var dealer_roll_dice_label: Label
+var dealer_roll_online := false
+var dealer_roll_animating := false
+var dealer_roll_auto_roll := false
+var dealer_roll_rng := RandomNumberGenerator.new()
+var online_roll_names: Array = []
+var online_rolling := false
 var session_font: Font
 var title_font: Font
 var faces: Array[Texture2D] = []
@@ -106,10 +130,14 @@ func _ready() -> void:
 	intro_timer.one_shot = true
 	add_child(intro_timer)
 	intro_timer.timeout.connect(advance_intro)
+	flower_timer = Timer.new()
+	flower_timer.one_shot = true
+	add_child(flower_timer)
+	flower_timer.timeout.connect(advance_flower)
 	dealer_roll_timer = Timer.new()
 	dealer_roll_timer.one_shot = true
 	add_child(dealer_roll_timer)
-	dealer_roll_timer.timeout.connect(finish_dealer_roll)
+	dealer_roll_timer.timeout.connect(_dealer_roll_tick)
 	audio = AudioStreamPlayer.new()
 	audio.volume_db = -12.0
 	add_child(audio)
@@ -306,6 +334,9 @@ func show_lobby() -> void:
 	close_modal(false)
 	close_menu()
 	cancel_dealer_roll()
+	cancel_flower_sequence()
+	draw_flower_active = false
+	last_flower_revision = -1
 	dealer_roll_shown_round = -1
 	intro = null
 	intro_timer.stop()
@@ -354,7 +385,11 @@ func exit_online() -> void:
 		online_lobby.queue_free()
 		online_lobby = null
 	cancel_dealer_roll()
+	cancel_flower_sequence()
+	draw_flower_active = false
+	last_flower_revision = -1
 	dealer_roll_shown_round = -1
+	online_rolling = false
 	online_view = {}
 	online_stage = -1
 	online_owner = -1
@@ -368,7 +403,19 @@ func room_state_changed() -> void:
 	if not is_instance_valid(online_lobby):
 		return
 	var snapshot: Dictionary = room.state
-	if snapshot.get("phase") != "playing":
+	var phase: String = snapshot.get("phase", "")
+	if phase == "rolling":
+		online_rolling = true
+		if is_instance_valid(online_lobby):
+			online_lobby.hide()
+		header.show()
+		leave_button.text = "退出房间"
+		show_online_dealer_roll(snapshot)
+		return
+	if phase != "playing":
+		var was_rolling := online_rolling
+		online_rolling = false
+		close_online_dealer_roll()
 		if not online_view.is_empty():
 			cancel_dealer_roll()
 			dealer_roll_shown_round = -1
@@ -381,6 +428,9 @@ func room_state_changed() -> void:
 			online_owner = -1
 			online_reconnecting = false
 			pending_stage = -1
+			header.hide()
+			online_lobby.show()
+		elif was_rolling:
 			header.hide()
 			online_lobby.show()
 		online_lobby.refresh()
@@ -421,16 +471,14 @@ func room_state_changed() -> void:
 		last_remaining = -1
 		_dice_round = 0
 		shown_round = -1
+		last_flower_revision = int(next_view.get("flower_revision", 0))
+		online_rolling = false
+		close_online_dealer_roll()
 	if round_changed:
 		log_lines.clear()
 	transfer_button.visible = is_room_owner() and not reconnecting
 	if round_changed and next_view.phase != "result" and next_view.latest.type == "start":
-		var roll: Dictionary = next_view.get("dealer_rolls", {})
-		if next_view.round == 1 and not roll.is_empty() and dealer_roll_shown_round != 1:
-			refresh(entering or stage_changed)
-			show_dealer_roll(roll, start_intro)
-		else:
-			start_intro()
+		start_intro()
 	else:
 		refresh(entering or stage_changed)
 
@@ -458,7 +506,7 @@ func board_view() -> Dictionary:
 
 
 func local_moves() -> Array:
-	if intro_active() or is_instance_valid(dealer_roll_panel):
+	if intro_active() or draw_flower_active or is_instance_valid(dealer_roll_panel):
 		return []
 	if not online_view.is_empty():
 		if online_reconnecting or pending_stage == online_stage:
@@ -490,12 +538,11 @@ func begin_game(selections: Dictionary) -> void:
 	lobby = null
 	header.show()
 	dealer_roll_shown_round = -1
-	var rng := RandomNumberGenerator.new()
-	rng.randomize()
-	var roll := Rules.roll_dealer(rng)
-	show_dealer_roll(roll, func():
-		game = Game.new(-1, settings.rounds, settings.luck, false, int(roll.winner))
-		game.dealer_rolls = roll
+	dealer_roll_rng.randomize()
+	var state := Rules.dealer_roll_state(dealer_roll_rng)
+	show_dealer_roll(state, func():
+		game = Game.new(-1, settings.rounds, settings.luck, false, int(state.winner))
+		game.dealer_rolls = state
 		_dice_round = 0
 		log_lines.clear()
 		last_revision = -1
@@ -505,37 +552,203 @@ func begin_game(selections: Dictionary) -> void:
 		start_intro())
 
 
-func show_dealer_roll(roll: Dictionary, on_done: Callable) -> void:
+func show_dealer_roll(state: Dictionary, on_done: Callable) -> void:
 	cancel_dealer_roll()
 	dealer_roll_shown_round = 1
 	dealer_roll_callback = on_done
-	var dialog := panel(self, Rect2(390, 250, 500, 280), Color("#233c30"), Color("#ab8852"), 16)
+	dealer_roll_state = state
+	dealer_roll_online = false
+	_build_dealer_roll_panel()
+	_update_dealer_roll_panel()
+	_schedule_dealer_roll()
+
+
+func _build_dealer_roll_panel() -> void:
+	var dialog := panel(self, Rect2(390, 250, 500, 300), Color("#233c30"), Color("#ab8852"), 16)
 	dialog.z_index = 30
 	dealer_roll_panel = dialog
 	label(dialog, "掷骰定庄", Rect2(24, 14, 300, 36), 26, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
 	label(dialog, "点数最大者坐庄", Rect2(24, 48, 300, 22), 14, MUTED)
+	dealer_roll_rows = []
 	for seat in range(4):
 		var y := 82 + seat * 34
-		var winner: bool = seat == int(roll.winner)
-		var color := GOLD if winner else INK
-		var caption := player_name(seat) + ("  ·  庄" if winner else "")
-		var name_label := label(dialog, caption, Rect2(24, y, 150, 28), 17, color)
+		var name_text: String = online_roll_names[seat] if seat < online_roll_names.size() else player_name(seat)
+		var name_label := label(dialog, name_text, Rect2(24, y, 140, 28), 17, INK)
 		set_player_font(name_label)
-		var pair: Array = roll.dice[seat]
-		label(dialog, "%d + %d = %d" % [int(pair[0]), int(pair[1]), int(roll.sums[seat])],
-			Rect2(180, y, 200, 28), 17, color)
-	if int(roll.get("rerolls", 0)) > 0:
-		label(dialog, "平局重掷 %d 次" % int(roll.rerolls), Rect2(24, 238, 220, 22), 13, MUTED)
-	button(dialog, "开始发牌", Rect2(366, 236, 110, 32), finish_dealer_roll, "primary")
-	dealer_roll_timer.stop()
-	dealer_roll_timer.start(1.8)
+		var dice_label := label(dialog, "—", Rect2(168, y, 250, 28), 17, MUTED)
+		dealer_roll_rows.append({"name": name_label, "dice": dice_label})
+	dealer_roll_dice_label = label(dialog, "等待掷骰", Rect2(24, 220, 452, 34), 22, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	dealer_roll_status = label(dialog, "", Rect2(24, 258, 320, 24), 14, MUTED)
+	dealer_roll_button = button(dialog, "掷骰", Rect2(366, 254, 110, 34), _dealer_roll_press, "primary")
+	dealer_roll_button.hide()
+	dealer_roll_start_button = button(dialog, "开始发牌", Rect2(366, 254, 110, 34), finish_dealer_roll, "primary")
+	dealer_roll_start_button.hide()
+
+
+func _update_dealer_roll_panel() -> void:
+	if not is_instance_valid(dealer_roll_panel) or dealer_roll_state.is_empty():
+		return
+	var finished: bool = dealer_roll_state.get("finished", false)
+	var current := Rules.dealer_roll_current(dealer_roll_state)
+	var winner := int(dealer_roll_state.get("winner", -1))
+	for seat in range(4):
+		var row: Dictionary = dealer_roll_rows[seat]
+		var pair: Array = dealer_roll_state.dice[seat]
+		var total := int(dealer_roll_state.sums[seat])
+		var name_text: String = online_roll_names[seat] if seat < online_roll_names.size() else player_name(seat)
+		if pair.size() == 2 and total >= 0:
+			row.dice.text = "%d + %d = %d" % [int(pair[0]), int(pair[1]), total]
+			row.dice.add_theme_color_override("font_color", GOLD if seat == winner else INK)
+		else:
+			row.dice.text = "—"
+			row.dice.add_theme_color_override("font_color", MUTED)
+		var active: bool = seat == current and not finished
+		row.name.text = name_text + ("  ·  庄" if seat == winner else "")
+		row.name.add_theme_color_override("font_color", GOLD if seat == winner or active else INK)
+	if finished:
+		var winner_name := ""
+		if winner >= 0:
+			winner_name = online_roll_names[winner] if winner < online_roll_names.size() else player_name(winner)
+		dealer_roll_status.text = winner_name + " 坐庄"
+		dealer_roll_button.hide()
+		if dealer_roll_online:
+			dealer_roll_start_button.hide()
+			dealer_roll_dice_label.text = "准备发牌…"
+		else:
+			dealer_roll_start_button.show()
+			dealer_roll_dice_label.text = "等待开始发牌"
+		return
+	var round_text := ""
+	if int(dealer_roll_state.get("round", 1)) > 1:
+		round_text = "平局重掷 · 第 %d 轮 · " % int(dealer_roll_state.round)
+	var current_name: String = online_roll_names[current] if current >= 0 and current < online_roll_names.size() else player_name(current)
+	dealer_roll_status.text = round_text + ("轮到你掷骰" if current == 0 else "%s 掷骰中…" % current_name)
+	dealer_roll_button.visible = current == 0
+	dealer_roll_button.disabled = dealer_roll_animating
+	dealer_roll_start_button.hide()
+
+
+func _schedule_dealer_roll() -> void:
+	if dealer_roll_online or not is_instance_valid(dealer_roll_panel):
+		return
+	if dealer_roll_state.get("finished", false):
+		dealer_roll_auto_roll = false
+		_update_dealer_roll_panel()
+		dealer_roll_timer.start(1.8)
+		return
+	var current := Rules.dealer_roll_current(dealer_roll_state)
+	if current <= 0:
+		dealer_roll_auto_roll = false
+		dealer_roll_timer.stop()
+		_update_dealer_roll_panel()
+		return
+	dealer_roll_auto_roll = true
+	_update_dealer_roll_panel()
+	dealer_roll_timer.start(0.6)
+
+
+func _dealer_roll_tick() -> void:
+	if not is_instance_valid(dealer_roll_panel):
+		return
+	if dealer_roll_state.get("finished", false):
+		finish_dealer_roll()
+	elif dealer_roll_auto_roll:
+		_dealer_roll_press()
+
+
+func _dealer_roll_press() -> void:
+	if dealer_roll_state.is_empty() or dealer_roll_state.get("finished", false) or dealer_roll_animating:
+		return
+	if dealer_roll_online:
+		if is_instance_valid(dealer_roll_button):
+			dealer_roll_button.disabled = true
+		room.request("roll")
+		return
+	var current := Rules.dealer_roll_current(dealer_roll_state)
+	if current != 0 and not dealer_roll_auto_roll:
+		return
+	Rules.dealer_roll_apply(dealer_roll_state, dealer_roll_rng)
+	dealer_roll_auto_roll = false
+	var pair: Array = dealer_roll_state.dice[current]
+	var total := int(dealer_roll_state.sums[current])
+	_animate_roll_dice(pair, total, func():
+		_update_dealer_roll_panel()
+		_schedule_dealer_roll())
+
+
+func _animate_roll_dice(pair: Array, total: int, on_done: Callable) -> void:
+	dealer_roll_animating = true
+	if is_instance_valid(dealer_roll_button):
+		dealer_roll_button.disabled = true
+	for step in range(6):
+		if not is_instance_valid(dealer_roll_panel):
+			return
+		dealer_roll_dice_label.text = "%d    +    %d" % [_display_rng.randi_range(1, 6), _display_rng.randi_range(1, 6)]
+		await get_tree().create_timer(0.055).timeout
+	dealer_roll_animating = false
+	if is_instance_valid(dealer_roll_panel):
+		dealer_roll_dice_label.text = "%d + %d = %d" % [int(pair[0]), int(pair[1]), total]
+	if on_done.is_valid():
+		on_done.call()
+
+
+func _dealer_roll_apply_now() -> void:
+	if dealer_roll_state.is_empty() or dealer_roll_state.get("finished", false):
+		return
+	Rules.dealer_roll_apply(dealer_roll_state, dealer_roll_rng)
+	_update_dealer_roll_panel()
+
+
+func show_online_dealer_roll(snapshot: Dictionary) -> void:
+	var viewer := int(snapshot.get("my_seat", 0))
+	var roll: Dictionary = OnlineTableView.rotate_roll(snapshot.get("roll", {}), viewer)
+	var seats: Array = OnlineTableView.rotate_seats(snapshot.get("seats", []), viewer)
+	var names: Array = seats.map(func(entry): return String(entry.get("name", "")))
+	if not (is_instance_valid(dealer_roll_panel) and dealer_roll_online):
+		cancel_dealer_roll()
+		online_roll_names = names
+		dealer_roll_online = true
+		dealer_roll_state = roll
+		_build_dealer_roll_panel()
+		_update_dealer_roll_panel()
+		return
+	online_roll_names = names
+	var previous: Dictionary = dealer_roll_state
+	dealer_roll_state = roll
+	_update_dealer_roll_panel()
+	if dealer_roll_animating:
+		return
+	var prev_sums: Array = previous.get("sums", [-1, -1, -1, -1])
+	var changed := -1
+	for seat in range(4):
+		if int(prev_sums[seat]) != int(roll.sums[seat]) and int(roll.sums[seat]) >= 0:
+			changed = seat
+	if changed >= 0:
+		var pair: Array = roll.dice[changed]
+		var total := int(roll.sums[changed])
+		_animate_roll_dice(pair, total, func(): _update_dealer_roll_panel())
+
+
+func close_online_dealer_roll() -> void:
+	if dealer_roll_online:
+		cancel_dealer_roll()
 
 
 func cancel_dealer_roll() -> void:
 	if is_instance_valid(dealer_roll_panel):
 		dealer_roll_panel.queue_free()
 	dealer_roll_panel = null
+	dealer_roll_rows = []
+	dealer_roll_status = null
+	dealer_roll_button = null
+	dealer_roll_start_button = null
+	dealer_roll_dice_label = null
+	dealer_roll_state = {}
 	dealer_roll_callback = Callable()
+	dealer_roll_online = false
+	dealer_roll_animating = false
+	dealer_roll_auto_roll = false
+	online_roll_names = []
 	if is_instance_valid(dealer_roll_timer):
 		dealer_roll_timer.stop()
 
@@ -543,6 +756,9 @@ func cancel_dealer_roll() -> void:
 func finish_dealer_roll() -> void:
 	if not is_instance_valid(dealer_roll_panel):
 		return
+	if not dealer_roll_state.get("finished", false):
+		while not dealer_roll_state.get("finished", false):
+			Rules.dealer_roll_apply(dealer_roll_state, dealer_roll_rng)
 	var callback := dealer_roll_callback
 	cancel_dealer_roll()
 	if callback.is_valid():
@@ -553,6 +769,7 @@ func start_intro() -> void:
 	var view := board_view()
 	if view.is_empty():
 		return
+	last_flower_revision = int(view.get("flower_revision", 0))
 	intro = OpeningIntro.new()
 	intro.start(int(view.get("dealer", 0)))
 	intro_timer.stop()
@@ -583,7 +800,120 @@ func advance_intro() -> void:
 		finish_intro()
 		return
 	refresh()
+	if intro.stage == "flowers":
+		var events: Array = board_view().get("deal_flowers", [])
+		if events.is_empty():
+			intro.advance()
+			finish_intro()
+		else:
+			play_flower_events(events, "opening", func():
+				if is_instance_valid(intro):
+					intro.advance()
+				finish_intro())
+		return
+	if intro.stage == "dice":
+		_animate_gold_dice()
 	intro_timer.start(_intro_delay(intro.stage))
+
+
+func _animate_gold_dice() -> void:
+	var view := board_view()
+	var final := Vector2i(1, 1)
+	if view.get("gold_dice", []).size() == 2:
+		final = Vector2i(int(view.gold_dice[0]), int(view.gold_dice[1]))
+	for step in range(6):
+		if not intro_active() or intro.stage != "dice":
+			return
+		board_art.set_dice(Vector2i(_display_rng.randi_range(1, 6), _display_rng.randi_range(1, 6)))
+		await get_tree().create_timer(0.055).timeout
+	if intro_active() and intro.stage == "dice":
+		board_art.set_dice(final)
+
+
+func play_flower_events(events: Array, mode: String, on_done: Callable) -> void:
+	cancel_flower_sequence()
+	if events.is_empty():
+		if on_done.is_valid():
+			on_done.call()
+		return
+	flower_queue = events.duplicate(true)
+	flower_index = 0
+	flower_mode = mode
+	flower_done = on_done
+	flower_active = true
+	flower_panel = panel(self, Rect2(430, 170, 420, 160), Color("#233c30"), Color("#ab8852"), 14)
+	flower_panel.z_index = 30
+	label(flower_panel, "福清麻将 · 融城茶馆", Rect2(20, 10, 380, 18), 12, GOLD)
+	flower_title = label(flower_panel, "", Rect2(20, 34, 380, 32), 24, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
+	flower_seat_label = label(flower_panel, "", Rect2(20, 70, 250, 24), 16, MUTED)
+	flower_slot = Control.new()
+	flower_slot.position = Vector2(330, 52)
+	flower_slot.size = Vector2(60, 80)
+	flower_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flower_panel.add_child(flower_slot)
+	label(flower_panel, "点击画面可跳过", Rect2(20, 132, 380, 18), 12, MUTED)
+	_show_flower_event()
+	flower_timer.start(0.32)
+
+
+func _show_flower_event() -> void:
+	if flower_index < 0 or flower_index >= flower_queue.size():
+		return
+	var event: Dictionary = flower_queue[flower_index]
+	var round_number := int(event.get("round", 0))
+	if round_number == 0:
+		flower_title.text = "摸到花"
+	elif flower_mode == "opening":
+		flower_title.text = "第 %d 轮补花" % round_number
+	else:
+		flower_title.text = "第 %d 次补花" % round_number
+	flower_seat_label.text = player_name(int(event.get("seat", 0)))
+	for child in flower_slot.get_children():
+		child.queue_free()
+	var gold := int(board_view().get("gold", -1))
+	tile(flower_slot, int(event.get("tile", -1)), Rect2(0, 0, 54, 72), gold)
+
+
+func advance_flower() -> void:
+	if not flower_active:
+		return
+	flower_index += 1
+	if flower_index >= flower_queue.size():
+		_finish_flower_sequence()
+	else:
+		_show_flower_event()
+		flower_timer.start(0.32)
+
+
+func _finish_flower_sequence() -> void:
+	if not flower_active:
+		return
+	flower_active = false
+	flower_timer.stop()
+	if is_instance_valid(flower_panel):
+		flower_panel.queue_free()
+	flower_panel = null
+	flower_slot = null
+	flower_title = null
+	flower_seat_label = null
+	flower_queue = []
+	var callback := flower_done
+	flower_done = Callable()
+	if callback.is_valid():
+		callback.call()
+
+
+func cancel_flower_sequence() -> void:
+	flower_active = false
+	flower_timer.stop()
+	if is_instance_valid(flower_panel):
+		flower_panel.queue_free()
+	flower_panel = null
+	flower_slot = null
+	flower_title = null
+	flower_seat_label = null
+	flower_queue = []
+	flower_done = Callable()
 
 
 func finish_intro() -> void:
@@ -593,6 +923,9 @@ func finish_intro() -> void:
 
 
 func skip_intro() -> void:
+	if flower_active:
+		_finish_flower_sequence()
+		return
 	if not is_instance_valid(intro):
 		return
 	intro = null
@@ -704,6 +1037,14 @@ func refresh(animate := false) -> void:
 	if intro_running and not intro_gold:
 		render_view = view.duplicate(true)
 		render_view.gold = -1
+	if not intro_running and not flower_active and int(view.get("flower_revision", 0)) != last_flower_revision:
+		last_flower_revision = int(view.get("flower_revision", 0))
+		var events: Array = view.get("last_flowers", [])
+		if not events.is_empty():
+			draw_flower_active = true
+			play_flower_events(events, "draw", func():
+				draw_flower_active = false
+				refresh(true))
 	clear_board()
 	dynamic = Control.new()
 	dynamic.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -713,8 +1054,6 @@ func refresh(animate := false) -> void:
 	if _dice_round != view.round:
 		_dice_round = view.round
 		board_art.set_dice(Vector2i(_display_rng.randi_range(1, 6), _display_rng.randi_range(1, 6)))
-	if intro_running and intro.stage == "dice" and view.gold_dice.size() == 2:
-		board_art.set_dice(Vector2i(int(view.gold_dice[0]), int(view.gold_dice[1])))
 	var moves := local_moves()
 	var fresh: bool = last_revision != view.latest.revision
 	var deal: bool = animate and fresh and view.latest.type == "start"
@@ -732,7 +1071,7 @@ func refresh(animate := false) -> void:
 	if not view.result.is_empty():
 		if shown_round != view.round and not is_instance_valid(modal):
 			show_result()
-	elif online_view.is_empty() and not is_instance_valid(modal) and not intro_running:
+	elif online_view.is_empty() and not is_instance_valid(modal) and not intro_running and not draw_flower_active:
 		for seat in range(1, 4):
 			if not game.actions(seat).is_empty():
 				ai_timer.start(0.54 if view.phase == "turn" else 0.25)
@@ -1132,7 +1471,10 @@ func render_controls(view: Dictionary, moves: Array) -> void:
 	var options: Array = []
 	var detail := ""
 	var intro_running := intro_active()
-	if intro_running:
+	if draw_flower_active:
+		detail = "补花中…"
+		options = []
+	elif intro_running:
 		detail = intro.status_text()
 		options = []
 	elif not view.result.is_empty():
@@ -1360,10 +1702,10 @@ func close_modal(resume := true) -> void:
 
 
 func show_reset() -> void:
-	if game == null and online_view.is_empty():
+	if game == null and online_view.is_empty() and not online_rolling:
 		show_lobby()
 		return
-	if not online_view.is_empty():
+	if not online_view.is_empty() or online_rolling:
 		var dialog := open_modal("退出房间？", 440, 192)
 		var explanation := "关闭承载端会结束当前房间。" if room.state.my_seat == 0 else "退出后由 AI 接管你的座位。"
 		label(dialog, explanation, Rect2(24, 90, 391, 28), 16, MUTED)
@@ -1528,12 +1870,22 @@ func end_table() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if flower_active:
+		var finish := false
+		if event is InputEventMouseButton and event.pressed:
+			finish = true
+		elif event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_SPACE, KEY_ENTER, KEY_ESCAPE]:
+			finish = true
+		if finish:
+			_finish_flower_sequence()
+			get_viewport().set_input_as_handled()
+		return
 	if not intro_active():
 		return
 	var skip := false
 	if event is InputEventMouseButton and event.pressed:
 		skip = true
-	elif event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_SPACE, KEY_ENTER]:
+	elif event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_SPACE, KEY_ENTER, KEY_ESCAPE]:
 		skip = true
 	if skip:
 		skip_intro()

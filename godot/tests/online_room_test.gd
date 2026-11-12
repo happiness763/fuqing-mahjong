@@ -2,6 +2,7 @@ extends SceneTree
 
 const ROOM_PATH := "res://scripts/online_room.gd"
 const Game = preload("res://scripts/game.gd")
+const Rules = preload("res://scripts/rules.gd")
 
 var failures := 0
 
@@ -34,6 +35,20 @@ func make_room(branch_name: String):
 	room.name = "OnlineRoom"
 	branch.add_child(room)
 	return room
+
+
+func drive_rolls(host, client) -> bool:
+	var guard := 0
+	while host.state.get("phase") == "rolling" and guard < 400:
+		var roll: Dictionary = host.state.get("roll", {})
+		var current: int = Rules.dealer_roll_current(roll) if not roll.is_empty() else -1
+		if current == host.state.get("my_seat", -1):
+			host.request("roll")
+		elif current == client.state.get("my_seat", -1) and client.state.get("phase") == "rolling":
+			client.request("roll")
+		await create_timer(0.05).timeout
+		guard += 1
+	return await wait_for(func(): return client.state.get("phase") == "playing", "mixed table starts for both peers")
 
 
 func set_dealer_turn(host, dealer: int) -> void:
@@ -211,7 +226,7 @@ func run() -> void:
 		quit(failures)
 		return
 	host.request("start")
-	if not await wait_for(func(): return client.state.get("phase") == "playing", "mixed table starts for both peers"):
+	if not await drive_rolls(host, client):
 		quit(failures)
 		return
 	check(not host.state.view.dealer_rolls.is_empty(), "host publishes the dealer roll")
@@ -219,7 +234,7 @@ func run() -> void:
 		"both peers see the same dealer")
 	check(host.state.view.gold_dice.size() == 2 and client.state.view.gold_dice == host.state.view.gold_dice,
 		"gold dice are part of the snapshot")
-	check(host._deadline_ms - Time.get_ticks_msec() >= 5000, "first stage includes the intro grace")
+	check(host._deadline_ms - Time.get_ticks_msec() >= 4000, "first stage includes the intro grace")
 	for room in [host, client]:
 		for seat in range(4):
 			check(room.state.view.players[seat].has("hand") == (seat == room.state.my_seat), "live hand is private to its seat")
@@ -286,6 +301,9 @@ func run() -> void:
 	await wait_for(func(): return client.state.get("phase") == "lobby", "lobby accepts new clients after settlement")
 	host.request("settings", {"rounds": 1, "turn_seconds": 0})
 	host.request("start")
+	if not await drive_rolls(host, client):
+		quit(failures)
+		return
 	set_dealer_turn(host, 1)
 	stage = host.state.stage
 	await wait_for(func(): return client.state.get("stage") == stage, "client sees the unlimited stage")

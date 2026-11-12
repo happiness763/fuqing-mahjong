@@ -1,6 +1,7 @@
 extends SceneTree
 
 const Game = preload("res://scripts/game.gd")
+const Rules = preload("res://scripts/rules.gd")
 const Desk = preload("res://table.tscn")
 const Tile = preload("res://scripts/tile_view.gd")
 const Art = preload("res://scripts/table_art.gd")
@@ -184,8 +185,15 @@ func run() -> void:
 	test_waiting_presentation(desk)
 	await test_scoring_presentation(desk)
 	test_dense_board(desk)
-	var roll := {"winner": 2, "dice": [[1, 2], [3, 4], [5, 6], [2, 2]], "sums": [3, 7, 11, 4], "rerolls": 0}
-	desk.show_dealer_roll(roll, Callable())
+	var roll_state := Rules.dealer_roll_state(RandomNumberGenerator.new())
+	roll_state.start = 2
+	roll_state.order = [2, 3, 0, 1]
+	roll_state.round_seats = [2, 3, 0, 1]
+	roll_state.dice = [[1, 2], [3, 4], [5, 6], [2, 2]]
+	roll_state.sums = [3, 7, 11, 4]
+	roll_state.winner = 2
+	roll_state.finished = true
+	desk.show_dealer_roll(roll_state, Callable())
 	check(is_instance_valid(desk.dealer_roll_panel), "dealer roll panel opens")
 	var roll_labels: Array = desk.dealer_roll_panel.find_children("*", "Label", true, false).map(
 		func(node): return node.text)
@@ -194,6 +202,31 @@ func run() -> void:
 		"winner and sums are shown")
 	desk.finish_dealer_roll()
 	check(desk.dealer_roll_panel == null, "dealer roll closes")
+	var live_roll := Rules.dealer_roll_state(RandomNumberGenerator.new())
+	desk.show_dealer_roll(live_roll, Callable())
+	check(desk.dealer_roll_status.text.contains("掷骰"), "live dealer roll waits for a seat")
+	while not live_roll.finished:
+		desk._dealer_roll_apply_now()
+	check(desk.dealer_roll_status.text.contains("坐庄"), "live dealer roll settles on a dealer")
+	desk.finish_dealer_roll()
+	check(desk.dealer_roll_panel == null, "live dealer roll panel closes")
+	var online_state := Rules.dealer_roll_state(RandomNumberGenerator.new())
+	online_state.start = 0
+	online_state.order = [0, 1, 2, 3]
+	online_state.round_seats = [0, 1, 2, 3]
+	online_state.index = 0
+	online_state.dice = [[], [], [], []]
+	online_state.sums = [-1, -1, -1, -1]
+	var online_snapshot := {"my_seat": 0, "seats": [
+		{"name": "甲"}, {"name": "乙"}, {"name": "丙"}, {"name": "丁"}], "roll": online_state}
+	desk.show_online_dealer_roll(online_snapshot)
+	check(desk.dealer_roll_online and is_instance_valid(desk.dealer_roll_panel), "online roll panel opens")
+	check(desk.dealer_roll_button.visible and desk.dealer_roll_status.text.contains("轮到你"),
+		"local human can press roll")
+	desk.close_online_dealer_roll()
+	check(not desk.dealer_roll_online and desk.dealer_roll_panel == null, "online roll panel closes")
+	if desk.draw_flower_active:
+		desk._finish_flower_sequence()
 	desk.game = Game.new(43, 2)
 	desk.game.gold = desk.game.players[0].hand[0]
 	desk.game.indicator = desk.game.gold
@@ -215,6 +248,39 @@ func run() -> void:
 	desk.skip_intro()
 	check(not desk.intro_active() and desk.human_buttons.size() == desk.game.players[0].hand.size(),
 		"skip restores the full hand")
+	desk.game = Game.new(43, 2)
+	desk.game.deal_flowers = [
+		{"round": 0, "seat": 0, "tile": 27},
+		{"round": 1, "seat": 1, "tile": 28},
+	]
+	desk.start_intro()
+	for index in range(4):
+		desk.intro.advance()
+	desk.intro.advance()
+	desk.intro.advance()
+	desk.refresh()
+	check(desk.intro.stage == "gold", "intro reaches the gold reveal")
+	desk.advance_intro()
+	check(desk.flower_active and is_instance_valid(desk.flower_panel), "opening flower animation starts")
+	check(desk.flower_title.text == "摸到花" and desk.flower_seat_label.text == "你",
+		"opening flower shows seat and round")
+	desk._finish_flower_sequence()
+	check(not desk.flower_active and desk.intro == null, "opening flower animation finishes the intro")
+	desk.game = Game.new(43)
+	desk.game.phase = "turn"
+	desk.game.current = 0
+	desk.game.gold = 26
+	desk.game.indicator = 26
+	desk.game.players[0].hand = [10]
+	desk.game.last_flowers = [{"round": 1, "seat": 0, "tile": 27}]
+	desk.game.flower_revision = 1
+	desk.last_flower_revision = 0
+	desk.refresh()
+	check(desk.draw_flower_active and is_instance_valid(desk.flower_panel), "draw flower animation starts")
+	check(desk.flower_title.text == "第 1 次补花", "draw flower shows the replacement round")
+	check(desk.local_moves().is_empty(), "draw flower animation blocks moves")
+	desk._finish_flower_sequence()
+	check(not desk.draw_flower_active, "draw flower animation ends")
 	if DisplayServer.get_name() != "headless":
 		root.size = Vector2i(864, 540)
 		await create_timer(0.65).timeout
@@ -393,9 +459,13 @@ func test_scoring_presentation(desk) -> void:
 
 func finish_round(desk) -> void:
 	desk.skip_intro()
+	if desk.draw_flower_active:
+		desk._finish_flower_sequence()
 	var steps := 0
 	while desk.game.phase != "result" and steps < 260:
 		desk.ai_timer.stop()
+		if desk.draw_flower_active:
+			desk._finish_flower_sequence()
 		if desk.game.actions(0).is_empty():
 			desk.run_ai()
 		elif desk.controls.has("discard"):
@@ -469,6 +539,8 @@ func test_concealed_kong_prompt(desk) -> void:
 	desk.perform(0, discard)
 	game.draw_tile(0, false)
 	desk.refresh()
+	if desk.draw_flower_active:
+		desk._finish_flower_sequence()
 	check(desk.controls.has("kong") and desk.controls.kong.text == "杠", "deferred kong prompts on next turn")
 
 
