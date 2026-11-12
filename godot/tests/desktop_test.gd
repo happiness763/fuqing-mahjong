@@ -54,7 +54,7 @@ func capture(filename: String) -> void:
 func run() -> void:
 	var desk = Desk.instantiate()
 	root.add_child(desk)
-	check(ProjectSettings.get_setting("application/config/version") == "1.2.2", "project version")
+	check(ProjectSettings.get_setting("application/config/version") == "1.2.3", "project version")
 	check(desk.game == null and desk.lobby.round_field.text == "15", "lobby defaults to 15 rounds")
 	check(desk.win_caption({"kind": "discard", "pattern": "sparrow"}) == "金雀", "win button names the big pattern")
 	check(desk.win_caption({"kind": "self", "pattern": "pengpeng"}) == "碰碰胡", "self-draw button names pengpeng")

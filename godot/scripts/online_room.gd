@@ -5,7 +5,7 @@ signal notice(message: String)
 
 const Game = preload("res://scripts/game.gd")
 const Opponent = preload("res://scripts/opponent.gd")
-const VERSION := "1.2.2"
+const VERSION := "1.2.3"
 const SERVER := 1
 const DEFAULT_PORT := 36712
 const CONNECT_MS := 8000
