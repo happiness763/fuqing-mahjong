@@ -26,6 +26,8 @@ var gold_dice: Array = []
 var gold_index := -1
 var dealer_rolls: Dictionary = {}
 var deal_flowers: Array = []
+var deal_initial_hands: Array = []
+var deal_draws: Array = []
 var last_flowers: Array = []
 var flower_revision := 0
 var _online := false
@@ -96,6 +98,8 @@ func deal(shuffled: Array) -> void:
 		for seat in order:
 			players[seat].hand.append(wall.pop_front())
 	players[dealer].hand.append(wall.pop_front())
+	deal_initial_hands = players.map(func(player): return player.hand.duplicate())
+	deal_draws = []
 	if wall.is_empty():
 		indicator = -1
 		gold = -1
@@ -124,7 +128,9 @@ func deal(shuffled: Array) -> void:
 		for seat in order:
 			for count in range(flower_debts[seat]):
 				var tile: int = wall.pop_back()
-				if Rules.is_flower(tile, gold):
+				var flower := Rules.is_flower(tile, gold)
+				deal_draws.append({"round": flower_round, "seat": seat, "tile": tile, "flower": flower})
+				if flower:
 					players[seat].flowers.append(tile)
 					deal_flowers.append({"round": flower_round, "seat": seat, "tile": tile})
 					next_debts[seat] += 1
@@ -692,6 +698,10 @@ func view(seat: int) -> Dictionary:
 					meld.tiles = [-1, -1, -1, -1]
 		public_players.append(shown)
 	var sees_claim: bool = phase in ["opening", "robKong"] and online_actor() == seat
+	var visible_draws: Array = []
+	for draw in deal_draws:
+		if int(draw.seat) == seat or bool(draw.flower):
+			visible_draws.append(draw)
 	return {
 		"seat": seat, "dealer": dealer, "round": round_number, "gold": gold, "indicator": indicator,
 		"round_limit": round_limit, "table_finished": is_table_finished(),
@@ -703,5 +713,7 @@ func view(seat: int) -> Dictionary:
 		"gold_dice": gold_dice.duplicate(), "gold_index": gold_index,
 		"dealer_rolls": dealer_rolls.duplicate(true),
 		"deal_flowers": deal_flowers.duplicate(true),
+		"deal_initial_hand": deal_initial_hands[seat].duplicate() if seat >= 0 and seat < deal_initial_hands.size() else [],
+		"deal_draws": visible_draws,
 		"last_flowers": last_flowers.duplicate(true), "flower_revision": flower_revision,
 	}

@@ -249,10 +249,9 @@ func run() -> void:
 	check(not desk.intro_active() and desk.human_buttons.size() == desk.game.players[0].hand.size(),
 		"skip restores the full hand")
 	desk.game = Game.new(43, 2)
-	desk.game.deal_flowers = [
-		{"round": 0, "seat": 0, "tile": 27},
-		{"round": 1, "seat": 1, "tile": 28},
-	]
+	desk.game.deal_initial_hands = [[27, 10], [], [], []]
+	desk.game.deal_flowers = [{"round": 0, "seat": 0, "tile": 27}]
+	desk.game.deal_draws = [{"round": 1, "seat": 0, "tile": 22, "flower": false}]
 	desk.start_intro()
 	for index in range(4):
 		desk.intro.advance()
@@ -261,10 +260,12 @@ func run() -> void:
 	desk.refresh()
 	check(desk.intro.stage == "gold", "intro reaches the gold reveal")
 	desk.advance_intro()
-	check(desk.flower_active and is_instance_valid(desk.flower_panel), "opening flower animation starts")
-	check(desk.flower_title.text == "摸到花" and desk.flower_seat_label.text == "你",
-		"opening flower shows seat and round")
-	desk._finish_flower_sequence()
+	check(desk.flower_active and desk.flower_preview, "opening flower preview starts")
+	check(desk.flower_status_text == "摸到花", "opening flower shows the initial draw")
+	check(desk.flower_preview_hand == [10], "initial flower leaves the raw hand")
+	desk.advance_flower()
+	check(desk.flower_preview_hand.has(22), "replacement slides into the raw hand")
+	desk.advance_flower()
 	check(not desk.flower_active and desk.intro == null, "opening flower animation finishes the intro")
 	desk.game = Game.new(43)
 	desk.game.phase = "turn"
@@ -276,11 +277,11 @@ func run() -> void:
 	desk.game.flower_revision = 1
 	desk.last_flower_revision = 0
 	desk.refresh()
-	check(desk.draw_flower_active and is_instance_valid(desk.flower_panel), "draw flower animation starts")
-	check(desk.flower_title.text == "第 1 次补花", "draw flower shows the replacement round")
+	check(desk.draw_flower_active and desk.flower_active, "draw flower animation starts")
+	check(desk.flower_status_text == "第 1 次补花", "draw flower shows the replacement round")
 	check(desk.local_moves().is_empty(), "draw flower animation blocks moves")
 	desk._finish_flower_sequence()
-	check(not desk.draw_flower_active, "draw flower animation ends")
+	check(not desk.draw_flower_active and not desk.flower_active, "draw flower animation ends")
 	if DisplayServer.get_name() != "headless":
 		root.size = Vector2i(864, 540)
 		await create_timer(0.65).timeout

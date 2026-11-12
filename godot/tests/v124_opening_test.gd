@@ -109,6 +109,14 @@ func test_deal_flower_events() -> void:
 	check(game.gold == 34, "season gold")
 	check(game.deal_flowers.has({"round": 0, "seat": 1, "tile": 38}), "initial flower is round zero")
 	check(game.deal_flowers.has({"round": 1, "seat": 1, "tile": 39}), "replacement flower is round one")
+	check(38 in game.deal_initial_hands[1], "initial hand keeps the flower until it is replaced")
+	check(game.deal_draws.any(func(draw): return draw.seat == 1 and draw.tile == 39 and draw.flower),
+		"flower replacement draws are recorded")
+	check(game.deal_draws.any(func(draw): return draw.seat == 1 and draw.tile == 22 and not draw.flower),
+		"tile replacements are recorded")
+	check(game.view(0).deal_draws.any(func(draw): return draw.tile == 39), "public flower draw")
+	check(not game.view(0).deal_draws.any(func(draw): return draw.tile == 22),
+		"other seats' tile replacements stay private")
 
 
 func test_flower_draw_events() -> void:

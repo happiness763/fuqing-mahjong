@@ -687,8 +687,10 @@ func _finish_rolling() -> void:
 	_roll_ai_due_ms = -1
 	_game = Game.new(-1, _rounds, "normal", true, int(_roll_state.winner))
 	_game.dealer_rolls = _roll_state.duplicate(true)
-	var flowers: int = _game.view(0).get("deal_flowers", []).size()
-	_begin_stage(INTRO_MS + flowers * 320)
+	var view := _game.view(0)
+	var flowers: int = view.get("deal_flowers", []).size()
+	var draws: int = view.get("deal_draws", []).size()
+	_begin_stage(INTRO_MS + (flowers + draws) * 250 + 500)
 
 
 func _begin_stage(intro_ms := 0) -> void:

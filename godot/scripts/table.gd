@@ -56,15 +56,16 @@ var intro_visible_hand := -1
 var intro_flowers := true
 var intro_gold := true
 var flower_timer: Timer
-var flower_panel: Panel
-var flower_slot: Control
-var flower_title: Label
-var flower_seat_label: Label
-var flower_queue: Array = []
+var flower_fx: Control
+var flower_sequence: Array = []
 var flower_index := 0
-var flower_mode := ""
 var flower_done: Callable
 var flower_active := false
+var flower_preview := false
+var flower_preview_hand: Array = []
+var flower_hold_drawn := false
+var flower_slide_tile := -1
+var flower_status_text := ""
 var draw_flower_active := false
 var last_flower_revision := -1
 var dealer_roll_panel: Panel
@@ -130,6 +131,10 @@ func _ready() -> void:
 	intro_timer.one_shot = true
 	add_child(intro_timer)
 	intro_timer.timeout.connect(advance_intro)
+	flower_fx = Control.new()
+	flower_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flower_fx.z_index = 15
+	add_child(flower_fx)
 	flower_timer = Timer.new()
 	flower_timer.one_shot = true
 	add_child(flower_timer)
@@ -506,7 +511,7 @@ func board_view() -> Dictionary:
 
 
 func local_moves() -> Array:
-	if intro_active() or draw_flower_active or is_instance_valid(dealer_roll_panel):
+	if intro_active() or draw_flower_active or flower_active or is_instance_valid(dealer_roll_panel):
 		return []
 	if not online_view.is_empty():
 		if online_reconnecting or pending_stage == online_stage:
@@ -564,7 +569,8 @@ func show_dealer_roll(state: Dictionary, on_done: Callable) -> void:
 
 
 func _build_dealer_roll_panel() -> void:
-	var dialog := panel(self, Rect2(390, 250, 500, 300), Color("#233c30"), Color("#ab8852"), 16)
+	board_art.set_dice(Vector2i(_display_rng.randi_range(1, 6), _display_rng.randi_range(1, 6)))
+	var dialog := panel(self, Rect2(390, 470, 500, 300), Color("#233c30"), Color("#ab8852"), 16)
 	dialog.z_index = 30
 	dealer_roll_panel = dialog
 	label(dialog, "掷骰定庄", Rect2(24, 14, 300, 36), 26, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
@@ -683,11 +689,14 @@ func _animate_roll_dice(pair: Array, total: int, on_done: Callable) -> void:
 	for step in range(6):
 		if not is_instance_valid(dealer_roll_panel):
 			return
-		dealer_roll_dice_label.text = "%d    +    %d" % [_display_rng.randi_range(1, 6), _display_rng.randi_range(1, 6)]
+		var pair_display := Vector2i(_display_rng.randi_range(1, 6), _display_rng.randi_range(1, 6))
+		dealer_roll_dice_label.text = "%d    +    %d" % [pair_display.x, pair_display.y]
+		board_art.set_dice(pair_display)
 		await get_tree().create_timer(0.055).timeout
 	dealer_roll_animating = false
 	if is_instance_valid(dealer_roll_panel):
 		dealer_roll_dice_label.text = "%d + %d = %d" % [int(pair[0]), int(pair[1]), total]
+	board_art.set_dice(Vector2i(int(pair[0]), int(pair[1])))
 	if on_done.is_valid():
 		on_done.call()
 
@@ -799,18 +808,25 @@ func advance_intro() -> void:
 	if not intro.is_active():
 		finish_intro()
 		return
-	refresh()
 	if intro.stage == "flowers":
-		var events: Array = board_view().get("deal_flowers", [])
-		if events.is_empty():
+		var view := board_view()
+		var sequence: Array = []
+		for event in view.get("deal_flowers", []):
+			if int(event.get("round", 0)) == 0:
+				sequence.append({"kind": "initial", "seat": int(event.seat), "tile": int(event.tile), "round": 0})
+		for event in view.get("deal_draws", []):
+			sequence.append({"kind": "draw", "seat": int(event.seat), "tile": int(event.tile),
+				"flower": bool(event.flower), "round": int(event.round)})
+		if sequence.is_empty():
 			intro.advance()
 			finish_intro()
 		else:
-			play_flower_events(events, "opening", func():
+			start_flower_sequence(sequence, "opening", view.get("deal_initial_hand", []), func():
 				if is_instance_valid(intro):
 					intro.advance()
 				finish_intro())
 		return
+	refresh()
 	if intro.stage == "dice":
 		_animate_gold_dice()
 	intro_timer.start(_intro_delay(intro.stage))
@@ -830,59 +846,58 @@ func _animate_gold_dice() -> void:
 		board_art.set_dice(final)
 
 
-func play_flower_events(events: Array, mode: String, on_done: Callable) -> void:
+func start_flower_sequence(sequence: Array, mode: String, preview_hand: Array, on_done: Callable, hold_drawn := false) -> void:
 	cancel_flower_sequence()
-	if events.is_empty():
-		if on_done.is_valid():
-			on_done.call()
-		return
-	flower_queue = events.duplicate(true)
+	flower_sequence = sequence.duplicate(true)
 	flower_index = 0
-	flower_mode = mode
+	flower_preview = mode == "opening"
+	flower_preview_hand = preview_hand.duplicate()
 	flower_done = on_done
 	flower_active = true
-	flower_panel = panel(self, Rect2(430, 170, 420, 160), Color("#233c30"), Color("#ab8852"), 14)
-	flower_panel.z_index = 30
-	label(flower_panel, "福清麻将 · 融城茶馆", Rect2(20, 10, 380, 18), 12, GOLD)
-	flower_title = label(flower_panel, "", Rect2(20, 34, 380, 32), 24, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
-	flower_seat_label = label(flower_panel, "", Rect2(20, 70, 250, 24), 16, MUTED)
-	flower_slot = Control.new()
-	flower_slot.position = Vector2(330, 52)
-	flower_slot.size = Vector2(60, 80)
-	flower_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	flower_panel.add_child(flower_slot)
-	label(flower_panel, "点击画面可跳过", Rect2(20, 132, 380, 18), 12, MUTED)
-	_show_flower_event()
-	flower_timer.start(0.32)
-
-
-func _show_flower_event() -> void:
-	if flower_index < 0 or flower_index >= flower_queue.size():
+	flower_hold_drawn = hold_drawn
+	flower_slide_tile = -1
+	flower_status_text = "摸到花"
+	if flower_sequence.is_empty():
+		_finish_flower_sequence()
 		return
-	var event: Dictionary = flower_queue[flower_index]
+	_show_flower_step()
+	flower_timer.start(0.22)
+
+
+func _show_flower_step() -> void:
+	if not flower_active or flower_index < 0 or flower_index >= flower_sequence.size():
+		return
+	flower_slide_tile = -1
+	var event: Dictionary = flower_sequence[flower_index]
+	var seat := int(event.get("seat", 0))
+	var tile_number := int(event.get("tile", -1))
 	var round_number := int(event.get("round", 0))
-	if round_number == 0:
-		flower_title.text = "摸到花"
-	elif flower_mode == "opening":
-		flower_title.text = "第 %d 轮补花" % round_number
+	var kind: String = String(event.get("kind", "draw_flower"))
+	if kind == "initial":
+		flower_status_text = "摸到花"
+		if seat == 0 and flower_preview:
+			flower_preview_hand.erase(tile_number)
+		pop_flower(seat, tile_number)
+	elif kind == "draw" and not bool(event.get("flower", false)):
+		flower_status_text = "第 %d 轮补花" % round_number
+		if seat == 0 and flower_preview:
+			flower_preview_hand.append(tile_number)
+			flower_slide_tile = tile_number
 	else:
-		flower_title.text = "第 %d 次补花" % round_number
-	flower_seat_label.text = player_name(int(event.get("seat", 0)))
-	for child in flower_slot.get_children():
-		child.queue_free()
-	var gold := int(board_view().get("gold", -1))
-	tile(flower_slot, int(event.get("tile", -1)), Rect2(0, 0, 54, 72), gold)
+		flower_status_text = ("第 %d 轮补花" % round_number) if flower_preview else ("第 %d 次补花" % round_number)
+		pop_flower(seat, tile_number)
+	refresh()
 
 
 func advance_flower() -> void:
 	if not flower_active:
 		return
 	flower_index += 1
-	if flower_index >= flower_queue.size():
+	if flower_index >= flower_sequence.size():
 		_finish_flower_sequence()
 	else:
-		_show_flower_event()
-		flower_timer.start(0.32)
+		_show_flower_step()
+		flower_timer.start(0.22)
 
 
 func _finish_flower_sequence() -> void:
@@ -890,13 +905,10 @@ func _finish_flower_sequence() -> void:
 		return
 	flower_active = false
 	flower_timer.stop()
-	if is_instance_valid(flower_panel):
-		flower_panel.queue_free()
-	flower_panel = null
-	flower_slot = null
-	flower_title = null
-	flower_seat_label = null
-	flower_queue = []
+	flower_preview = false
+	flower_preview_hand = []
+	flower_hold_drawn = false
+	flower_sequence = []
 	var callback := flower_done
 	flower_done = Callable()
 	if callback.is_valid():
@@ -906,14 +918,33 @@ func _finish_flower_sequence() -> void:
 func cancel_flower_sequence() -> void:
 	flower_active = false
 	flower_timer.stop()
-	if is_instance_valid(flower_panel):
-		flower_panel.queue_free()
-	flower_panel = null
-	flower_slot = null
-	flower_title = null
-	flower_seat_label = null
-	flower_queue = []
+	flower_sequence = []
+	flower_preview = false
+	flower_preview_hand = []
+	flower_hold_drawn = false
+	flower_slide_tile = -1
+	flower_status_text = ""
 	flower_done = Callable()
+	if is_instance_valid(flower_fx):
+		for child in flower_fx.get_children():
+			child.queue_free()
+
+
+func pop_flower(seat: int, tile_number: int) -> void:
+	if tile_number < 0 or not is_instance_valid(flower_fx):
+		return
+	var positions := [Vector2(990, 700), Vector2(930, 355), Vector2(760, 80), Vector2(120, 355)]
+	var pos: Vector2 = positions[clampi(seat, 0, 3)]
+	var node := tile(flower_fx, tile_number, Rect2(pos, Vector2(52, 69)), int(board_view().get("gold", -1)))
+	node.z_index = 16
+	node.pivot_offset = node.size * 0.5
+	node.scale = Vector2(0.6, 0.6)
+	var animation := node.create_tween()
+	animation.tween_property(node, "scale", Vector2(1.12, 1.12), 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	animation.tween_property(node, "scale", Vector2(1.0, 1.0), 0.1)
+	animation.tween_interval(0.12)
+	animation.tween_property(node, "modulate:a", 0.0, 0.12)
+	animation.tween_callback(node.queue_free)
 
 
 func finish_intro() -> void:
@@ -1042,9 +1073,16 @@ func refresh(animate := false) -> void:
 		var events: Array = view.get("last_flowers", [])
 		if not events.is_empty():
 			draw_flower_active = true
-			play_flower_events(events, "draw", func():
+			var sequence: Array = []
+			for event in events:
+				sequence.append({"kind": "draw_flower", "seat": int(event.seat), "tile": int(event.tile), "round": int(event.round)})
+			var drawn_tile := int(view.get("drawn", -1))
+			var drawer := int(view.get("current", -1))
+			start_flower_sequence(sequence, "draw", [], func():
 				draw_flower_active = false
-				refresh(true))
+				flower_hold_drawn = false
+				flower_slide_tile = drawn_tile if drawer == 0 else -1
+				refresh(true), drawn_tile >= 0 and drawer == 0)
 	clear_board()
 	dynamic = Control.new()
 	dynamic.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1071,7 +1109,7 @@ func refresh(animate := false) -> void:
 	if not view.result.is_empty():
 		if shown_round != view.round and not is_instance_valid(modal):
 			show_result()
-	elif online_view.is_empty() and not is_instance_valid(modal) and not intro_running and not draw_flower_active:
+	elif online_view.is_empty() and not is_instance_valid(modal) and not intro_running and not draw_flower_active and not flower_active:
 		for seat in range(1, 4):
 			if not game.actions(seat).is_empty():
 				ai_timer.start(0.54 if view.phase == "turn" else 0.25)
@@ -1364,16 +1402,23 @@ func draw_river(view: Dictionary, seat: int, animate: bool) -> void:
 func draw_hand(view: Dictionary, moves: Array, deal: bool, drew: bool) -> void:
 	var playable := moves.filter(func(move): return move.type == "discard" or is_swap(move)).map(
 		func(move): return move.tile)
-	var hand: Array = view.players[0].hand.duplicate()
-	if intro_visible_hand >= 0:
-		hand = hand.slice(0, mini(intro_visible_hand, hand.size()))
-	var has_draw: bool = view.drawn >= 0
+	var hand: Array
+	if flower_preview:
+		hand = flower_preview_hand.duplicate()
+	else:
+		hand = view.players[0].hand.duplicate()
+		if intro_visible_hand >= 0:
+			hand = hand.slice(0, mini(intro_visible_hand, hand.size()))
+		if flower_hold_drawn and view.drawn >= 0:
+			hand.erase(view.drawn)
+	var has_draw: bool = view.drawn >= 0 and not flower_hold_drawn and not flower_preview
 	if has_draw:
 		hand.pop_back()
 	hand.sort()
 	if has_draw:
 		hand.append(view.drawn)
 	var cursor := 549.0 - (hand.size() * 59 - 3 + (10 if has_draw else 0)) * 0.5
+	var slid := false
 	for index in range(hand.size()):
 		var number: int = hand[index]
 		var chosen := selected_index == index
@@ -1389,6 +1434,10 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool, drew: bool) -> void:
 			slide(node, Vector2(0, 18), index * 0.017)
 		elif drew and drawn:
 			slide(node, Vector2(20, 0))
+		elif flower_slide_tile >= 0 and number == flower_slide_tile and not slid:
+			slide(node, Vector2(70, 0))
+			slid = true
+			flower_slide_tile = -1
 		cursor += 59
 
 
@@ -1471,7 +1520,10 @@ func render_controls(view: Dictionary, moves: Array) -> void:
 	var options: Array = []
 	var detail := ""
 	var intro_running := intro_active()
-	if draw_flower_active:
+	if flower_active:
+		detail = flower_status_text if not flower_status_text.is_empty() else "补花中…"
+		options = []
+	elif draw_flower_active:
 		detail = "补花中…"
 		options = []
 	elif intro_running:
