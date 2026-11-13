@@ -19,6 +19,7 @@ var text_font: Font
 var title: Label
 var subtitle: Label
 var back_button: Button
+var settings_button: Button
 var notice: Label
 var entry_screen: Control
 var room_screen: Control
@@ -47,6 +48,7 @@ var previous_rounds := -1
 var previous_turn := -1
 var addresses := PackedStringArray()
 var can_start := false
+var joining_nickname := ""
 
 
 func setup(table, online_room) -> void:
@@ -70,6 +72,7 @@ func setup(table, online_room) -> void:
 	title = desk.label(self, "", Rect2(148, 63, 750, 48), 39, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
 	subtitle = desk.label(self, "", Rect2(151, 112, 870, 28), 17, GOLD)
 	back_button = desk.button(self, "返回首页", Rect2(1053, 79, 153, 42), desk.exit_online)
+	settings_button = desk.button(self, "设置", Rect2(939, 79, 102, 42), desk.show_settings)
 	entry_screen = _section(self)
 	room_screen = _section(self)
 	room_screen.hide()
@@ -148,14 +151,14 @@ func _menu(parent: Control, rect: Rect2, captions: Array) -> OptionButton:
 
 func _build_entry() -> void:
 	desk.label(entry_screen, "你的昵称", Rect2(89, 159, 128, 42), 18, INK)
-	entry_name = _field(entry_screen, Rect2(218, 159, 274, 42), "输入昵称")
+	entry_name = _field(entry_screen, Rect2(218, 159, 274, 42), "输入昵称", desk.preferences.values.nickname)
 	desk.label(entry_screen, "1–12 个字符，同一房间内不能重名", Rect2(507, 159, 660, 42), 16, MUTED)
 	desk.panel(entry_screen, Rect2(76, 223, 451, 429), CARD, BORDER, 16)
 	desk.panel(entry_screen, Rect2(550, 223, 654, 429), CARD, BORDER, 16)
 	desk.label(entry_screen, "开房间", Rect2(101, 245, 350, 44), 28, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
 	desk.label(entry_screen, "开房后可复制房间地址，让朋友加入。", Rect2(101, 297, 401, 29), 17, MUTED)
 	desk.label(entry_screen, "监听端口（UDP）", Rect2(101, 346, 395, 28), 17, INK)
-	host_port = _field(entry_screen, Rect2(101, 381, 401, 43), "1–65535", str(DEFAULT_PORT))
+	host_port = _field(entry_screen, Rect2(101, 381, 401, 43), "1–65535", str(desk.preferences.values.host_port))
 	desk.label(entry_screen, "房间由你的电脑承载，请保持游戏运行。", Rect2(101, 445, 401, 29), 16, MUTED)
 	host_button = desk.button(entry_screen, "开房间", Rect2(101, 565, 401, 53), _host, "primary")
 	host_port.text_submitted.connect(func(_value): _host())
@@ -256,6 +259,8 @@ func refresh() -> void:
 	if not active:
 		host_button.disabled = room.is_connecting()
 		join_button.disabled = host_button.disabled
+		if not room.is_connecting():
+			joining_nickname = ""
 		return
 	var reconnecting: bool = state.get("reconnecting", false)
 	if reconnecting:
@@ -279,6 +284,9 @@ func refresh() -> void:
 	start_button.visible = owner
 	_refresh_addresses(state)
 	_refresh_settings(state)
+	if not joining_nickname.is_empty() and state.seats[state.my_seat].name == joining_nickname:
+		desk.save_preferences({"nickname": joining_nickname})
+		joining_nickname = ""
 
 
 func _refresh_seat(seat: int, occupant: Dictionary, state: Dictionary, owner: bool) -> void:
@@ -426,8 +434,10 @@ func _host() -> void:
 		_set_notice("监听端口应为 1–65535 的整数。")
 		return
 	_set_notice("")
-	var error: String = room.host(nick, port)
+	var preferences: Dictionary = desk.preferences.values
+	var error: String = room.host(nick, port, preferences.room_rounds, preferences.turn_seconds)
 	if error.is_empty():
+		desk.save_preferences({"nickname": nick, "host_port": port})
 		refresh()
 	else:
 		show_notice(error)
@@ -459,10 +469,12 @@ func _join() -> void:
 		_set_notice("请输入有效的房间地址（frp-ice.com:45939）。")
 		return
 	_set_notice("正在连接房间…", MUTED)
+	joining_nickname = nick
 	var error: String = room.join(nick, endpoint.address, endpoint.port)
 	if error.is_empty():
 		refresh()
 	else:
+		joining_nickname = ""
 		show_notice(error)
 
 
@@ -540,7 +552,8 @@ func _save_settings() -> void:
 	if rounds < 0:
 		_set_notice("请输入 1–32 的整数作为局数。")
 		return
-	_request("settings", {"rounds": rounds, "turn_seconds": TURN_SECONDS[turn_menu.selected]})
+	var seconds: int = TURN_SECONDS[turn_menu.selected]
+	_request("settings", {"rounds": rounds, "turn_seconds": seconds})
 
 
 func _start() -> void:

@@ -11,7 +11,9 @@ var round_field: LineEdit
 var round_error: Label
 var start_button: Button
 var online_button: Button
+var settings_button: Button
 var selections: Dictionary
+var choice_buttons := {}
 
 
 func setup(table, settings: Dictionary) -> void:
@@ -79,24 +81,30 @@ func setup(table, settings: Dictionary) -> void:
 	choice_row("运气", "luck", ["非酋", "普通", "欧皇"], ["unlucky", "normal", "lucky"], 451)
 	start_button = desk.button(self, "开始游戏", Rect2(704, 570, 458, 58), start, "primary")
 	start_button.add_theme_font_size_override("font_size", 23)
-	desk.button(self, "玩法规则", Rect2(704, 652, 458, 39), desk.show_rules)
+	settings_button = desk.button(self, "设置", Rect2(704, 652, 222, 39), desk.show_settings)
+	desk.button(self, "玩法规则", Rect2(940, 652, 222, 39), desk.show_rules)
 	start_button.grab_focus()
 
 
 func choice_row(title: String, key: String, labels: Array, values: Array, y: int) -> void:
 	desk.label(self, title, Rect2(704, y, 95, 42), 18, INK)
 	var group := ButtonGroup.new()
+	choice_buttons[key] = {}
 	for index in range(labels.size()):
 		var node: Button = desk.button(self, labels[index], Rect2(809 + index * 119, y, 113, 42), Callable())
 		node.toggle_mode = true
 		node.button_group = group
 		node.button_pressed = selections[key] == values[index]
+		choice_buttons[key][values[index]] = node
 		node.add_theme_stylebox_override("pressed", Art.box(Color("#48694e"), GOLD, 8, 2))
 		node.pressed.connect(select.bind(key, values[index]))
 
 
 func select(key: String, value: String) -> void:
-	selections[key] = value
+	if desk.save_preferences({key: value}):
+		selections[key] = value
+	elif choice_buttons.has(key):
+		choice_buttons[key][selections[key]].set_pressed_no_signal(true)
 
 
 func change_slider(value: float) -> void:
@@ -111,8 +119,17 @@ func change_input(raw: String) -> void:
 	round_error.text = "1–32 局" if valid else "请输入 1–32 的整数"
 	round_error.add_theme_color_override("font_color", MUTED if valid else Color("#f0a18d"))
 	if valid:
-		selections.rounds = value.to_int()
+		var rounds := value.to_int()
+		if desk.save_preferences({"rounds": rounds}):
+			selections.rounds = rounds
+		else:
+			round_field.text = str(selections.rounds)
 		slider.set_value_no_signal(selections.rounds)
+
+
+func show_save_error() -> void:
+	round_error.text = "无法保存设置，原设置已保留。"
+	round_error.add_theme_color_override("font_color", Color("#f0a18d"))
 
 
 func start() -> void:

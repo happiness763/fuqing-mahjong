@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 150 200">
+  <title>竹</title>
+  <g transform="translate(14 10) scale(0.71)"><path d="M31 14 Q25 32 12 43 M23 31 L49 28 M36 31 L35 76 M68 13 Q61 32 50 42 M59 29 L87 26 M74 30 L73 79 Q72 89 62 83" fill="none" stroke="#a5292c" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M35 68 L35 76" fill="none" stroke="#a5292c" stroke-width="9.36" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><path d="M88 27 H119 V57 H88Z" fill="none" stroke="#a5292c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <g transform="translate(90 29) scale(0.26)"><path d="M24 25 Q50 21 78 22 M30 49 Q51 46 73 46 M12 77 Q47 73 88 73" fill="none" stroke="#a5292c" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M73 73 L87 70" fill="none" stroke="#a5292c" stroke-width="10.53" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><path d="M57 179 L68 108 M79 175 L96 108 M52 153 L64 155 M60 126 L71 128 M81 151 L92 153 M88 124 L100 126" fill="none" stroke="#244b36" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <g transform="translate(65 141) rotate(-145) scale(1.15)"><path d="M0 0 Q8 -18 29 -12 Q19 1 0 0Z" fill="#14705a" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><g transform="translate(90 132) rotate(-22) scale(1.12)"><path d="M0 0 Q8 -18 29 -12 Q19 1 0 0Z" fill="#14705a" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><g transform="translate(89 135) rotate(27) scale(1.07)"><path d="M0 0 Q8 -18 29 -12 Q19 1 0 0Z" fill="#519073" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><g transform="translate(57 168) rotate(-158) scale(1.07)"><path d="M0 0 Q8 -18 29 -12 Q19 1 0 0Z" fill="#14705a" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><g transform="translate(62 155) rotate(8) scale(0.84)"><path d="M0 0 Q8 -18 29 -12 Q19 1 0 0Z" fill="#519073" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

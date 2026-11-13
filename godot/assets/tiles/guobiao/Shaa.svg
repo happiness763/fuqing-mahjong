@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 150 200">
+  <title>西</title>
+  <g transform="translate(14 35) scale(1.22)"><path d="M13 20 Q52 15 88 16 M19 38 L22 85 M20 39 L82 35 L79 83 M23 82 L77 78 M41 20 Q41 54 29 67 M58 19 L56 56 Q56 64 72 59" fill="none" stroke="#192e34" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M76 80 L80 83" fill="none" stroke="#192e34" stroke-width="9.36" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

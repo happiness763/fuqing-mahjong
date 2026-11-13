@@ -4,6 +4,9 @@ const Rules = preload("res://scripts/rules.gd")
 const Game = preload("res://scripts/game.gd")
 const Opponent = preload("res://scripts/opponent.gd")
 const Art = preload("res://scripts/table_art.gd")
+const Preferences = preload("res://scripts/preferences.gd")
+const Skins = preload("res://scripts/tile_skins.gd")
+const SettingsPanel = preload("res://scripts/settings_panel.gd")
 const Tile = preload("res://scripts/tile_view.gd")
 const Lobby = preload("res://scripts/lobby.gd")
 const OnlineLobby = preload("res://scripts/online_lobby.gd")
@@ -48,6 +51,10 @@ var transfer_button: Button
 var leave_button: Button
 var nickname_font: Font
 var settings := {"rounds": 15, "difficulty": "normal", "luck": "normal"}
+var preferences_root := "user://"
+var preferences: Preferences
+var settings_panel: Control
+var applied_skin := ""
 var selected_index := -1
 var selected_tile := -1
 var intro
@@ -113,16 +120,14 @@ func _ready() -> void:
 	session_font = UI_FONT
 	title_font = system_font(["KaiTi", "SimSun", "Microsoft YaHei", "Noto Serif CJK SC"])
 	nickname_font = system_font(["Microsoft YaHei UI", "Microsoft YaHei", "SimSun", "Segoe UI"])
-	for suit in ["Man", "Pin", "Sou"]:
-		for rank in range(1, 10):
-			faces.append(load("res://assets/tiles/%s%d.svg" % [suit, rank]))
-	for name in ["Ton", "Nan", "Shaa", "Pei", "Chun", "Hatsu", "Haku",
-			"Spring", "Summer", "Autumn", "Winter", "Plum", "Orchid", "Bamboo", "Chrysanthemum"]:
-		faces.append(load("res://assets/tiles/%s.svg" % name))
+	preferences = Preferences.new(preferences_root)
+	for key in settings:
+		settings[key] = preferences.values[key]
 	_display_rng.randomize()
 	board_art = Art.new()
 	add_child(board_art)
 	build_header()
+	apply_saved_appearance()
 	ai_timer = Timer.new()
 	ai_timer.one_shot = true
 	add_child(ai_timer)
@@ -155,6 +160,7 @@ func _ready() -> void:
 	room.name = "OnlineRoom"
 	room.state_changed.connect(room_state_changed)
 	room.notice.connect(show_room_notice)
+	room.preferences_confirmed.connect(save_preferences)
 	add_child(room)
 	show_lobby()
 
@@ -258,14 +264,15 @@ func build_header() -> void:
 	add_child(header)
 	menu_button = button(header, "菜单", Rect2(1083, 16, 169, 44), toggle_menu)
 	menu_button.z_index = 20
-	menu_panel = panel(header, Rect2(1083, 64, 169, 188), Color("#203a2e"), Color("#ab8852"), 12)
+	menu_panel = panel(header, Rect2(1083, 64, 169, 230), Color("#203a2e"), Color("#ab8852"), 12)
 	menu_panel.visible = false
 	menu_panel.z_index = 21
 	sound_button = menu_row(menu_panel, 0, "声音  开", _menu_sound)
 	menu_row(menu_panel, 1, "玩法规则", _menu_rules)
 	transfer_button = menu_row(menu_panel, 2, "移交房主", _menu_transfer)
 	transfer_button.hide()
-	leave_button = menu_row(menu_panel, 3, "返回首页", _menu_leave)
+	menu_row(menu_panel, 3, "设置", show_settings)
+	leave_button = menu_row(menu_panel, 4, "返回首页", _menu_leave)
 
 
 func menu_row(parent: Control, index: int, copy: String, handler: Callable) -> Button:
@@ -329,10 +336,58 @@ func _menu_leave() -> void:
 
 
 func toggle_sound() -> void:
-	muted = not muted
+	if not save_preferences({"muted": not muted}):
+		return
+	muted = preferences.values.muted
 	if muted:
 		audio.stop()
 	sound_button.text = "声音  关" if muted else "声音  开"
+
+
+func save_preferences(changes: Dictionary) -> bool:
+	if preferences.update(changes) == OK:
+		for key in changes:
+			if settings.has(key):
+				settings[key] = preferences.values[key]
+		if changes.has("nickname") and is_instance_valid(online_lobby):
+			online_lobby.entry_name.text = preferences.values.nickname
+		return true
+	if is_instance_valid(lobby):
+		lobby.show_save_error()
+	elif is_instance_valid(online_lobby) and online_lobby.visible:
+		online_lobby.show_notice("无法保存设置，原设置已保留。")
+	else:
+		last_notice = "无法保存设置，原设置已保留。"
+		notice_until = Time.get_ticks_msec() + 4000
+		if online_view.is_empty():
+			var warning := label(self, last_notice, Rect2(780, 67, 288, 38), 16, GOLD)
+			warning.z_index = 40
+			warning.create_tween().tween_callback(warning.queue_free).set_delay(4.0)
+	return false
+
+
+func show_settings() -> void:
+	if is_instance_valid(modal):
+		return
+	close_menu()
+	var dialog := open_modal("设置", 706, 679, false)
+	modal.z_index = 40
+	settings_panel = SettingsPanel.new()
+	dialog.add_child(settings_panel)
+	settings_panel.setup(self)
+
+
+func apply_saved_appearance() -> void:
+	muted = preferences.values.muted
+	sound_button.text = "声音  关" if muted else "声音  开"
+	board_art.set_table_texture(preferences.table_texture(preferences.values.table_id))
+	if applied_skin != preferences.values.skin:
+		applied_skin = preferences.values.skin
+		faces = Skins.faces(applied_skin)
+		for node in find_children("*", "Button", true, false):
+			if node is Tile and node.number >= 0 and node.number < faces.size():
+				node.texture = faces[node.number]
+				node.queue_redraw()
 
 
 func show_lobby() -> void:
@@ -496,7 +551,7 @@ func show_room_notice(message: String) -> void:
 	else:
 		pending_stage = -1
 		notice_until = Time.get_ticks_msec() + 4000
-		if not is_instance_valid(modal):
+		if not is_instance_valid(modal) or is_instance_valid(settings_panel):
 			refresh()
 
 
@@ -1007,7 +1062,7 @@ func is_swap(move: Dictionary) -> bool:
 
 
 func perform(seat: int, move: Dictionary) -> void:
-	if is_instance_valid(modal):
+	if is_instance_valid(modal) and (seat == 0 or not is_instance_valid(settings_panel)):
 		return
 	var discards_tile: bool = move.type in ["discard", "declareGoldGap"]
 	if not online_view.is_empty():
@@ -1033,7 +1088,7 @@ func perform(seat: int, move: Dictionary) -> void:
 
 
 func run_ai() -> void:
-	if is_instance_valid(modal):
+	if is_instance_valid(modal) and not is_instance_valid(settings_panel):
 		return
 	for seat in range(1, 4):
 		var moves: Array = game.actions(seat)
@@ -1110,7 +1165,7 @@ func refresh(animate := false) -> void:
 	if not view.result.is_empty():
 		if shown_round != view.round and not is_instance_valid(modal):
 			show_result()
-	elif online_view.is_empty() and not is_instance_valid(modal) and not intro_running and not draw_flower_active and not flower_active:
+	elif online_view.is_empty() and (not is_instance_valid(modal) or is_instance_valid(settings_panel)) and not intro_running and not draw_flower_active and not flower_active:
 		for seat in range(1, 4):
 			if not game.actions(seat).is_empty():
 				ai_timer.start(0.54 if view.phase == "turn" else 0.25)
@@ -1716,9 +1771,10 @@ func submit_choice(move: Dictionary, owner, chooser: Control) -> void:
 		refresh()
 
 
-func open_modal(title: String, width: int, height: int) -> Panel:
+func open_modal(title: String, width: int, height: int, pause_ai := true) -> Panel:
 	close_modal(false)
-	ai_timer.stop()
+	if pause_ai:
+		ai_timer.stop()
 	suspend_focus(self)
 	var backdrop := ColorRect.new()
 	backdrop.color = Color(0.02, 0.05, 0.04, 0.78)
@@ -1744,9 +1800,11 @@ func suspend_focus(branch: Node) -> void:
 
 func close_modal(resume := true) -> void:
 	if is_instance_valid(modal):
+		var closing_settings := is_instance_valid(settings_panel)
 		remove_child(modal)
 		modal.queue_free()
 		modal = null
+		settings_panel = null
 		modal_tracks_stage = false
 		chooser_countdown = null
 		for control in suspended_focus:
@@ -1754,7 +1812,12 @@ func close_modal(resume := true) -> void:
 				control.focus_mode = Control.FOCUS_ALL
 		suspended_focus.clear()
 		if resume:
-			refresh()
+			if not closing_settings:
+				refresh()
+			else:
+				var view := board_view()
+				if not view.is_empty() and not view.result.is_empty() and shown_round != view.round:
+					show_result()
 
 
 func show_reset() -> void:

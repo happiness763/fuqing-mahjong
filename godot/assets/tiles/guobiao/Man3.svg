@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 150 200">
+  <title>三萬</title>
+  <g transform="translate(29 11) scale(0.91)"><path d="M24 25 Q50 21 78 22 M30 49 Q51 46 73 46 M12 77 Q47 73 88 73" fill="none" stroke="#192e34" stroke-width="8.7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M73 73 L87 70" fill="none" stroke="#192e34" stroke-width="10.178999999999998" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><g transform="translate(22 88) scale(1.06)"><path d="M16 21 L83 18 M35 10 L39 26 M65 9 L61 26 M29 34 L29 56 M29 35 L72 32 L70 54 M30 45 L70 43 M31 56 L69 54 M49 34 L50 81 M18 67 L19 92 M19 68 L80 63 L78 87 L68 91 M33 82 L65 76 M59 72 L67 82" fill="none" stroke="#a5292c" stroke-width="6.9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M72 88 L76 88" fill="none" stroke="#a5292c" stroke-width="8.073" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
