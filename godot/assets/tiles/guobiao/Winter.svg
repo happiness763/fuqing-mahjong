@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 150 200">
+  <title>冬</title>
+  <g transform="translate(14 10) scale(0.71)"><path d="M46 14 Q37 30 19 43 M38 25 L74 23 Q56 50 13 64 M33 34 Q55 57 86 63 M40 64 L57 71 M35 79 Q48 81 65 91" fill="none" stroke="#194c69" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M60 87 L66 91" fill="none" stroke="#194c69" stroke-width="9.36" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><path d="M88 27 H119 V57 H88Z" fill="none" stroke="#194c69" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <g transform="translate(90 29) scale(0.26)"><path d="M18 24 L23 79 M19 28 Q49 23 83 24 L77 78 M25 75 L77 73 M41 29 Q41 52 29 60 M59 29 L57 51 Q59 61 72 54" fill="none" stroke="#194c69" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M21 77 L26 80" fill="none" stroke="#194c69" stroke-width="10.53" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><path d="M44 177 Q67 158 71 131 M68 147 Q88 146 102 133" fill="none" stroke="#244b36" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M37 153 Q61 140 72 109 Q85 133 105 135 Q87 142 74 138 Q60 151 37 153Z" fill="#194c69" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M51 128 Q67 114 73 95 Q86 113 95 118 Q84 122 76 116 Q69 125 51 128Z" fill="#14705a" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M36 164 Q53 160 63 151 M83 148 Q103 147 114 139" fill="none" stroke="#194c69" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="35" cy="128" r="4" fill="#194c69" stroke="none" stroke-width="1"/>
+  <circle cx="111" cy="112" r="4" fill="#194c69" stroke="none" stroke-width="1"/>
+  <circle cx="120" cy="156" r="3.5" fill="#194c69" stroke="none" stroke-width="1"/>
+</svg>

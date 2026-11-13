@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 150 200">
+  <title>一條</title>
+  <path d="M24 167 Q62 154 126 158" fill="none" stroke="#244b36" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M53 140 Q26 133 22 104 Q36 113 55 114 L66 127Z" fill="#14705a" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M55 137 Q28 142 20 130 Q36 127 53 119Z" fill="#194c69" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M51 118 Q55 93 83 82 Q87 54 106 51 Q121 50 123 67 Q124 81 108 89 Q105 122 84 138 Q67 150 55 140Z" fill="#244b36" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M89 58 Q86 41 94 34 Q95 46 101 54 M100 54 Q101 40 110 38 Q108 46 111 54" fill="#a5292c" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M119 67 L134 74 L120 80Z" fill="#a5292c" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M57 122 Q61 96 93 92 Q94 119 77 132 Q65 140 57 130Z" fill="#a5292c" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M66 125 Q77 119 85 106" fill="none" stroke="#fff4da" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M71 140 L67 157 L58 159 M85 136 L83 153 L92 156" fill="none" stroke="#a56426" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="111" cy="65" r="4" fill="#fff4da" stroke="none" stroke-width="1"/>
+  <circle cx="112" cy="65" r="1.7" fill="#192e34" stroke="none" stroke-width="1"/>
+  <path d="M30 162 Q27 151 18 149 Q20 160 30 162 M108 158 Q116 145 131 145 Q127 155 108 158" fill="#14705a" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

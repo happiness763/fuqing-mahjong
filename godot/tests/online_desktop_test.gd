@@ -45,7 +45,11 @@ func run() -> void:
 	var role := "host" if host else "guest"
 	var port: int = int(args.get("port", "36712"))
 	var desk = Desk.instantiate()
+	desk.preferences_root = args.qa.path_join(role + "-profile")
 	root.add_child(desk)
+	if not host:
+		check(desk.preferences.update({"skin": "guobiao"}) == OK, "guest can choose a different tile skin")
+		desk.apply_saved_appearance()
 	desk.lobby.online_button.pressed.emit()
 	var screen = desk.online_lobby
 	var room = desk.room
@@ -77,6 +81,7 @@ func run() -> void:
 			quit(failures)
 			return
 		check(room.state.turn_seconds == 60, "opening defaults to 60 seconds")
+		check(desk.preferences.values.nickname == "玉兰" and desk.preferences.values.host_port == port, "host preferences saved")
 		await capture("room-owner")
 		screen.seat_rows[1].transfer.pressed.emit()
 		screen.confirm.confirmed.emit()
@@ -91,10 +96,18 @@ func run() -> void:
 		if not await wait_for(func(): return room.state.get("owner", -1) == 1, "guest receives ownership"):
 			quit(failures)
 			return
+		check(desk.preferences.values.nickname == "海棠", "joined nickname saved after acceptance")
 		screen.round_field.text = "1"
 		screen.round_field.text_changed.emit("1")
 		screen.turn_menu.select(0)
 		screen.save_button.pressed.emit()
+		if not await wait_for(func(): return desk.preferences.values.room_rounds == 1 and desk.preferences.values.turn_seconds == 15,
+			"accepted remote room settings are persisted"):
+			quit(failures)
+			return
+		room._wire_preferences_confirmed(999999, true)
+		check(desk.preferences.values.skin == "guobiao" and desk.preferences.values.nickname == "海棠",
+			"an unsolicited receipt cannot change local preferences")
 		for seat in [2, 3]:
 			screen.seat_rows[seat].add.pressed.emit()
 			if not await wait_for(func(): return not room.state.seats[seat].is_empty(), "AI seat added"):
@@ -110,28 +123,36 @@ func run() -> void:
 		await capture("room-settings")
 		screen.start_button.pressed.emit()
 
-	var roll_guard := 0
-	while room.state.get("phase") == "rolling" and roll_guard < 500:
+	var roll_deadline := Time.get_ticks_msec() + 15000
+	while room.state.get("phase") in ["lobby", "rolling"] and Time.get_ticks_msec() < roll_deadline:
 		if is_instance_valid(desk.dealer_roll_button) and desk.dealer_roll_button.visible \
 				and not desk.dealer_roll_button.disabled:
 			desk.dealer_roll_button.pressed.emit()
 		await process_frame
-		roll_guard += 1
 
 	if not await wait_for(func(): return room.state.get("phase") == "playing", "table starts on both peers"):
 		quit(failures)
 		return
 	check(room.state.owner == 1 and room.state.turn_seconds == 15, "room owner and turn time are synchronized")
+	if host:
+		check(desk.preferences.values.skin == "riichi" and desk.preferences.values.turn_seconds == 60,
+			"guest skin and room changes do not overwrite host preferences")
+	else:
+		check(desk.preferences.values.skin == "guobiao" and desk.preferences.values.room_rounds == 1
+			and desk.preferences.values.turn_seconds == 15, "acknowledged settings and guest skin are saved locally")
 	check(desk.header.visible and not screen.visible and desk.online_view.seat == 0, "online table opens in local perspective")
 	check(desk.player_name(0) == ("玉兰" if host else "海棠"), "local seat nickname")
 	check(desk.online_view.players[0].has("hand") and not desk.online_view.players[1].has("hand"), "hand privacy through UI")
 	check(is_instance_valid(desk.countdown_label) and room.seconds_left() in range(0, 76), "countdown displays from server state")
 	room.state_changed.connect(func(): check_action_banner(desk, room))
+	desk.skip_intro()
 	await create_timer(0.60).timeout
 	await capture("table-" + role)
 	var deadline := Time.get_ticks_msec() + 65000
 	var actions := 0
 	while room.state.get("phase") == "playing" and room.state.view.phase != "result" and Time.get_ticks_msec() < deadline:
+		if desk.flower_active:
+			desk._finish_flower_sequence()
 		var moves: Array = desk.local_moves()
 		if not moves.is_empty():
 			var move: Dictionary = moves[0]

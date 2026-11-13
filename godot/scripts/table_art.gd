@@ -18,6 +18,7 @@ const DIE_PIPS := [
 ]
 
 var dice := Vector2i.ZERO
+var table_texture: Texture2D
 var _flecks := PackedVector2Array()
 
 
@@ -44,6 +45,11 @@ func set_dice(faces: Vector2i) -> void:
 	queue_redraw()
 
 
+func set_table_texture(texture: Texture2D) -> void:
+	table_texture = texture
+	queue_redraw()
+
+
 func _draw() -> void:
 	gradient(Rect2(0, 0, 1280, 800), Color("#253a30"), Color("#10231d"))
 	draw_style_box(box(Color("#0c1814"), Color("#0c1814"), 24), Rect2(FRAME.position + Vector2(0, 7), FRAME.size).grow(3))
@@ -51,11 +57,18 @@ func _draw() -> void:
 	draw_style_box(box(Color("#815137"), Color("#b18151"), 20), FRAME.grow(-4))
 	draw_style_box(box(Color("#5b3829"), Color("#3e271e"), 17, 2), FRAME.grow(-8))
 	draw_style_box(box(Color("#23523f"), Color("#112c22"), 15, 2), FELT)
-	for ring in range(9, 0, -1):
-		var scale := ring / 9.0
-		draw_circle(CENTER, 270 * scale, Color(0.18, 0.46, 0.32, 0.045), true, -1.0, true)
-	for point in _flecks:
-		draw_line(point, point + Vector2(2, -1), Color(0.81, 0.86, 0.68, 0.08), 1.0)
+	if table_texture:
+		var area := FELT.grow(-7)
+		var image_size := table_texture.get_size()
+		var scale := maxf(area.size.x / image_size.x, area.size.y / image_size.y)
+		var crop_size := area.size / scale
+		draw_texture_rect_region(table_texture, area, Rect2((image_size - crop_size) * 0.5, crop_size), Color(0.83, 0.83, 0.83))
+	else:
+		for ring in range(9, 0, -1):
+			var scale := ring / 9.0
+			draw_circle(CENTER, 270 * scale, Color(0.18, 0.46, 0.32, 0.045), true, -1.0, true)
+		for point in _flecks:
+			draw_line(point, point + Vector2(2, -1), Color(0.81, 0.86, 0.68, 0.08), 1.0)
 	draw_style_box(box(Color.TRANSPARENT, Color("#638064"), 11), FELT.grow(-6))
 	for corner in [Vector2(57, 45), Vector2(1041, 45), Vector2(57, 755), Vector2(1041, 755)]:
 		var horizontal := -1.0 if corner.x > 500 else 1.0

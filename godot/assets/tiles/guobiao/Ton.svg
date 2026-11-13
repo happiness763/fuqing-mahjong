@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 150 200">
+  <title>東</title>
+  <g transform="translate(14 35) scale(1.22)"><path d="M12 22 Q47 18 88 18 M26 33 L27 67 M27 35 L75 31 L74 63 M28 49 L73 45 M29 65 L72 62 M50 9 L49 92 M45 60 Q34 74 15 87 M54 62 Q71 80 88 84" fill="none" stroke="#192e34" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M83 83 L88 85" fill="none" stroke="#192e34" stroke-width="9.36" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

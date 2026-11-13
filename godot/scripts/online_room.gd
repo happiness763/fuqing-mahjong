@@ -1,12 +1,13 @@
 extends Node
 
 signal state_changed
+signal preferences_confirmed(changes: Dictionary)
 signal notice(message: String)
 
 const Game = preload("res://scripts/game.gd")
 const Opponent = preload("res://scripts/opponent.gd")
 const Rules = preload("res://scripts/rules.gd")
-const VERSION := "1.2.4"
+const VERSION := "1.2.5"
 const SERVER := 1
 const DEFAULT_PORT := 36712
 const CONNECT_MS := 8000
@@ -32,6 +33,8 @@ var _owner := 0
 var _seat_order := 0
 var _seats: Array[Dictionary] = []
 var _pending_peers: Dictionary = {}
+var _preference_serial := 0
+var _pending_preferences := {}
 var _rounds := 15
 var _turn_seconds := 60
 var _game: Game
@@ -64,7 +67,7 @@ func _exit_tree() -> void:
 	_close_transport()
 
 
-func host(nick: String, port: int = DEFAULT_PORT) -> String:
+func host(nick: String, port: int = DEFAULT_PORT, rounds := 15, turn_seconds := 60) -> String:
 	if not _can_open():
 		return "请先离开当前房间。"
 	nick = nick.strip_edges()
@@ -72,6 +75,8 @@ func host(nick: String, port: int = DEFAULT_PORT) -> String:
 		return "昵称须为 1–12 个可见字符。"
 	if not _valid_port(port):
 		return "端口须为 1–65535。"
+	if rounds < 1 or rounds > 32 or turn_seconds not in TURN_OPTIONS:
+		return "房间局数或出牌时间无效。"
 	var peer := ENetMultiplayerPeer.new()
 	if peer.create_server(port, 8) != OK:
 		return "无法监听 UDP %d，端口可能已被占用。" % port
@@ -80,8 +85,8 @@ func host(nick: String, port: int = DEFAULT_PORT) -> String:
 	_local_addresses = _find_local_addresses(IP.get_local_addresses())
 	_owner = 0
 	_seat_order = 0
-	_rounds = 15
-	_turn_seconds = 60
+	_rounds = rounds
+	_turn_seconds = turn_seconds
 	_game = null
 	_seats = [_human_seat(nick, SERVER), {}, {}, {}]
 	_install_transport(peer)
@@ -139,7 +144,22 @@ func request(op: String, data: Dictionary = {}) -> void:
 	if _role == "host":
 		_handle_request(SERVER, op, data)
 	elif _role == "client":
-		_wire_request.rpc_id(SERVER, op, data)
+		var changes := _preference_changes(op, data)
+		var receipt := 0
+		if not changes.is_empty():
+			_preference_serial += 1
+			receipt = _preference_serial
+			_pending_preferences[receipt] = changes
+		_wire_request.rpc_id(SERVER, op, data, receipt)
+
+
+func _preference_changes(op: String, data: Dictionary) -> Dictionary:
+	match op:
+		"rename":
+			return {"nickname": _read_name(data)}
+		"settings":
+			return {"room_rounds": data.get("rounds"), "turn_seconds": data.get("turn_seconds")}
+	return {}
 
 
 func _process(_delta: float) -> void:
@@ -191,6 +211,7 @@ func _connect_transport() -> Error:
 
 
 func _close_transport() -> void:
+	_pending_preferences.clear()
 	if _peer == null:
 		return
 	var peer := _peer
@@ -375,9 +396,9 @@ func _wire_snapshot(snapshot: Dictionary) -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _wire_request(op: String, data: Dictionary) -> void:
+func _wire_request(op: String, data: Dictionary, receipt: int) -> void:
 	if _role == "host":
-		_handle_request(multiplayer.get_remote_sender_id(), op, data)
+		_handle_request(multiplayer.get_remote_sender_id(), op, data, receipt)
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -442,7 +463,7 @@ func _expire_seats(now: int) -> void:
 		_publish()
 
 
-func _handle_request(peer_id: int, op: String, data: Dictionary) -> void:
+func _handle_request(peer_id: int, op: String, data: Dictionary, receipt := 0) -> void:
 	var received_at := Time.get_ticks_msec()
 	var seat := _seat_for_peer(peer_id)
 	if seat < 0:
@@ -450,10 +471,26 @@ func _handle_request(peer_id: int, op: String, data: Dictionary) -> void:
 	var error := _apply_request(seat, op, data, received_at)
 	if error.is_empty():
 		_publish()
+		if peer_id == SERVER:
+			var changes := _preference_changes(op, data)
+			if not changes.is_empty():
+				preferences_confirmed.emit(changes)
 	elif peer_id == SERVER:
 		notice.emit(error)
 	else:
 		_wire_notice.rpc_id(peer_id, error)
+	if peer_id != SERVER and receipt > 0:
+		_wire_preferences_confirmed.rpc_id(peer_id, receipt, error.is_empty())
+
+
+@rpc("authority", "call_remote", "reliable")
+func _wire_preferences_confirmed(receipt: int, accepted: bool) -> void:
+	if _role != "client" or not _pending_preferences.has(receipt):
+		return
+	var changes: Dictionary = _pending_preferences[receipt]
+	_pending_preferences.erase(receipt)
+	if accepted:
+		preferences_confirmed.emit(changes)
 
 
 func _apply_request(seat: int, op: String, data: Dictionary, received_at: int) -> String:

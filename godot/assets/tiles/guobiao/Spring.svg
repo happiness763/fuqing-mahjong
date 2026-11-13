@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 150 200">
+  <title>春</title>
+  <g transform="translate(14 10) scale(0.71)"><path d="M19 24 L78 19 M23 37 L74 32 M14 51 L87 45 M50 12 Q43 53 15 70 M54 48 Q69 64 85 70 M33 63 L35 91 M34 65 L68 61 L67 88 M35 77 L67 73 M36 90 L65 86" fill="none" stroke="#194c69" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M78 67 L85 70" fill="none" stroke="#194c69" stroke-width="9.36" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><path d="M88 27 H119 V57 H88Z" fill="none" stroke="#194c69" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <g transform="translate(90 29) scale(0.26)"><path d="M13 55 Q44 51 85 49" fill="none" stroke="#194c69" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M71 49 L85 46" fill="none" stroke="#194c69" stroke-width="10.53" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><path d="M29 177 Q51 160 61 123 M58 145 Q81 139 100 123" fill="none" stroke="#244b36" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <g transform="translate(46 158) rotate(-140) scale(0.95)"><path d="M0 0 Q8 -18 29 -12 Q19 1 0 0Z" fill="#14705a" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><g transform="translate(78 135) rotate(-16) scale(0.7)"><path d="M0 0 Q8 -18 29 -12 Q19 1 0 0Z" fill="#14705a" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><g transform="translate(59 114) scale(1.2)"><g transform="rotate(0.0000)"><path d="M-3 1 Q-13 -11 -7 -20 Q0 -24 7 -20 Q13 -11 3 1Z" fill="#a5292c" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><g transform="rotate(72.0000)"><path d="M-3 1 Q-13 -11 -7 -20 Q0 -24 7 -20 Q13 -11 3 1Z" fill="#a5292c" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><g transform="rotate(144.0000)"><path d="M-3 1 Q-13 -11 -7 -20 Q0 -24 7 -20 Q13 -11 3 1Z" fill="#a5292c" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><g transform="rotate(216.0000)"><path d="M-3 1 Q-13 -11 -7 -20 Q0 -24 7 -20 Q13 -11 3 1Z" fill="#a5292c" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><g transform="rotate(288.0000)"><path d="M-3 1 Q-13 -11 -7 -20 Q0 -24 7 -20 Q13 -11 3 1Z" fill="#a5292c" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><circle cx="0" cy="0" r="6" fill="#a56426" stroke="none" stroke-width="1"/>
+  </g><g transform="translate(105 117) scale(0.72)"><g transform="rotate(0.0000)"><path d="M-3 1 Q-13 -11 -7 -20 Q0 -24 7 -20 Q13 -11 3 1Z" fill="#b74b50" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><g transform="rotate(72.0000)"><path d="M-3 1 Q-13 -11 -7 -20 Q0 -24 7 -20 Q13 -11 3 1Z" fill="#b74b50" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><g transform="rotate(144.0000)"><path d="M-3 1 Q-13 -11 -7 -20 Q0 -24 7 -20 Q13 -11 3 1Z" fill="#b74b50" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><g transform="rotate(216.0000)"><path d="M-3 1 Q-13 -11 -7 -20 Q0 -24 7 -20 Q13 -11 3 1Z" fill="#b74b50" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><g transform="rotate(288.0000)"><path d="M-3 1 Q-13 -11 -7 -20 Q0 -24 7 -20 Q13 -11 3 1Z" fill="#b74b50" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><circle cx="0" cy="0" r="6" fill="#a56426" stroke="none" stroke-width="1"/>
+  </g>
+</svg>

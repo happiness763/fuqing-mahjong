@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 150 200">
+  <title>二條</title>
+  <g transform="translate(75 57) rotate(0) scale(0.97)"><path d="M-13 -30 Q0 -35 13 -30 L11 -24 Q6 -18 6 -10 L6 10 Q6 19 12 24 L13 29 Q0 35 -13 29 L-12 24 Q-6 18 -6 10 L-6 -10 Q-6 -18 -11 -24Z" fill="#14705a" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M-13 -24 Q0 -21 13 -24 M-8 0 L8 0 M-13 24 Q0 21 13 24" fill="none" stroke="#14705a" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M0 -19 L0 18" fill="none" stroke="#fff4da" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g><g transform="translate(75 143) rotate(0) scale(0.97)"><path d="M-13 -30 Q0 -35 13 -30 L11 -24 Q6 -18 6 -10 L6 10 Q6 19 12 24 L13 29 Q0 35 -13 29 L-12 24 Q-6 18 -6 10 L-6 -10 Q-6 -18 -11 -24Z" fill="#14705a" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M-13 -24 Q0 -21 13 -24 M-8 0 L8 0 M-13 24 Q0 21 13 24" fill="none" stroke="#14705a" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M0 -19 L0 18" fill="none" stroke="#fff4da" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
