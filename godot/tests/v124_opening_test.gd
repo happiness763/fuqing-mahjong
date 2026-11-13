@@ -13,6 +13,7 @@ func _initialize() -> void:
 	test_gold_dice_choose_the_indicator()
 	test_opening_intro_sequence()
 	test_deal_flower_events()
+	test_luck_preserves_opening_replay()
 	test_flower_draw_events()
 	if failures == 0:
 		print("v1.2.4 opening tests passed")
@@ -117,6 +118,21 @@ func test_deal_flower_events() -> void:
 	check(game.view(0).deal_draws.any(func(draw): return draw.tile == 39), "public flower draw")
 	check(not game.view(0).deal_draws.any(func(draw): return draw.tile == 22),
 		"other seats' tile replacements stay private")
+
+
+func test_luck_preserves_opening_replay() -> void:
+	for luck in ["lucky", "unlucky"]:
+		for seed in range(40, 49):
+			var game = Game.new(seed, 15, luck)
+			var view: Dictionary = game.view(0)
+			var replayed: Array = view.deal_initial_hand.duplicate()
+			for event in view.deal_flowers:
+				if event.round == 0 and event.seat == 0:
+					replayed.erase(event.tile)
+			for event in view.deal_draws:
+				if event.seat == 0 and not event.flower:
+					replayed.append(event.tile)
+			check(replayed == view.players[0].hand, "%s seed %d replay matches actual hand" % [luck, seed])
 
 
 func test_flower_draw_events() -> void:

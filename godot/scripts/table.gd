@@ -13,6 +13,8 @@ const OnlineLobby = preload("res://scripts/online_lobby.gd")
 const OnlineRoom = preload("res://scripts/online_room.gd")
 const OnlineTableView = preload("res://scripts/online_table_view.gd")
 const OpeningIntro = preload("res://scripts/opening_intro.gd")
+const SLIDE_DURATION := 0.23
+const SLIDE_FADE := 0.16
 const UI_FONT = preload("res://assets/fonts/NotoSansSC.woff2")
 const NAMES := ["你", "阿岚", "阿榕", "阿屿"]
 const MARKS := ["你", "岚", "榕", "屿"]
@@ -71,7 +73,8 @@ var flower_active := false
 var flower_preview := false
 var flower_preview_hand: Array = []
 var flower_hold_drawn := false
-var flower_slide_tile := -1
+var flower_slide_index := -1
+var flower_slide_started := 0
 var flower_status_text := ""
 var draw_flower_active := false
 var last_flower_revision := -1
@@ -535,6 +538,8 @@ func room_state_changed() -> void:
 		online_rolling = false
 		close_online_dealer_roll()
 	if round_changed:
+		cancel_flower_sequence()
+		draw_flower_active = false
 		log_lines.clear()
 	transfer_button.visible = is_room_owner() and not reconnecting
 	if round_changed and next_view.phase != "result" and next_view.latest.type == "start":
@@ -910,20 +915,19 @@ func start_flower_sequence(sequence: Array, mode: String, preview_hand: Array, o
 	flower_done = on_done
 	flower_active = true
 	flower_hold_drawn = hold_drawn
-	flower_slide_tile = -1
 	flower_status_text = "摸到花"
 	if flower_sequence.is_empty():
 		_finish_flower_sequence()
 		return
 	flower_index = -1
 	refresh()
-	flower_timer.start(0.45)
+	flower_timer.start(OpeningIntro.FLOWER_HOLD)
 
 
 func _show_flower_step() -> void:
 	if not flower_active or flower_index < 0 or flower_index >= flower_sequence.size():
 		return
-	flower_slide_tile = -1
+	flower_slide_index = -1
 	var event: Dictionary = flower_sequence[flower_index]
 	var seat := int(event.get("seat", 0))
 	var tile_number := int(event.get("tile", -1))
@@ -938,10 +942,15 @@ func _show_flower_step() -> void:
 		flower_status_text = "第 %d 轮补花" % round_number
 		if seat == 0 and flower_preview:
 			flower_preview_hand.append(tile_number)
-			flower_slide_tile = tile_number
+			flower_slide_index = flower_preview_hand.filter(func(number): return number <= tile_number).size() - 1
+	elif kind == "replacement":
+		flower_hold_drawn = false
+		flower_slide_index = board_view().players[0].hand.size() - 1
 	else:
 		flower_status_text = ("第 %d 轮补花" % round_number) if flower_preview else ("第 %d 次补花" % round_number)
 		pop_flower(seat, tile_number)
+	if flower_slide_index >= 0:
+		flower_slide_started = Time.get_ticks_msec()
 	refresh()
 
 
@@ -953,7 +962,7 @@ func advance_flower() -> void:
 		_finish_flower_sequence()
 	else:
 		_show_flower_step()
-		flower_timer.start(0.22)
+		flower_timer.start(OpeningIntro.REPLACEMENT_STEP if flower_slide_index >= 0 else OpeningIntro.FLOWER_STEP)
 
 
 func _finish_flower_sequence() -> void:
@@ -964,6 +973,7 @@ func _finish_flower_sequence() -> void:
 	flower_preview = false
 	flower_preview_hand = []
 	flower_hold_drawn = false
+	flower_slide_index = -1
 	flower_sequence = []
 	var callback := flower_done
 	flower_done = Callable()
@@ -978,7 +988,7 @@ func cancel_flower_sequence() -> void:
 	flower_preview = false
 	flower_preview_hand = []
 	flower_hold_drawn = false
-	flower_slide_tile = -1
+	flower_slide_index = -1
 	flower_status_text = ""
 	flower_done = Callable()
 	if is_instance_valid(flower_fx):
@@ -1134,11 +1144,13 @@ func refresh(animate := false) -> void:
 				sequence.append({"kind": "draw_flower", "seat": int(event.seat), "tile": int(event.tile), "round": int(event.round)})
 			var drawn_tile := int(view.get("drawn", -1))
 			var drawer := int(view.get("current", -1))
+			var local_replacement := drawn_tile >= 0 and drawer == 0
+			if local_replacement:
+				sequence.append({"kind": "replacement", "seat": 0, "tile": drawn_tile})
 			start_flower_sequence(sequence, "draw", [], func():
 				draw_flower_active = false
-				flower_hold_drawn = false
-				flower_slide_tile = drawn_tile if drawer == 0 else -1
-				refresh(true), drawn_tile >= 0 and drawer == 0)
+				refresh(), local_replacement)
+			return
 	clear_board()
 	dynamic = Control.new()
 	dynamic.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1163,7 +1175,7 @@ func refresh(animate := false) -> void:
 	if is_instance_valid(modal):
 		suspend_focus(dynamic)
 	if not view.result.is_empty():
-		if shown_round != view.round and not is_instance_valid(modal):
+		if shown_round != view.round and not is_instance_valid(modal) and not flower_active and not intro_running:
 			show_result()
 	elif online_view.is_empty() and (not is_instance_valid(modal) or is_instance_valid(settings_panel)) and not intro_running and not draw_flower_active and not flower_active:
 		for seat in range(1, 4):
@@ -1281,8 +1293,22 @@ func slide(node: Control, offset: Vector2, delay := 0.0) -> void:
 	node.position += offset
 	node.modulate.a = 0.0
 	var motion := node.create_tween().set_parallel()
-	motion.tween_property(node, "position", destination, 0.23).set_delay(delay).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	motion.tween_property(node, "modulate:a", 1.0, 0.16).set_delay(delay)
+	motion.tween_property(node, "position", destination, SLIDE_DURATION).set_delay(delay).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	motion.tween_property(node, "modulate:a", 1.0, SLIDE_FADE).set_delay(delay)
+
+
+func slide_flower_replacement(node: Control) -> void:
+	# Board redraws can happen during the animation, for example on a room update.
+	var elapsed := float(Time.get_ticks_msec() - flower_slide_started) / 1000.0
+	var time_left := SLIDE_DURATION - elapsed
+	if time_left <= 0.0:
+		return
+	var destination := node.position
+	node.position.x += 70.0 * pow(time_left / SLIDE_DURATION, 3)
+	node.modulate.a = minf(1.0, elapsed / SLIDE_FADE)
+	var motion := node.create_tween().set_parallel()
+	motion.tween_property(node, "position", destination, time_left).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	motion.tween_property(node, "modulate:a", 1.0, maxf(0.0, SLIDE_FADE - elapsed))
 
 
 func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: bool, draw_seat_index: int) -> void:
@@ -1469,15 +1495,16 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool, drew: bool) -> void:
 				hand = initial.duplicate()
 			hand = hand.slice(0, mini(intro_visible_hand, hand.size()))
 		if flower_hold_drawn and view.drawn >= 0:
-			hand.erase(view.drawn)
+			hand.pop_back()
 	var has_draw: bool = view.drawn >= 0 and not flower_hold_drawn and not flower_preview
 	if has_draw:
 		hand.pop_back()
 	hand.sort()
 	if has_draw:
 		hand.append(view.drawn)
-	var cursor := 549.0 - (hand.size() * 59 - 3 + (10 if has_draw else 0)) * 0.5
-	var slid := false
+	var reserve_draw_slot: bool = flower_hold_drawn and view.drawn >= 0
+	var slot_count := hand.size() + int(reserve_draw_slot)
+	var cursor := 549.0 - (slot_count * 59 - 3 + (10 if has_draw or reserve_draw_slot else 0)) * 0.5
 	for index in range(hand.size()):
 		var number: int = hand[index]
 		var chosen := selected_index == index
@@ -1489,14 +1516,12 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool, drew: bool) -> void:
 			view.gold, handler, chosen, drawn)
 		node.name = "HandTile%d" % index
 		human_buttons.append(node)
-		if deal:
+		if index == flower_slide_index:
+			slide_flower_replacement(node)
+		elif deal:
 			slide(node, Vector2(0, 18), index * 0.017)
 		elif drew and drawn:
 			slide(node, Vector2(20, 0))
-		elif flower_slide_tile >= 0 and number == flower_slide_tile and not slid:
-			slide(node, Vector2(70, 0))
-			slid = true
-			flower_slide_tile = -1
 		cursor += 59
 
 

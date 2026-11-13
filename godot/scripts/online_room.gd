@@ -7,7 +7,8 @@ signal notice(message: String)
 const Game = preload("res://scripts/game.gd")
 const Opponent = preload("res://scripts/opponent.gd")
 const Rules = preload("res://scripts/rules.gd")
-const VERSION := "1.2.5"
+const OpeningIntro = preload("res://scripts/opening_intro.gd")
+const VERSION := "1.2.5a"
 const SERVER := 1
 const DEFAULT_PORT := 36712
 const CONNECT_MS := 8000
@@ -643,9 +644,10 @@ func _play(seat: int, data: Dictionary, received_at: int) -> String:
 	if _deadline_ms >= 0 and received_at >= _deadline_ms:
 		return "本阶段操作已超时。"
 	var id: Variant = data.get("id")
+	var flower_revision := _game.flower_revision
 	if typeof(id) != TYPE_STRING or not _game.act(seat, id):
 		return "这项操作当前无效。"
-	_begin_stage()
+	_begin_stage(_draw_grace_ms(flower_revision))
 	return ""
 
 
@@ -655,7 +657,7 @@ func _after_result(op: String, data: Dictionary) -> String:
 	if op == "next":
 		if not _game.next_round():
 			return "本桌已打完。"
-		_begin_stage(INTRO_MS)
+		_begin_stage(_opening_grace_ms())
 		return ""
 	if not _game.is_table_finished():
 		return "整桌结束后可返回等候室。"
@@ -724,10 +726,21 @@ func _finish_rolling() -> void:
 	_roll_ai_due_ms = -1
 	_game = Game.new(-1, _rounds, "normal", true, int(_roll_state.winner))
 	_game.dealer_rolls = _roll_state.duplicate(true)
-	var view := _game.view(0)
-	var flowers: int = view.get("deal_flowers", []).size()
-	var draws: int = view.get("deal_draws", []).size()
-	_begin_stage(INTRO_MS + (flowers + draws) * 250 + 500)
+	_begin_stage(_opening_grace_ms())
+
+
+func _opening_grace_ms() -> int:
+	var initial_flowers := _game.deal_flowers.filter(func(event): return event.round == 0).size()
+	var seconds := OpeningIntro.FLOWER_HOLD + initial_flowers * OpeningIntro.FLOWER_STEP
+	seconds += _game.deal_draws.size() * OpeningIntro.REPLACEMENT_STEP
+	return INTRO_MS + ceili(seconds * 1000.0)
+
+
+func _draw_grace_ms(previous_revision: int) -> int:
+	if _game.flower_revision == previous_revision:
+		return 0
+	var seconds := OpeningIntro.FLOWER_HOLD + _game.last_flowers.size() * OpeningIntro.FLOWER_STEP
+	return ceili((seconds + OpeningIntro.REPLACEMENT_STEP) * 1000.0)
 
 
 func _begin_stage(intro_ms := 0) -> void:
@@ -751,8 +764,9 @@ func _process_stage(now: int) -> void:
 		move = _game.online_timeout_action()
 	else:
 		return
+	var flower_revision := _game.flower_revision
 	if not move.is_empty() and _game.act(actor, move.id):
-		_begin_stage()
+		_begin_stage(_draw_grace_ms(flower_revision))
 		_publish()
 
 

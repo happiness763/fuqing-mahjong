@@ -56,7 +56,7 @@ func run() -> void:
 	var desk = Desk.instantiate()
 	desk.preferences_root = OS.get_temp_dir().path_join("fuqing-desktop-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	root.add_child(desk)
-	check(ProjectSettings.get_setting("application/config/version") == "1.2.5", "project version")
+	check(ProjectSettings.get_setting("application/config/version") == "1.2.5a", "project version")
 	check(desk.game == null and desk.lobby.round_field.text == "15", "lobby defaults to 15 rounds")
 	check(Art.FRAME == Rect2(28, 16, 1042, 768), "table frame fills the window")
 	check(Art.FELT == Rect2(41, 29, 1016, 742), "felt follows the frame")
@@ -250,6 +250,7 @@ func run() -> void:
 	check(not desk.intro_active() and desk.human_buttons.size() == desk.game.players[0].hand.size(),
 		"skip restores the full hand")
 	desk.game = Game.new(43, 2)
+	desk.game.players[0].hand = [10, 22]
 	desk.game.deal_initial_hands = [[27, 10], [], [], []]
 	desk.game.deal_flowers = [{"round": 0, "seat": 0, "tile": 27}]
 	desk.game.deal_draws = [{"round": 1, "seat": 0, "tile": 22, "flower": false}]
@@ -270,6 +271,7 @@ func run() -> void:
 	check(desk.flower_preview_hand == [10], "initial flower leaves the raw hand")
 	desk.advance_flower()
 	check(desk.flower_preview_hand.has(22), "replacement slides into the raw hand")
+	check(desk.flower_timer.wait_time >= 0.23, "opening replacement has time to finish sliding before the board is rebuilt")
 	desk.advance_flower()
 	check(not desk.flower_active and desk.intro == null, "opening flower animation finishes the intro")
 	desk.game = Game.new(43)
@@ -277,7 +279,8 @@ func run() -> void:
 	desk.game.current = 0
 	desk.game.gold = 26
 	desk.game.indicator = 26
-	desk.game.players[0].hand = [10]
+	desk.game.players[0].hand = [10, 16, 10]
+	desk.game.drawn = 10
 	desk.game.last_flowers = [{"round": 1, "seat": 0, "tile": 27}]
 	desk.game.flower_revision = 1
 	desk.last_flower_revision = 0
@@ -287,6 +290,17 @@ func run() -> void:
 	check(desk.local_moves().is_empty(), "draw flower animation blocks moves")
 	desk.advance_flower()
 	check(desk.flower_status_text == "第 1 次补花", "draw flower shows the replacement round")
+	check(desk.human_buttons.map(func(button): return button.number) == [10, 16],
+		"the settled hand stays in place during the flower")
+	var first_slot: Vector2 = desk.human_buttons[0].position
+	desk.advance_flower()
+	check(desk.flower_active and desk.human_buttons.size() == 3,
+		"the replacement arrives before the flower sequence unlocks the hand")
+	check(desk.human_buttons[0].modulate.a == 1.0 and desk.human_buttons.back().modulate.a < 1.0,
+		"only the newly drawn copy slides in when its face matches an existing tile")
+	check(desk.human_buttons[0].position == first_slot, "the settled row does not recenter when the replacement appears")
+	desk.refresh()
+	check(desk.human_buttons.back().modulate.a < 1.0, "an intervening refresh does not snap the replacement into place")
 	desk._finish_flower_sequence()
 	check(not desk.draw_flower_active and not desk.flower_active, "draw flower animation ends")
 	if DisplayServer.get_name() != "headless":
