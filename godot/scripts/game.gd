@@ -64,19 +64,22 @@ func start_round() -> void:
 		gold_dice = [_dice_rng.randi_range(1, 6), _dice_rng.randi_range(1, 6)]
 	deal(Rules.make_wall(_rng))
 	if luck != "normal":
-		var best := {"players": players, "wall": wall, "gold": gold, "indicator": indicator, "gold_index": gold_index}
+		var best := opening_deal()
 		var best_score := Opponent.opening_value(players[0].hand, gold, dealer == 0)
 		for candidate in range(4):
 			deal(Rules.make_wall(_rng))
 			var value := Opponent.opening_value(players[0].hand, gold, dealer == 0)
 			if (luck == "lucky" and value > best_score) or (luck == "unlucky" and value < best_score):
-				best = {"players": players, "wall": wall, "gold": gold, "indicator": indicator, "gold_index": gold_index}
+				best = opening_deal()
 				best_score = value
 		players = best.players
 		wall = best.wall
 		gold = best.gold
 		indicator = best.indicator
 		gold_index = best.gold_index
+		deal_initial_hands = best.initial_hands
+		deal_flowers = best.flowers
+		deal_draws = best.draws
 	last_discard = {}
 	pending = {}
 	result = {}
@@ -85,6 +88,11 @@ func start_round() -> void:
 	can_self_win = true
 	note("start", dealer)
 	open_claims("heaven")
+
+
+func opening_deal() -> Dictionary:
+	return {"players": players, "wall": wall, "gold": gold, "indicator": indicator, "gold_index": gold_index,
+		"initial_hands": deal_initial_hands, "flowers": deal_flowers, "draws": deal_draws}
 
 
 func deal(shuffled: Array) -> void:

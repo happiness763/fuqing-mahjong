@@ -1,6 +1,9 @@
 extends RefCounted
 
 const STAGES := ["deal", "dealer_extra", "dice", "gold", "flowers", "done"]
+const FLOWER_HOLD := 0.45
+const FLOWER_STEP := 0.22
+const REPLACEMENT_STEP := 0.28
 
 var stage := "idle"
 var deal_round := 0
