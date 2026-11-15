@@ -10,7 +10,7 @@ const Opponent = preload("res://scripts/opponent.gd")
 const Rules = preload("res://scripts/rules.gd")
 const Interactions = preload("res://scripts/table_interaction.gd")
 const OpeningIntro = preload("res://scripts/opening_intro.gd")
-const VERSION := "1.2.6"
+const VERSION := "1.2.7"
 const SERVER := 1
 const DEFAULT_PORT := 36712
 const CONNECT_MS := 8000
@@ -33,8 +33,8 @@ var _address := ""
 var _nickname := ""
 var _token := ""
 var _local_addresses: Array[String] = []
-var _owner := 0
-var _seat_order := 0
+var _owner_id := -1
+var _next_seat_id := 0
 var _seats: Array[Dictionary] = []
 var _pending_peers: Dictionary = {}
 var _interaction_after := {}
@@ -90,12 +90,12 @@ func host(nick: String, port: int = DEFAULT_PORT, rounds := 15, turn_seconds := 
 	_role = "host"
 	_port = port
 	_local_addresses = _find_local_addresses(IP.get_local_addresses())
-	_owner = 0
-	_seat_order = 0
+	_next_seat_id = 0
 	_rounds = rounds
 	_turn_seconds = turn_seconds
 	_game = null
 	_seats = [_human_seat(nick, SERVER), {}, {}, {}]
+	_owner_id = _seats[0].seat_id
 	_install_transport(peer)
 	_publish()
 	return ""
@@ -148,6 +148,12 @@ func seconds_left() -> int:
 
 
 func request(op: String, data: Dictionary = {}) -> void:
+	if op in ["transfer", "remove", "update_ai"] and not data.has("seat_id"):
+		var target: Variant = data.get("seat")
+		var seats: Array = state.get("seats", [])
+		if target is int and target >= 0 and target < seats.size():
+			data = data.duplicate()
+			data.seat_id = seats[target].get("seat_id", -1)
 	if _role == "host":
 		_handle_request(SERVER, op, data)
 	elif _role == "client":
@@ -280,7 +286,7 @@ func _on_peer_disconnected(peer_id: int) -> void:
 		return
 	_seats[seat].peer = 0
 	_seats[seat].expires_at = Time.get_ticks_msec() + RESUME_MS
-	if seat == _owner:
+	if _seats[seat].seat_id == _owner_id:
 		_reassign_owner()
 	_publish()
 
@@ -340,8 +346,8 @@ func _wire_hello(version: String, nick: String, token: String) -> void:
 	var now := Time.get_ticks_msec()
 	_expire_seats(now)
 	if not token.is_empty():
-		for seat in range(1, _seats.size()):
-			if _seats[seat].get("token", "") != token:
+		for seat in range(_seats.size()):
+			if _seats[seat].get("peer", 0) == SERVER or _seats[seat].get("token", "") != token:
 				continue
 			var old_peer: int = _seats[seat].peer
 			_seats[seat].peer = sender
@@ -384,7 +390,7 @@ func _wire_welcome(token: String, snapshot: Dictionary) -> void:
 	_token = token
 	_apply_snapshot(snapshot)
 	if resumed:
-		notice.emit("已恢复原座位。")
+		notice.emit("已恢复座位。")
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -417,7 +423,7 @@ func _wire_depart() -> void:
 		return
 	var peer_id := multiplayer.get_remote_sender_id()
 	var seat := _seat_for_peer(peer_id)
-	if seat > 0:
+	if peer_id != SERVER and seat >= 0:
 		_release_seat(seat)
 		_drain_peer(peer_id)
 		_publish()
@@ -425,8 +431,8 @@ func _wire_depart() -> void:
 
 func _human_seat(nick: String, peer_id: int) -> Dictionary:
 	var seat := {"name": nick, "kind": "human", "difficulty": "normal", "peer": peer_id,
-		"token": Crypto.new().generate_random_bytes(24).hex_encode(), "expires_at": -1, "order": _seat_order}
-	_seat_order += 1
+		"token": Crypto.new().generate_random_bytes(24).hex_encode(), "expires_at": -1, "seat_id": _next_seat_id}
+	_next_seat_id += 1
 	return seat
 
 
@@ -440,31 +446,39 @@ func _seat_for_peer(peer_id: int) -> int:
 
 
 func _release_seat(seat: int) -> void:
+	var was_owner: bool = _seats[seat].seat_id == _owner_id
 	if _game == null and not _rolling:
 		_seats[seat] = {}
 	else:
 		var old_name: String = _seats[seat].get("name", "AI")
-		_seats[seat] = {"name": old_name, "kind": "ai", "difficulty": "normal", "managed": true}
+		_seats[seat] = {"name": old_name, "kind": "ai", "difficulty": "normal", "managed": true, "seat_id": _next_seat_id}
+		_next_seat_id += 1
 		if _game != null and _game.online_actor() == seat:
 			_ai_due_ms = Time.get_ticks_msec() + AI_DELAY_MS
 		elif _rolling and Rules.dealer_roll_current(_roll_state) == seat:
 			_schedule_roll()
-	if seat == _owner:
+	if was_owner:
 		_reassign_owner()
 
 
 func _reassign_owner() -> void:
-	var earliest := _seat_order
+	var earliest := _next_seat_id
+	for player in _seats:
+		if player.get("peer", 0) != 0:
+			earliest = mini(earliest, player.seat_id)
+	_owner_id = -1 if earliest == _next_seat_id else earliest
+
+
+func _owner_seat() -> int:
 	for seat in range(_seats.size()):
-		var player := _seats[seat]
-		if player.get("peer", 0) != 0 and player.order < earliest:
-			_owner = seat
-			earliest = player.order
+		if _seats[seat].get("seat_id", -1) == _owner_id and not _seats[seat].is_empty():
+			return seat
+	return -1
 
 
 func _expire_seats(now: int) -> void:
 	var changed := false
-	for seat in range(1, _seats.size()):
+	for seat in range(_seats.size()):
 		var expiry: int = _seats[seat].get("expires_at", -1)
 		if expiry >= 0 and now >= expiry:
 			_release_seat(seat)
@@ -545,20 +559,26 @@ func _apply_request(seat: int, op: String, data: Dictionary, received_at: int) -
 		return "正在掷骰定庄，请稍候。"
 	if op == "rename":
 		return "本桌已开局，结算后可修改昵称。" if _game != null else _rename(seat, data)
-	if seat != _owner:
+	if op == "move_seat":
+		return "本桌进行中，结算后可调整房间。" if _game != null else _move_seat(seat, data)
+	if _seats[seat].seat_id != _owner_id:
 		return "只有房主可以执行这项操作。"
 	var target: Variant = data.get("seat", -1)
-	var has_target: bool = typeof(target) == TYPE_INT and target >= 0 and target < _seats.size()
+	var has_target := _valid_seat(target)
+	if has_target and op in ["transfer", "remove", "update_ai"] and not _seat_matches(target, data.get("seat_id")):
+		return "座位已变化，请确认后再操作。"
 	if op == "transfer":
-		if not has_target or _seats[target].get("peer", 0) == 0 or target == _owner:
+		if not has_target or _seats[target].get("peer", 0) == 0 or target == seat:
 			return "请选择另一位在线真人接任房主。"
-		_owner = target
+		_owner_id = _seats[target].seat_id
 		return ""
 	if op in ["next", "lobby"]:
 		return _after_result(op, data)
 	if _game != null:
 		return "本桌进行中，结算后可调整房间。"
 	match op:
+		"arrange_seats":
+			return _arrange_seats(data)
 		"settings":
 			var rounds: Variant = data.get("rounds")
 			var seconds: Variant = data.get("turn_seconds")
@@ -578,7 +598,7 @@ func _apply_request(seat: int, op: String, data: Dictionary, received_at: int) -
 				return "请选择有效座位。"
 			return _set_ai(target, op == "update_ai", data)
 		"remove":
-			if not has_target or target == 0 or target == _owner or _seats[target].is_empty():
+			if not has_target or target == seat or _seats[target].is_empty() or _seats[target].get("peer", 0) == SERVER:
 				return "请选择可移除的座位。"
 			var player := _seats[target]
 			_seats[target] = {}
@@ -586,6 +606,41 @@ func _apply_request(seat: int, op: String, data: Dictionary, received_at: int) -
 				_drain_peer(player.peer, "房主已将你移出房间。")
 		_:
 			return "房间不支持这项操作。"
+	return ""
+
+
+func _valid_seat(seat: Variant) -> bool:
+	return seat is int and seat >= 0 and seat < _seats.size()
+
+
+func _seat_matches(seat: int, expected_id: Variant) -> bool:
+	return expected_id is int and _seats[seat].get("seat_id", -1) == expected_id
+
+
+func _move_seat(source: int, data: Dictionary) -> String:
+	var target: Variant = data.get("seat")
+	if not _valid_seat(target) or source == target:
+		return "请选择其他空座。"
+	if not _seats[target].is_empty():
+		return "该座位已有人"
+	var expected_source: Variant = data.get("from")
+	if not expected_source is int or expected_source != source:
+		return "座位已变化，请确认后再操作。"
+	_seats[target] = _seats[source]
+	_seats[source] = {}
+	return ""
+
+
+func _arrange_seats(data: Dictionary) -> String:
+	var source: Variant = data.get("from")
+	var target: Variant = data.get("seat")
+	if not _valid_seat(source) or not _valid_seat(target) or source == target:
+		return "请选择两个不同的座位。"
+	if _seats[source].is_empty() or not _seat_matches(source, data.get("from_id")) or not _seat_matches(target, data.get("seat_id")):
+		return "座位已变化，请确认后再操作。"
+	var occupant := _seats[source]
+	_seats[source] = _seats[target]
+	_seats[target] = occupant
 	return ""
 
 
@@ -611,7 +666,10 @@ func _set_ai(seat: int, update: bool, data: Dictionary) -> String:
 		return "昵称须为 1–12 个可见字符。"
 	if not _name_available(nick, seat):
 		return "房间内已有同名玩家，请更换昵称。"
-	_seats[seat] = {"name": nick, "kind": "ai", "difficulty": difficulty}
+	var seat_id: int = player.seat_id if update else _next_seat_id
+	if not update:
+		_next_seat_id += 1
+	_seats[seat] = {"name": nick, "kind": "ai", "difficulty": difficulty, "seat_id": seat_id}
 	return ""
 
 
@@ -701,7 +759,7 @@ func _after_result(op: String, data: Dictionary) -> String:
 	_game = null
 	_deadline_ms = -1
 	_ai_due_ms = -1
-	for seat in range(1, _seats.size()):
+	for seat in range(_seats.size()):
 		if _seats[seat].get("managed", false):
 			_seats[seat] = {}
 	return ""
@@ -817,17 +875,18 @@ func _process_stage(now: int) -> void:
 
 
 func _snapshot(seat: int) -> Dictionary:
+	var owner := _owner_seat()
 	var public_seats: Array[Dictionary] = []
 	for player in _seats:
 		if player.is_empty():
 			public_seats.append({})
 		else:
-			public_seats.append({"name": player.name, "kind": player.kind, "difficulty": player.difficulty,
+			public_seats.append({"name": player.name, "kind": player.kind, "difficulty": player.difficulty, "seat_id": player.seat_id,
 				"connected": player.kind == "ai" or player.get("peer", 0) != 0, "managed": player.get("managed", false)})
 	var snapshot := {"phase": "rolling" if _rolling else ("lobby" if _game == null else "playing"),
-		"my_seat": seat, "owner": _owner, "seats": public_seats, "rounds": _rounds,
+		"my_seat": seat, "owner": owner, "host_seat": _seat_for_peer(SERVER), "seats": public_seats, "rounds": _rounds,
 		"turn_seconds": _turn_seconds, "port": _port}
-	if seat == _owner:
+	if seat == owner:
 		snapshot.local_addresses = _local_addresses.duplicate()
 	if _rolling:
 		snapshot.roll = _roll_state.duplicate(true)
@@ -848,11 +907,11 @@ func _snapshot(seat: int) -> Dictionary:
 
 
 func _publish(skip_peer := -1) -> void:
-	for seat in range(1, _seats.size()):
+	for seat in range(_seats.size()):
 		var peer_id: int = _seats[seat].get("peer", 0)
-		if peer_id != 0 and peer_id != skip_peer:
+		if peer_id != 0 and peer_id != SERVER and peer_id != skip_peer:
 			_wire_snapshot.rpc_id(peer_id, _snapshot(seat))
-	_apply_snapshot(_snapshot(0))
+	_apply_snapshot(_snapshot(_seat_for_peer(SERVER)))
 
 
 func _apply_snapshot(snapshot: Dictionary) -> void:

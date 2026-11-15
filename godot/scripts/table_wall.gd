@@ -3,12 +3,20 @@ extends Control
 const Art = preload("res://scripts/table_art.gd")
 const STACKS_PER_SIDE := 18
 const SLOTS_PER_SIDE := STACKS_PER_SIDE * 2
-const STACK_DEPTH := 4
+
+# Near, right, far, left. The step follows the original physical draw order.
+const WALL_CENTERS := [Vector2(549, 590), Vector2(850, 400), Vector2(549, 180), Vector2(248, 400)]
+const STACK_STEPS := [Vector2(27.3, 0), Vector2(0, -21.6), Vector2(-26.5, 0), Vector2(0, 21.6)]
+const TILE_SIZES := [Vector2(26, 42), Vector2(34, 20.3), Vector2(25, 41), Vector2(34, 20.3)]
+const BODY_EDGES := [Vector2(0, 7), Vector2(7, 0), Vector2(0, 7), Vector2(-7, 0)]
+const STACK_OFFSETS := [Vector2(0, -9), Vector2(-9, 0), Vector2(0, -9), Vector2(9, 0)]
 
 var slots: Array = []
 var dealer := 0
-var _lower := Art.box(Color("#50695c"), Color("#304b41"), 2)
-var _upper := Art.box(Color("#849985"), Color("#536e5e"), 2)
+var _bodies := [Art.box(Color("#e8d9bb"), Color("#766a4b"), 3),
+	Art.box(Color("#c8b891"), Color("#655840"), 3)]
+var _backs := [Art.box(Color("#609267"), Color("#28593f"), 3),
+	Art.box(Color("#497655"), Color("#254d36"), 3)]
 
 
 func set_slots(values: Array, dealer_seat: int) -> void:
@@ -20,28 +28,18 @@ func set_slots(values: Array, dealer_seat: int) -> void:
 
 
 static func slot_rect(slot: int, dealer_seat: int) -> Rect2:
-	var side := posmod(floori(float(slot) / SLOTS_PER_SIDE) + dealer_seat, 4)
+	var side := wall_side(slot, dealer_seat)
 	var stack := floori(float(slot % SLOTS_PER_SIDE) / 2)
 	var along := stack - (STACKS_PER_SIDE - 1) * 0.5
-	var center: Vector2 = Art.CENTER
-	var dimensions := Vector2(8.2, 22.0)
-	match side:
-		0:
-			center += Vector2(8.8 * along, 85)
-		1:
-			center += Vector2(84, -7.8 * along)
-			dimensions = Vector2(21.0, 7.0)
-		2:
-			center += Vector2(-8.8 * along, -91)
-		3:
-			center += Vector2(-84, 7.8 * along)
-			dimensions = Vector2(21.0, 7.0)
+	var center: Vector2 = WALL_CENTERS[side] + STACK_STEPS[side] * along
 	if slot % 2 == 0:
-		if side in [1, 3]:
-			center.x += -STACK_DEPTH if side == 1 else STACK_DEPTH
-		else:
-			center.y -= STACK_DEPTH
+		center += STACK_OFFSETS[side]
+	var dimensions: Vector2 = TILE_SIZES[side]
 	return Rect2(center - dimensions * 0.5, dimensions)
+
+
+static func wall_side(slot: int, dealer_seat: int) -> int:
+	return posmod(floori(float(slot) / SLOTS_PER_SIDE) + dealer_seat, 4)
 
 
 static func opening_slots(wall: Dictionary, dealt: int, gold_visible: bool, replacements: int) -> Array:
@@ -71,7 +69,9 @@ func _draw() -> void:
 			if int(slot) % 2 != layer:
 				continue
 			var rect := slot_rect(int(slot), dealer)
-			draw_style_box(_lower if layer == 1 else _upper, rect)
-			if layer == 0:
-				draw_line(rect.position + Vector2(2, 2), Vector2(rect.end.x - 2, rect.position.y + 2),
-					Color("#9aaa92"), 1.0)
+			var edge: Vector2 = BODY_EDGES[wall_side(int(slot), dealer)]
+			var back := Rect2(rect.position - edge.min(Vector2.ZERO), rect.size - edge.abs())
+			draw_style_box(_bodies[layer], rect)
+			draw_style_box(_backs[layer], back)
+			draw_line(back.position + Vector2(3, 2), Vector2(back.end.x - 3, back.position.y + 2),
+				Color(0.82, 0.91, 0.71, 0.34), 1.0, true)

@@ -5,6 +5,7 @@ const TableView = preload("res://scripts/online_table_view.gd")
 const Desk = preload("res://table.tscn")
 const TableWall = preload("res://scripts/table_wall.gd")
 const Art = preload("res://scripts/table_art.gd")
+const Tile = preload("res://scripts/tile_view.gd")
 
 var failures := 0
 var output_dir := ""
@@ -18,12 +19,58 @@ func _initialize() -> void:
 
 
 func run() -> void:
+	test_wall_layout()
 	test_geometry()
 	test_kong_takes()
 	await test_table()
 	if failures == 0:
 		print("Dynamic wall rules and table passed.")
 	quit(failures)
+
+
+func test_wall_layout() -> void:
+	var footprints: Array[Rect2] = []
+	var dial := Rect2(467, 328, 164, 144)
+	var gold := Rect2(842, 52, 194, 112)
+	for seat in range(4):
+		var first := seat * 36
+		var wall := TableWall.slot_rect(first, 0)
+		for slot in range(first, first + 36):
+			wall = wall.merge(TableWall.slot_rect(slot, 0))
+		var river: Rect2 = Art.RIVERS[seat]
+		match seat:
+			0:
+				check(wall.position.y > river.end.y and river.position.y > dial.end.y,
+					"near river is between the dial and the near wall")
+				check(wall.end.y < 615, "near wall clears the hand and the action buttons")
+			1:
+				check(wall.position.x > river.end.x and river.position.x > dial.end.x,
+					"right river is between the dial and the right wall")
+				check(wall.end.x < 915, "right wall clears the right avatar")
+			2:
+				check(wall.end.y < river.position.y and river.end.y < dial.position.y,
+					"far river is between the dial and the far wall")
+				check(wall.position.y > 145, "far wall clears the far melds")
+			3:
+				check(wall.end.x < river.position.x and river.end.x < dial.position.x,
+					"left river is between the dial and the left wall")
+				check(wall.position.x > 184, "left wall clears the left avatar")
+		if seat % 2 == 0:
+			check(wall.size.x >= 450 and wall.size.x <= 520, "horizontal wall spans the table")
+		else:
+			check(wall.size.y >= 360 and wall.size.y <= 430, "side wall spans the table")
+		check(Art.FELT.encloses(wall) and not gold.intersects(wall), "wall stays on the felt clear of gold")
+		check(not Art.RIVERS.any(func(area): return wall.intersects(area)), "wall clears all rivers")
+		check(not footprints.any(func(area): return wall.grow(5).intersects(area)), "wall corners leave gaps")
+		footprints.append(wall)
+		var upper := TableWall.slot_rect(first, 0)
+		var lower := TableWall.slot_rect(first + 1, 0)
+		check(upper.intersects(lower) and upper.position != lower.position, "a stack has two visible layers")
+		for stack in range(first, first + 34, 2):
+			check(not TableWall.slot_rect(stack, 0).intersects(TableWall.slot_rect(stack + 2, 0)),
+				"neighboring stacks have distinct footprints")
+		check(TableWall.slot_rect(first, 1) == TableWall.slot_rect((first + 36) % 144, 0),
+			"changing perspective rotates the wall without reindexing its physical slots")
 
 
 func test_geometry() -> void:
@@ -142,14 +189,11 @@ func test_table() -> void:
 	desk.start_intro()
 	desk.intro_timer.stop()
 	check(desk.wall_art.slots.size() == 144, "opening renders four sides of 18 two-tile stacks")
-	for slot in range(144):
-		var rect := TableWall.slot_rect(slot, 0)
-		var overlaps_river := Art.RIVERS.any(func(river): return river.intersects(rect))
-		var dice_rect := Rect2(Art.CENTER - Vector2(68, 62), Vector2(136, 124))
-		var rob_kong_offer := Rect2(480, 322, 138, 88)
-		check(not overlaps_river and not dice_rect.intersects(rect) and not rob_kong_offer.intersects(rect),
-			"wall slot %d has a clear position" % slot)
 	await capture("wall-full.png")
+	if not output_dir.is_empty() and DisplayServer.get_name() != "headless":
+		root.size = Vector2i(864, 540)
+		await capture("wall-full-small.png")
+		root.size = Vector2i(1280, 800)
 	desk.advance_intro()
 	desk.intro_timer.stop()
 	check(desk.wall_art.slots.size() == 128 and desk.wall_flights.get_child_count() == 16,
@@ -178,8 +222,9 @@ func test_table() -> void:
 	desk.skip_intro()
 	check(desk.wall_art.slots == game.view(0).wall.slots and desk.wall_flights.get_child_count() == 0,
 		"skip jumps to the current synchronized wall")
-	await capture("wall-settled.png")
-	if DisplayServer.get_name() != "headless":
+	if not output_dir.is_empty() and DisplayServer.get_name() != "headless":
+		await create_timer(0.5).timeout
+		await capture("wall-settled.png")
 		root.size = Vector2i(864, 540)
 		await capture("wall-small.png")
 	game.wall[0] = 28
@@ -200,9 +245,32 @@ func test_table() -> void:
 	desk.refresh(true)
 	check(desk.wall_art.slots == game.view(0).wall.slots and desk.wall_draw_from.is_finite(),
 		"the local draw starts at its actual slot and shows the card in hand")
+	test_dense_rivers(desk)
 	test_resync(desk)
 	desk.queue_free()
 	await process_frame
+
+
+func test_dense_rivers(desk) -> void:
+	var view: Dictionary = desk.game.view(0)
+	# 60 ordinary draws plus the dealer's opening discard bound a single river.
+	var numbers: Array = []
+	for index in range(61):
+		numbers.append(index % 27)
+	for seat in range(4):
+		var region: Rect2 = Art.RIVERS[seat]
+		for other in range(seat):
+			check(not region.intersects(Art.RIVERS[other]), "rivers occupy separate regions")
+		view.players[seat].river = numbers
+		var first: int = desk.dynamic.get_child_count()
+		desk.draw_river(view, seat, false)
+		var rectangles: Array[Rect2] = []
+		for node in desk.dynamic.get_children().slice(first):
+			var tile_rect: Rect2 = node.get_rect()
+			check(node.get_script() == Tile and region.encloses(tile_rect), "river tile fits its felt region")
+			check(not rectangles.any(func(other): return other.intersects(tile_rect)), "river tiles remain separate")
+			rectangles.append(tile_rect)
+		check(rectangles.size() == numbers.size(), "a full river shows every discard")
 
 
 func test_resync(desk) -> void:
@@ -236,6 +304,7 @@ func test_resync(desk) -> void:
 func capture(filename: String) -> void:
 	if output_dir.is_empty() or DisplayServer.get_name() == "headless":
 		return
+	await process_frame
 	await RenderingServer.frame_post_draw
 	check(root.get_texture().get_image().save_png(output_dir.path_join(filename)) == OK, "saved " + filename)
 
