@@ -176,7 +176,8 @@ func run() -> void:
 	if result.is_empty():
 		quit(failures + 1)
 		return
-	check(desk.modal != null and room.state.standings.size() == 4, "full settlement is displayed")
+	await wait_for(func(): return is_instance_valid(desk.modal) and room.state.standings.size() == 4,
+		"full settlement is displayed after the last draw animation")
 	await capture("result-" + role)
 	var result_file: String = args.qa.path_join(role + "-scores.txt")
 	check(FileAccess.open(result_file, FileAccess.WRITE).store_string(str(room.state.view.scores)), "scores recorded")

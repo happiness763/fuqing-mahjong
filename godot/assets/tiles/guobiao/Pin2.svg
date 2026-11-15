@@ -1,22 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 150 200">
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
   <title>二筒</title>
-  <g transform="translate(75 59) scale(0.53846)"><circle cx="0" cy="0" r="47" fill="none" stroke="#14705a" stroke-width="10"/>
-  <circle cx="0" cy="0" r="30" fill="none" stroke="#14705a" stroke-width="6"/>
-  <ellipse cx="17.0" cy="0.0" rx="9" ry="5" fill="#14705a" transform="rotate(0 17.0 0.0)"/>
-  <ellipse cx="8.5" cy="14.72" rx="9" ry="5" fill="#14705a" transform="rotate(60 8.5 14.72)"/>
-  <ellipse cx="-8.5" cy="14.72" rx="9" ry="5" fill="#14705a" transform="rotate(120 -8.5 14.72)"/>
-  <ellipse cx="-17.0" cy="0.0" rx="9" ry="5" fill="#14705a" transform="rotate(180 -17.0 0.0)"/>
-  <ellipse cx="-8.5" cy="-14.72" rx="9" ry="5" fill="#14705a" transform="rotate(240 -8.5 -14.72)"/>
-  <ellipse cx="8.5" cy="-14.72" rx="9" ry="5" fill="#14705a" transform="rotate(300 8.5 -14.72)"/>
-  <circle cx="0" cy="0" r="6" fill="#14705a" stroke="none" stroke-width="1"/>
-  </g><g transform="translate(75 140) scale(0.53846)"><circle cx="0" cy="0" r="47" fill="none" stroke="#194c69" stroke-width="10"/>
-  <circle cx="0" cy="0" r="30" fill="none" stroke="#194c69" stroke-width="6"/>
-  <ellipse cx="17.0" cy="0.0" rx="9" ry="5" fill="#194c69" transform="rotate(0 17.0 0.0)"/>
-  <ellipse cx="8.5" cy="14.72" rx="9" ry="5" fill="#194c69" transform="rotate(60 8.5 14.72)"/>
-  <ellipse cx="-8.5" cy="14.72" rx="9" ry="5" fill="#194c69" transform="rotate(120 -8.5 14.72)"/>
-  <ellipse cx="-17.0" cy="0.0" rx="9" ry="5" fill="#194c69" transform="rotate(180 -17.0 0.0)"/>
-  <ellipse cx="-8.5" cy="-14.72" rx="9" ry="5" fill="#194c69" transform="rotate(240 -8.5 -14.72)"/>
-  <ellipse cx="8.5" cy="-14.72" rx="9" ry="5" fill="#194c69" transform="rotate(300 8.5 -14.72)"/>
-  <circle cx="0" cy="0" r="6" fill="#194c69" stroke="none" stroke-width="1"/>
-  </g>
+  <circle cx="85" cy="59" r="18" fill="none" stroke="#22463a" stroke-width="4.25"/>
+  <circle cx="85" cy="59" r="10.8" fill="none" stroke="#22463a" stroke-width="3"/>
+  <circle cx="85" cy="59" r="5.4" fill="#22463a"/>
+  <circle cx="85" cy="130" r="18" fill="none" stroke="#181b1d" stroke-width="4.25"/>
+  <circle cx="85" cy="130" r="10.8" fill="none" stroke="#181b1d" stroke-width="3"/>
+  <circle cx="85" cy="130" r="5.4" fill="#181b1d"/>
 </svg>

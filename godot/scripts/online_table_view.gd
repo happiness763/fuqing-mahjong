@@ -34,6 +34,12 @@ static func from_room(state: Dictionary) -> Dictionary:
 	view.players = rotate_seats(view.players, viewer)
 	view.scores = rotate_seats(view.scores, viewer)
 	view.seat_info = rotate_seats(state.seats, viewer)
+	for key in ["deal_flowers", "deal_draws", "last_flowers"]:
+		for event in view.get(key, []):
+			event.seat = local_seat(event.seat, viewer)
+	for key in ["opening", "takes"]:
+		for event in view.get("wall", {}).get(key, []):
+			event.seat = local_seat(event.seat, viewer)
 	view.latest.seat = local_seat(view.latest.seat, viewer)
 	if view.latest.has("previous"):
 		view.latest.previous.seat = local_seat(view.latest.previous.seat, viewer)

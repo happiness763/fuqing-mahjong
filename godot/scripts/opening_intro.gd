@@ -1,6 +1,7 @@
 extends RefCounted
 
 const STAGES := ["deal", "dealer_extra", "dice", "gold", "flowers", "done"]
+const DICE_DURATION_MS := 740
 const FLOWER_HOLD := 0.45
 const FLOWER_STEP := 0.22
 const REPLACEMENT_STEP := 0.28

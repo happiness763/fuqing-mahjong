@@ -10,6 +10,7 @@ const MUTED := Color("#b0bd9e")
 var desk
 var nickname: LineEdit
 var initial_nickname := ""
+var interaction_effects: CheckButton
 var skin: OptionButton
 var table_menu: OptionButton
 var notice: Label
@@ -46,6 +47,13 @@ func setup(table) -> void:
 	skin.add_item("国标")
 	skin.select(SKIN_IDS.find(preferences.skin))
 	skin.item_selected.connect(func(_index): refresh_preview())
+	interaction_effects = CheckButton.new()
+	interaction_effects.text = "显示互动特效"
+	interaction_effects.button_pressed = preferences.interaction_effects
+	interaction_effects.position = Vector2(425, 157)
+	interaction_effects.add_theme_font_override("font", desk.session_font)
+	interaction_effects.add_theme_font_size_override("font_size", 16)
+	add_child(interaction_effects)
 	preview_tiles = Control.new()
 	preview_tiles.position = Vector2(28, 211)
 	add_child(preview_tiles)
@@ -122,6 +130,7 @@ func refresh_preview() -> void:
 			var number: int = SAMPLE_TILES[index]
 			var tile = desk.tile(preview_tiles, number, Rect2(index * 66, 0, 52, 71), -1)
 			tile.texture = faces[number]
+			tile.guobiao_face = preview_skin == "guobiao"
 			tile.queue_redraw()
 	var id: String = table_ids[table_menu.selected]
 	preview_table.texture = ImageTexture.create_from_image(pending_image) if id == ":import" else desk.preferences.table_texture(id)
@@ -170,7 +179,8 @@ func apply() -> void:
 			notice.text = "昵称须使用可见字符。"
 			return
 	var id: String = table_ids[table_menu.selected]
-	var changes := {"skin": SKIN_IDS[skin.selected], "table_id": "" if id == ":import" else id}
+	var changes := {"skin": SKIN_IDS[skin.selected], "table_id": "" if id == ":import" else id,
+		"interaction_effects": interaction_effects.button_pressed}
 	if name_value != initial_nickname:
 		changes.nickname = name_value
 	var previous_name: String = desk.preferences.values.nickname

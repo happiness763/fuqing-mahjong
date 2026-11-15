@@ -235,10 +235,22 @@ func run() -> void:
 	check(host.state.view.gold_dice.size() == 2 and client.state.view.gold_dice == host.state.view.gold_dice,
 		"gold dice are part of the snapshot")
 	check(host._deadline_ms - Time.get_ticks_msec() >= 4000, "first stage includes the intro grace")
+	var host_props: Array = []
+	var guest_props: Array = []
+	host.interaction.connect(func(source, target, kind): host_props.append([source, target, kind]))
+	client.interaction.connect(func(source, target, kind): guest_props.append([source, target, kind]))
+	var before_prop: int = host.state.stage
+	client.request("interaction", {"target": 1, "kind": "egg"})
+	client.request("interaction", {"target": 2, "kind": "invalid"})
+	client.request("interaction", {"target": 2, "kind": "flower"})
+	client.request("interaction", {"target": 0, "kind": "water"})
+	await wait_for(func(): return guest_props.size() == 1, "interactive prop reaches the sending guest")
+	check(host_props == [[1, 2, "flower"]] and guest_props == host_props, "validated prop keeps source and target seat on all peers")
+	check(host.state.stage == before_prop, "props do not advance the stage")
 	for room in [host, client]:
 		for seat in range(4):
 			check(room.state.view.players[seat].has("hand") == (seat == room.state.my_seat), "live hand is private to its seat")
-		check(not room.state.view.has("wall") and not room.state.view.has("pending"), "private game internals stay server-side")
+		check(not room.state.view.has("pending"), "private claim options stay server-side")
 		if room.state.actor != room.state.my_seat:
 			check(room.state.moves.is_empty(), "other seats cannot see the actor's moves")
 	await test_private_reaction(host, client)
