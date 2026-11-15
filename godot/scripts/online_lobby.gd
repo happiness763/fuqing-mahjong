@@ -10,6 +10,7 @@ const CARD := Color("#203a2e")
 const BORDER := Color("#6c7553")
 const DIFFICULTIES := ["easy", "normal", "hard"]
 const DIFFICULTY_NAMES := ["简单", "普通", "困难"]
+const WINDS := ["东", "南", "西", "北"]
 const TURN_SECONDS := [15, 30, 60, 0]
 const TURN_LABELS := ["15 秒", "30 秒", "60 秒", "不限时"]
 
@@ -49,6 +50,8 @@ var previous_turn := -1
 var addresses := PackedStringArray()
 var can_start := false
 var joining_nickname := ""
+var arranging_seat := -1
+var arranging_id := -1
 
 
 func setup(table, online_room) -> void:
@@ -216,18 +219,19 @@ func _build_seat(seat: int) -> void:
 	room_screen.add_child(row)
 	desk.panel(row, Rect2(0, 0, 612, 82), Color("#1a3328"), Color("#506b54"), 11)
 	desk.panel(row, Rect2(12, 12, 58, 58), Color("#294638"), BORDER, 9)
-	desk.label(row, "%d 号座" % (seat + 1), Rect2(12, 12, 58, 58), 14, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	desk.label(row, WINDS[seat], Rect2(12, 12, 58, 58), 24, GOLD, HORIZONTAL_ALIGNMENT_CENTER, true)
 	var caption: Label = desk.label(row, "", Rect2(85, 10, 312, 33), 20, INK)
 	caption.add_theme_font_override("font", text_font)
 	caption.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	var detail: Label = desk.label(row, "", Rect2(85, 48, 510, 25), 15, MUTED)
+	var detail: Label = desk.label(row, "", Rect2(85, 48, 382, 25), 15, MUTED)
 	var name := _field(row, Rect2(85, 10, 192, 36), "昵称")
 	var difficulty := _menu(row, Rect2(287, 10, 99, 36), DIFFICULTY_NAMES)
 	var add: Button = desk.button(row, "添加 AI", Rect2(479, 20, 116, 40), _add_ai.bind(seat))
 	var rename: Button = desk.button(row, "改名", Rect2(287, 10, 99, 36), _save_seat.bind(seat, "rename"))
 	var save: Button = desk.button(row, "保存 AI", Rect2(396, 10, 94, 36), _save_seat.bind(seat, "update_ai"))
-	var transfer: Button = desk.button(row, "转交房主", Rect2(387, 20, 103, 40), _confirm_seat.bind(seat, "transfer"))
-	var remove: Button = desk.button(row, "移出座位", Rect2(500, 20, 95, 40), _confirm_seat.bind(seat, "remove"))
+	var transfer: Button = desk.button(row, "转交房主", Rect2(387, 8, 103, 34), _confirm_seat.bind(seat, "transfer"))
+	var remove: Button = desk.button(row, "移出座位", Rect2(500, 8, 95, 34), _confirm_seat.bind(seat, "remove"))
+	var move: Button = desk.button(row, "", Rect2(479, 43, 116, 33), _change_seat.bind(seat))
 	name.text_submitted.connect(func(_value):
 		if rename.visible:
 			_save_seat(seat, "rename")
@@ -235,7 +239,7 @@ func _build_seat(seat: int) -> void:
 			_save_seat(seat, "update_ai"))
 	seat_rows.append({
 		"caption": caption, "detail": detail, "name": name, "difficulty": difficulty, "add": add,
-		"rename": rename, "save": save, "transfer": transfer, "remove": remove, "previous": {},
+		"rename": rename, "save": save, "transfer": transfer, "remove": remove, "move": move, "previous": {},
 	})
 
 
@@ -247,6 +251,7 @@ func refresh() -> void:
 		if active:
 			show_notice("")
 		else:
+			_clear_arrangement()
 			previous_rounds = -1
 			previous_turn = -1
 			for row in seat_rows:
@@ -266,6 +271,12 @@ func refresh() -> void:
 	if reconnecting:
 		subtitle.text = "连接中断，正在尝试恢复座位…"
 	var owner: bool = state.my_seat == state.owner
+	if arranging_seat >= 0:
+		if not owner or reconnecting:
+			_clear_arrangement()
+		elif state.seats[arranging_seat].get("seat_id", -1) != arranging_id:
+			_clear_arrangement()
+			_set_notice("选中的座位已变化，请重新选座。")
 	var occupied := 0
 	var ready := 0
 	for seat in range(4):
@@ -278,6 +289,8 @@ func refresh() -> void:
 	seat_summary.text = "已入座 %d / 4" % occupied
 	if ready < occupied:
 		seat_summary.text += "   ·   等待断线玩家"
+	if arranging_seat >= 0:
+		seat_summary.text = "正在调整%s座 · 选择目标座位" % WINDS[arranging_seat]
 	can_start = owner and not reconnecting and ready == 4
 	host_controls.visible = owner
 	guest_controls.visible = not owner
@@ -297,26 +310,34 @@ func _refresh_seat(seat: int, occupant: Dictionary, state: Dictionary, owner: bo
 	var ai := kind == "ai"
 	var own: bool = seat == state.my_seat
 	var can_edit: bool = not state.get("reconnecting", false)
+	var arranging := arranging_seat >= 0
+	var show_editor := not arranging
 	var name: String = occupant.get("name", "")
-	var edit_name := own or (owner and ai)
+	var edit_name := show_editor and (own or (owner and ai))
 	row.caption.visible = not edit_name
 	row.caption.text = "空座" if empty else name
 	row.name.visible = edit_name
 	var previous_name: String = previous.get("name", "")
-	if kind != previous.get("kind", "") or (name != previous_name
+	var changed_occupant: bool = occupant.get("seat_id", -1) != previous.get("seat_id", -1)
+	if changed_occupant or (name != previous_name
 		and (row.name.text == previous_name or row.name.text.strip_edges() == name)):
 		row.name.text = name
-	row.difficulty.visible = owner and ai
+	row.difficulty.visible = show_editor and owner and ai
 	var difficulty := maxi(0, DIFFICULTIES.find(occupant.get("difficulty", "normal")))
 	var old_difficulty := DIFFICULTIES.find(previous.get("difficulty", "normal"))
-	if kind != previous.get("kind", "") or (difficulty != old_difficulty and row.difficulty.selected == old_difficulty):
+	if changed_occupant or (difficulty != old_difficulty and row.difficulty.selected == old_difficulty):
 		row.difficulty.select(difficulty)
-	row.add.visible = owner and empty
-	row.rename.visible = own
-	row.save.visible = owner and ai
-	row.remove.visible = owner and not empty and not own and seat != 0
-	row.transfer.visible = owner and not empty and not own and not ai and occupant.get("connected", true)
-	for action in [row.add, row.rename, row.save, row.remove, row.transfer]:
+	row.add.visible = show_editor and owner and empty
+	row.rename.visible = show_editor and own
+	row.save.visible = show_editor and owner and ai
+	row.remove.visible = show_editor and owner and not empty and not own and seat != state.host_seat
+	row.transfer.visible = show_editor and owner and not empty and not own and not ai and occupant.get("connected", true)
+	row.move.visible = (arranging or not empty) if owner else empty
+	if arranging:
+		row.move.text = "取消调座" if arranging_seat == seat else ("移到此座" if empty else "交换座位")
+	else:
+		row.move.text = "调座" if owner else "换到此座"
+	for action in [row.add, row.rename, row.save, row.remove, row.transfer, row.move]:
 		action.disabled = not can_edit
 	var detail := ""
 	if ai:
@@ -332,7 +353,7 @@ func _refresh_seat(seat: int, occupant: Dictionary, state: Dictionary, owner: bo
 
 
 func _refresh_addresses(state: Dictionary) -> void:
-	listen_label.text = "本机监听 UDP %d" % state.get("port", DEFAULT_PORT)
+	listen_label.text = "承载端监听 UDP %d" % state.get("port", DEFAULT_PORT)
 	var new_addresses := PackedStringArray(state.get("local_addresses", []))
 	if addresses != new_addresses:
 		var selected := "" if lan_address.selected < 0 else lan_address.get_item_text(lan_address.selected)
@@ -518,13 +539,40 @@ func _save_seat(seat: int, operation: String) -> void:
 	var data := {"name": name}
 	if operation == "update_ai":
 		data["seat"] = seat
+		data["seat_id"] = row.previous.get("seat_id", -1)
 		data["difficulty"] = DIFFICULTIES[row.difficulty.selected]
 	_request(operation, data)
 
 
+func _clear_arrangement() -> void:
+	arranging_seat = -1
+	arranging_id = -1
+
+
+func _change_seat(seat: int) -> void:
+	var state: Dictionary = room.state
+	if state.get("phase") != "lobby" or state.get("reconnecting", false) or not seat_rows[seat].move.visible:
+		return
+	if state.my_seat != state.owner:
+		_request("move_seat", {"from": state.my_seat, "seat": seat})
+		return
+	var seat_id: int = state.seats[seat].get("seat_id", -1)
+	if arranging_seat < 0:
+		arranging_seat = seat
+		arranging_id = seat_id
+		_set_notice("")
+	elif arranging_seat == seat:
+		_clear_arrangement()
+	else:
+		var data := {"from": arranging_seat, "seat": seat, "from_id": arranging_id, "seat_id": seat_id}
+		_clear_arrangement()
+		_request("arrange_seats", data)
+	refresh()
+
+
 func _confirm_seat(seat: int, operation: String) -> void:
 	var occupant: Dictionary = room.state.seats[seat]
-	pending_confirmation = {"seat": seat, "op": operation, "name": occupant.name}
+	pending_confirmation = {"seat": seat, "op": operation, "name": occupant.name, "seat_id": occupant.seat_id}
 	if operation == "transfer":
 		confirm.dialog_text = "将房主权限转交给「%s」？承载房间的电脑需要继续运行游戏。" % occupant.name
 	elif occupant.kind == "ai":
@@ -539,10 +587,10 @@ func _submit_confirmation() -> void:
 	if state.get("phase") != "lobby" or state.my_seat != state.owner or state.get("reconnecting", false):
 		return
 	var seat: int = pending_confirmation.seat
-	if state.seats[seat].get("name") != pending_confirmation.name:
+	if state.seats[seat].get("seat_id") != pending_confirmation.seat_id or state.seats[seat].get("name") != pending_confirmation.name:
 		_set_notice("座位已变化，请确认后再操作。")
 		return
-	_request(pending_confirmation.op, {"seat": seat})
+	_request(pending_confirmation.op, {"seat": seat, "seat_id": pending_confirmation.seat_id})
 
 
 func _save_settings() -> void:

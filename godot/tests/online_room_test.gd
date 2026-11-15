@@ -37,15 +37,15 @@ func make_room(branch_name: String):
 	return room
 
 
-func drive_rolls(host, client) -> bool:
+func drive_rolls(host, client, other = null) -> bool:
+	var rooms := [host, client] if other == null else [host, client, other]
 	var guard := 0
 	while host.state.get("phase") == "rolling" and guard < 400:
 		var roll: Dictionary = host.state.get("roll", {})
 		var current: int = Rules.dealer_roll_current(roll) if not roll.is_empty() else -1
-		if current == host.state.get("my_seat", -1):
-			host.request("roll")
-		elif current == client.state.get("my_seat", -1) and client.state.get("phase") == "rolling":
-			client.request("roll")
+		for room in rooms:
+			if current >= 0 and current == room.state.get("my_seat", -1) and room.state.get("roll_ready", false):
+				room.request("roll")
 		await create_timer(0.05).timeout
 		guard += 1
 	return await wait_for(func(): return client.state.get("phase") == "playing", "mixed table starts for both peers")
@@ -170,9 +170,127 @@ func test_public_gold_gap(host, client) -> void:
 		and client.state.view.latest.gold_gap, "public declaration includes the chosen discard while the remaining hand is private")
 
 
+func test_lobby_seating() -> void:
+	var host = make_room("SeatingHost")
+	var guest = make_room("SeatingGuest")
+	var visitor = make_room("SeatingVisitor")
+	var guest_notices: Array[String] = []
+	var visitor_notices: Array[String] = []
+	guest.notice.connect(func(message: String): guest_notices.append(message))
+	visitor.notice.connect(func(message: String): visitor_notices.append(message))
+	var port := 40000 + int(randi() % 15000)
+	check(host.host("房东", port, 1, 0) == "", "seating host binds a UDP port")
+	check(guest.join("访客", "127.0.0.1", port) == "", "first guest joins seating fixture")
+	if not await wait_for(func(): return guest.state.get("my_seat") == 1, "first guest is assigned South"):
+		return
+	check(visitor.join("小松", "127.0.0.1", port) == "", "second guest joins seating fixture")
+	if not await wait_for(func(): return visitor.state.get("my_seat") == 2, "second guest is assigned West"):
+		return
+	guest.request("move_seat", {"from": 1, "seat": 3})
+	visitor.request("move_seat", {"from": 2, "seat": 3})
+	if not await wait_for(func(): return not host.state.seats[3].is_empty(), "one contender takes North", 1000):
+		return
+	if not await wait_for(func(): return guest_notices.size() + visitor_notices.size() == 1,
+			"one contender receives a seat conflict"):
+		return
+	var guest_won: bool = host.state.seats[3].name == "访客"
+	var guest_seat := 3 if guest_won else 1
+	var visitor_seat := 2 if guest_won else 3
+	var vacant := 1 if guest_won else 2
+	var conflict_notices := visitor_notices if guest_won else guest_notices
+	check(conflict_notices.back() == "该座位已有人" and host.state.seats[vacant].is_empty(),
+		"the losing mover stays seated and sees the occupied-seat notice")
+	await wait_for(func(): return guest.state.my_seat == guest_seat and visitor.state.my_seat == visitor_seat,
+		"all clients see the result of the race")
+
+	var swap := {"from": 0, "seat": guest_seat, "from_id": host.state.seats[0].seat_id,
+		"seat_id": host.state.seats[guest_seat].seat_id}
+	var occupied_target := swap.duplicate()
+	occupied_target.seat_id = -1
+	host.request("arrange_seats", occupied_target)
+	check(host.state.my_seat == 0, "an owner cannot arrange into a stale supposedly empty target")
+	host.request("arrange_seats", swap)
+	if not await wait_for(func(): return guest.state.my_seat == 0, "remote East receives the host swap"):
+		return
+	check(host.state.my_seat == guest_seat and host.state.host_seat == guest_seat and guest.state.owner == guest_seat,
+		"authority and management follow the creator to the new seat")
+	host.request("arrange_seats", swap)
+	check(host.state.my_seat == guest_seat, "stale swap with replaced occupants leaves both seats unchanged")
+	var preferences: Array[Dictionary] = []
+	host.preferences_confirmed.connect(func(changes: Dictionary): preferences.append(changes))
+	host.request("rename", {"name": "东家"})
+	check(host.state.seats[guest_seat].name == "东家" and preferences == [{"nickname": "东家"}],
+		"creator rename and preference acknowledgement follow the connection")
+	host.request("transfer", {"seat": 0})
+	if not await wait_for(func(): return guest.state.owner == 0, "ownership transfers to the human now at East"):
+		return
+	var guest_notice_count := guest_notices.size()
+	guest.request("remove", {"seat": guest_seat})
+	await wait_for(func(): return guest_notices.size() > guest_notice_count, "management cannot remove the moved host")
+	check(host.state.seats[guest_seat].name == "东家" and host.state.host_seat == guest_seat,
+		"host protection follows its connection")
+	guest.request("arrange_seats", {"from": 0, "seat": vacant, "from_id": guest.state.seats[0].seat_id, "seat_id": -1})
+	if not await wait_for(func(): return guest.state.my_seat == vacant, "remote owner moves themself to an empty seat"):
+		return
+	check(guest.state.owner == vacant and guest.state.seats[0].is_empty(), "owner stays owner after moving")
+	guest.request("add_ai", {"seat": 0, "name": "小竹", "difficulty": "hard"})
+	if not await wait_for(func(): return host.state.seats[0].get("kind") == "ai", "owner adds AI to the vacant East"):
+		return
+
+	var peer_before: int = guest.multiplayer.get_unique_id()
+	guest.multiplayer.multiplayer_peer.disconnect_peer(1)
+	if not await wait_for(func(): return not host.state.seats[vacant].connected, "guest seat is reserved after disconnect"):
+		return
+	check(host.state.owner == guest_seat, "owner fallback finds the earliest human away from East")
+	host.request("arrange_seats", {"from": vacant, "seat": 0, "from_id": host.state.seats[vacant].seat_id,
+		"seat_id": host.state.seats[0].seat_id})
+	check(host.state.seats[vacant].name == "小竹" and host.state.seats[vacant].difficulty == "hard",
+		"an atomic swap preserves the displaced AI's name and difficulty")
+	if not await wait_for(func(): return guest.state.get("my_seat") == 0 and guest.multiplayer.get_unique_id() != peer_before,
+			"the reconnect token follows the player into East"):
+		return
+	check(guest.state.seats[0].name == "访客" and guest.state.seats[0].connected,
+		"reconnect restores the moved identity")
+
+	var locked_swap := {"from": guest_seat, "seat": vacant, "from_id": host.state.seats[guest_seat].seat_id,
+		"seat_id": host.state.seats[vacant].seat_id}
+	host.request("start")
+	check(host.state.phase == "rolling", "four moved seats are ready to roll")
+	host.request("arrange_seats", locked_swap)
+	check(host.state.my_seat == guest_seat, "seat placement is locked as soon as dealer rolls start")
+	if not await drive_rolls(host, guest, visitor):
+		return
+	host.request("arrange_seats", locked_swap)
+	check(host.state.my_seat == guest_seat, "seat placement stays locked during play")
+	set_dealer_turn(host, guest_seat)
+	var stage: int = host.state.stage
+	await wait_for(func(): return guest.state.get("stage") == stage, "East receives a play snapshot after the swap")
+	check(host.state.view.players[guest_seat].has("hand") and not host.state.view.players[0].has("hand")
+		and guest.state.view.players[0].has("hand") and not guest.state.view.players[guest_seat].has("hand"),
+		"both moved connections receive only their own hand")
+	var discard: Dictionary = host.state.moves.filter(func(move): return move.type == "discard").front()
+	host.request("play", {"stage": stage, "id": discard.id})
+	check(host.state.stage == stage + 1, "the host can act from the moved seat")
+	guest.leave()
+	await wait_for(func(): return host.state.seats[0].get("managed", false), "a departing guest at East gets AI takeover")
+	host._game.finish({"winner": -1, "deltas": [0, 0, 0, 0]})
+	host._begin_stage()
+	host._publish()
+	host.request("lobby", {"stage": host.state.stage})
+	check(host.state.phase == "lobby" and host.state.seats[0].is_empty(), "returning to the lobby clears managed East")
+	host.request("arrange_seats", {"from": vacant, "seat": 0, "from_id": host.state.seats[vacant].seat_id, "seat_id": -1})
+	check(host.state.seats[0].get("name") == "小竹", "seat placement unlocks after returning to the lobby")
+	host.leave()
+	await wait_for(func(): return visitor.state.is_empty(), "the authority can still close the room after moving")
+
+
 func run() -> void:
 	if not ResourceLoader.exists(ROOM_PATH):
 		check(false, "authoritative ENet room is available")
+		quit(failures)
+		return
+	await test_lobby_seating()
+	if failures > 0:
 		quit(failures)
 		return
 	var host = make_room("Host")

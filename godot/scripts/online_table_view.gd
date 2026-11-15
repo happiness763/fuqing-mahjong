@@ -1,5 +1,7 @@
 extends RefCounted
 
+const WINDS := ["东", "南", "西", "北"]
+
 
 static func local_seat(seat: int, viewer: int) -> int:
 	return posmod(seat - viewer, 4) if seat >= 0 else -1
@@ -28,6 +30,7 @@ static func from_room(state: Dictionary) -> Dictionary:
 	var viewer: int = state.my_seat
 	var view: Dictionary = state.view.duplicate(true)
 	view.seat = 0
+	view.winds = rotate_seats(WINDS, viewer)
 	view.current = local_seat(view.current, viewer)
 	view.dealer = local_seat(view.dealer, viewer)
 	view.actor = local_seat(state.get("actor", -1), viewer)

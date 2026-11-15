@@ -5,8 +5,8 @@ const FRAME := Rect2(28, 16, 1042, 768)
 const FELT := Rect2(41, 29, 1016, 742)
 const CENTER := Vector2(549, 400)
 const RIVERS := [
-	Rect2(352, 505, 394, 101), Rect2(647, 330, 250, 132),
-	Rect2(352, 150, 394, 101), Rect2(201, 330, 250, 132),
+	Rect2(307, 482, 484, 72), Rect2(641, 319, 174, 162),
+	Rect2(307, 205, 484, 113), Rect2(283, 319, 174, 162),
 ]
 const BRASS := Color("#c49a61")
 const DICE_RING_RADIUS := 62.0

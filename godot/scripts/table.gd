@@ -4,6 +4,7 @@ const Rules = preload("res://scripts/rules.gd")
 const Game = preload("res://scripts/game.gd")
 const Opponent = preload("res://scripts/opponent.gd")
 const Art = preload("res://scripts/table_art.gd")
+const CenterDial = preload("res://scripts/center_dial.gd")
 const Preferences = preload("res://scripts/preferences.gd")
 const Skins = preload("res://scripts/tile_skins.gd")
 const SettingsPanel = preload("res://scripts/settings_panel.gd")
@@ -20,8 +21,7 @@ const SLIDE_FADE := 0.16
 const UI_FONT = preload("res://assets/fonts/NotoSansSC.woff2")
 const NAMES := ["你", "阿岚", "阿榕", "阿屿"]
 const MARKS := ["你", "岚", "榕", "屿"]
-const WINDS := ["东", "南", "西", "北"]
-const POSITIONS := ["本家", "右家", "对家", "左家"]
+const WINDS = OnlineTableView.WINDS
 const PORTRAITS := [Color("#d8ab70"), Color("#a2b38e"), Color("#87aa99"), Color("#bf9b8a")]
 const INK := Color("#f3e5cb")
 const MUTED := Color("#b0bd9e")
@@ -33,6 +33,7 @@ const SEAT_POSITIONS := [Vector2(63, 640), Vector2(915, 290), Vector2(472, 40), 
 
 var game
 var board_art: Control
+var center_dial: CenterDial
 var wall_art: TableWall
 var wall_flights: Control
 var wall_round := -1
@@ -136,6 +137,12 @@ func _ready() -> void:
 		settings[key] = preferences.values[key]
 	board_art = Art.new()
 	add_child(board_art)
+	center_dial = CenterDial.new()
+	center_dial.setup(session_font)
+	center_dial.position = Art.CENTER - CenterDial.MIDPOINT
+	center_dial.hide()
+	board_art.add_child(center_dial)
+	countdown_label = center_dial.clock
 	wall_art = TableWall.new()
 	wall_art.name = "TileWall"
 	wall_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -451,7 +458,7 @@ func clear_board() -> void:
 		dynamic = null
 	human_buttons.clear()
 	controls.clear()
-	countdown_label = null
+	center_dial.hide()
 	room_notice_label = null
 	status_label = null
 
@@ -496,9 +503,10 @@ func room_state_changed() -> void:
 	var snapshot: Dictionary = room.state
 	var phase: String = snapshot.get("phase", "")
 	if phase == "rolling":
-		online_rolling = true
-		if is_instance_valid(online_lobby):
+		if not online_rolling:
+			online_lobby.refresh()
 			online_lobby.hide()
+		online_rolling = true
 		header.show()
 		leave_button.text = "退出房间"
 		show_online_dealer_roll(snapshot)
@@ -628,6 +636,11 @@ func player_name(seat: int) -> String:
 	return NAMES[seat] if online_view.is_empty() else online_view.seat_info[seat].name
 
 
+func seat_wind(seat: int) -> String:
+	var viewer: int = room.state.get("my_seat", 0) if online_rolling or not online_view.is_empty() else 0
+	return WINDS[posmod(viewer + seat, 4)]
+
+
 func player_mark(seat: int) -> String:
 	return MARKS[seat] if online_view.is_empty() else player_name(seat).left(1)
 
@@ -711,7 +724,7 @@ func _update_dealer_roll_panel() -> void:
 			row.dice.text = "—"
 			row.dice.add_theme_color_override("font_color", MUTED)
 		var active: bool = seat == current and not finished
-		row.name.text = name_text + ("  ·  庄" if seat == winner else "")
+		row.name.text = seat_wind(seat) + " · " + name_text + (" · 庄" if seat == winner else "")
 		row.name.add_theme_color_override("font_color", GOLD if seat == winner or active else INK)
 	if finished:
 		var winner_name := ""
@@ -1386,24 +1399,21 @@ func show_action_banner() -> void:
 	var message: Dictionary = action_messages.pop_front()
 	var accent := Color("#ffe298") if message.win else Color("#cff7b9")
 	var fill := Color("#633023") if message.win else Color("#184734")
-	var actor_font := session_font if online_view.is_empty() else nickname_font
-	var actor_width := clampf(actor_font.get_string_size(message.actor, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x, 40, 240)
-	var caption_width := maxf(65, message.caption.length() * 28 + 22)
-	var width := actor_width + caption_width + 36
-	var banner := panel(self, Rect2(Art.CENTER.x - width * 0.5, 156, width, 48), fill, accent, 12)
+	var banner := panel(self, Rect2(65, 103, 188, 54), fill, accent, 10)
 	var style := banner.get_theme_stylebox("panel") as StyleBoxFlat
 	style.shadow_color = Color(0.02, 0.10, 0.07, 0.55)
-	style.shadow_size = 6
-	style.shadow_offset = Vector2(0, 3)
+	style.shadow_size = 4
+	style.shadow_offset = Vector2(0, 2)
 	banner.name = "ActionBanner"
 	banner.z_index = 11
 	action_banner = banner
-	var actor_label := label(banner, message.actor, Rect2(12, 0, actor_width, 48), 20, INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var actor_label := label(banner, message.actor, Rect2(8, 1, 172, 19), 14, INK, HORIZONTAL_ALIGNMENT_CENTER)
 	actor_label.name = "Actor"
 	set_player_font(actor_label)
-	var badge := Rect2(actor_width + 28, 5, caption_width, 38)
-	panel(banner, badge, accent, accent, 8)
-	var caption_label := label(banner, message.caption, badge, 28, fill,
+	var badge := Rect2(6, 23, 176, 26)
+	panel(banner, badge, accent, accent, 7)
+	var caption_size := clampi(floori(160.0 / maxi(1, message.caption.length())), 12, 22)
+	var caption_label := label(banner, message.caption, badge, caption_size, fill,
 		HORIZONTAL_ALIGNMENT_CENTER, true)
 	caption_label.name = "Caption"
 	var animation := banner.create_tween()
@@ -1492,13 +1502,15 @@ func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: b
 	if intro_active() or flower_active:
 		playable = maxi(0, wall_art.slots.size() - Rules.RESERVE)
 	label(dynamic, "可摸 %d 张" % playable, Rect2(71, 67, 135, 25), 14, MUTED)
+	center_dial.visible = not intro_active()
+	var public_turn: bool = view.phase == "turn" and not online_reconnecting
+	center_dial.set_seats(view.get("winds", WINDS), int(view.current) if public_turn else -1)
 	if not online_view.is_empty():
-		if view.phase != "result":
-			panel(dynamic, Rect2(65, 100, 136, 43), Color("#193d30"), Color("#75906d"))
-			countdown_label = label(dynamic, "", Rect2(65, 100, 136, 43), 20, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 		room_notice_label = label(dynamic, "", Rect2(216, 30, 230, 30), 13, GOLD)
 		room_notice_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		update_online_clock()
+	else:
+		countdown_label.text = ""
 	if intro_gold:
 		var gold_display := panel(dynamic, GOLD_AREA, Color("#1d4938"), Color("#668064"), 9)
 		gold_display.name = "GoldDisplay"
@@ -1521,10 +1533,10 @@ func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: b
 			Rect2(0, 87, 194, 22), 15, INK, HORIZONTAL_ALIGNMENT_CENTER)
 	var rob_tile: int = view.get("rob_tile", -1)
 	if view.phase == "robKong" and rob_tile >= 0 and moves.any(func(move): return move.type == "win"):
-		var offer := panel(dynamic, Rect2(480, 322, 138, 88), Color("#1a3d31"), GOLD, 10)
+		var offer := panel(dynamic, Rect2(604, 623, 130, 55), Color("#1a3d31"), GOLD, 10)
 		offer.name = "RobKongOffer"
-		label(offer, "可抢的补杠牌", Rect2(0, 3, 138, 22), 15, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-		tile(offer, rob_tile, Rect2(49, 28, 40, 53), view.gold, Callable(), false, true)
+		label(offer, "可抢的补杠牌", Rect2(45, 0, 80, 55), 12, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+		tile(offer, rob_tile, Rect2(8, 5, 32, 44), view.gold, Callable(), false, true)
 
 	for seat in range(4):
 		draw_seat(view, seat, SEAT_POSITIONS[seat])
@@ -1555,12 +1567,13 @@ func draw_seat(view: Dictionary, seat: int, origin: Vector2) -> void:
 		dynamic.add_child(hitbox)
 	set_player_font(label(dynamic, player_mark(seat), Rect2(origin + Vector2(5, 5), Vector2(29, 29)),
 		17, FONT_DARK, HORIZONTAL_ALIGNMENT_CENTER, true))
-	var wind: String = WINDS[(seat - view.dealer + 4) % 4]
-	set_player_font(label(dynamic, player_name(seat) + ("  ·  庄" if seat == view.dealer else ""),
+	var wind := seat_wind(seat) + (" · 庄" if seat == view.dealer else "")
+	set_player_font(label(dynamic, player_name(seat),
 		Rect2(origin + Vector2(41, 2), Vector2(width - 42, 18)), 14, GOLD if active else INK))
 	var flower_count: int = player.flowers.size() if intro_flowers else 0
-	label(dynamic, "%s风  ·  %d 花" % [wind, flower_count],
-		Rect2(origin + Vector2(41, 20), Vector2(width - 42, 16)), 12, MUTED)
+	var seat_caption := label(dynamic, "%s · %d 花" % [wind, flower_count],
+		Rect2(origin + Vector2(41, 20), Vector2(width - 42, 16)), 12, GOLD if seat == view.dealer else MUTED)
+	seat_caption.name = "SeatWind%d" % seat
 	var gold_gap: Array = player.get("gold_gap", [])
 	if seat != 0 and player.has("hand"):
 		var values: Array = player.hand.duplicate()
@@ -1641,27 +1654,30 @@ func draw_river(view: Dictionary, seat: int, animate: bool) -> void:
 		return
 	var region: Rect2 = Art.RIVERS[seat].grow(-6)
 	var side := seat in [1, 3]
-	var columns := 7 if side else 11
+	var columns := 5 if side else 14
 	var rows := 3 if side else 2
+	var spacing := Vector2(29, 38)
 	if river.size() > columns * rows:
 		var best_scale := 0.0
 		for candidate_columns in range(1, river.size() + 1):
 			var candidate_rows := ceili(float(river.size()) / candidate_columns)
-			var fit := minf(region.size.x / (candidate_columns * 32.0), region.size.y / (candidate_rows * 42.0))
+			var fit := minf(region.size.x / (candidate_columns * spacing.x), region.size.y / (candidate_rows * spacing.y))
 			if fit > best_scale:
 				best_scale = fit
 				columns = candidate_columns
 				rows = candidate_rows
-	var scale := minf(1.0, minf(region.size.x / (columns * 32.0), region.size.y / (rows * 42.0)))
-	var dimensions := Vector2(28, 38) * scale
-	var step := Vector2(32, 42) * scale
+	var grid_size := Vector2(columns, rows) * spacing
+	var scale := minf(1.0, minf(region.size.x / grid_size.x, region.size.y / grid_size.y))
+	var step := spacing * scale
+	var dimensions := Vector2(25, 34) * scale
+	var grid_origin := region.get_center() - (grid_size * scale - step + dimensions) * 0.5
 	for index in range(river.size()):
 		var last: bool = view.last_discard.get("seat", -1) == seat and index == river.size() - 1
 		var column := floori(float(index) / rows) if side else index % columns
 		var row := index % rows if side else floori(float(index) / columns)
-		var pos := region.position + Vector2(column, row) * step
 		if seat == 1:
-			pos.x = region.end.x - dimensions.x - column * step.x
+			column = columns - 1 - column
+		var pos := grid_origin + Vector2(column, row) * step
 		var node := tile(dynamic, river[index], Rect2(pos, dimensions), view.gold, Callable(), false, last)
 		if last:
 			var arrow := Polygon2D.new()
@@ -1725,8 +1741,8 @@ func render_sidebar(view: Dictionary) -> void:
 		panel(dynamic, Rect2(1093, y, 149, 46), Color("#213c30"), Color("#395543"))
 		panel(dynamic, Rect2(1099, y + 9, 27, 28), PORTRAITS[seat], PORTRAITS[seat])
 		set_player_font(label(dynamic, player_mark(seat), Rect2(1099, y + 9, 27, 28), 16, FONT_DARK, HORIZONTAL_ALIGNMENT_CENTER, true))
-		set_player_font(label(dynamic, player_name(seat) + (" · 庄" if view.dealer == seat else ""), Rect2(1133, y + 4, 63, 21), 13))
-		var status: String = POSITIONS[seat]
+		set_player_font(label(dynamic, player_name(seat), Rect2(1133, y + 4, 63, 21), 13))
+		var status := ""
 		if not online_view.is_empty():
 			var entry: Dictionary = view.seat_info[seat]
 			if entry.get("managed", false):
@@ -1737,7 +1753,10 @@ func render_sidebar(view: Dictionary) -> void:
 				status = "房主"
 			elif entry.kind == "ai":
 				status = "AI"
-		label(dynamic, status, Rect2(1133, y + 24, 62, 17), 11, MUTED)
+		var direction := seat_wind(seat) + (" · 庄" if seat == view.dealer else "")
+		var score_caption := label(dynamic, direction if status.is_empty() else direction + " · " + status,
+			Rect2(1133, y + 24, 76, 17), 11, GOLD if seat == view.dealer else MUTED)
+		score_caption.name = "ScoreWind%d" % seat
 		label(dynamic, points(view.scores[seat]), Rect2(1190, y + 7, 45, 32), 16,
 			score_color(view.scores[seat]), HORIZONTAL_ALIGNMENT_RIGHT)
 	label(dynamic, "行牌动态", Rect2(1094, 368, 146, 28), 21, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
@@ -2044,7 +2063,7 @@ func show_reset() -> void:
 		return
 	if not online_view.is_empty() or online_rolling:
 		var dialog := open_modal("退出房间？", 440, 192)
-		var explanation := "关闭承载端会结束当前房间。" if room.state.my_seat == 0 else "退出后由 AI 接管你的座位。"
+		var explanation := "关闭承载端会结束当前房间。" if room.state.my_seat == room.state.get("host_seat", 0) else "退出后由 AI 接管你的座位。"
 		label(dialog, explanation, Rect2(24, 90, 391, 28), 16, MUTED)
 		button(dialog, "继续本桌", Rect2(188, 138, 104, 36), close_modal)
 		button(dialog, "退出房间", Rect2(302, 138, 114, 36), exit_online, "primary")
@@ -2086,11 +2105,16 @@ func _process(_delta: float) -> void:
 
 func update_online_clock() -> void:
 	var remaining: int = room.seconds_left()
-	var caption := "正在重连" if online_reconnecting else ("不限时" if remaining < 0 else "%d 秒" % remaining)
-	if is_instance_valid(countdown_label) and countdown_label.text != caption:
-		countdown_label.text = caption
-	if is_instance_valid(chooser_countdown) and chooser_countdown.text != caption:
-		chooser_countdown.text = caption
+	var limit: int = room.state.get("turn_seconds", 0)
+	var timed: bool = limit > 0 and remaining >= 0 and not online_reconnecting and online_view.phase != "result"
+	var seconds := mini(limit, remaining)
+	var digits := "%02d" % seconds if timed and center_dial.visible else ""
+	if countdown_label.text != digits:
+		countdown_label.text = digits
+	if is_instance_valid(chooser_countdown):
+		var caption := "正在重连" if online_reconnecting else ("%d 秒" % seconds if timed else "不限时")
+		if chooser_countdown.text != caption:
+			chooser_countdown.text = caption
 	if is_instance_valid(room_notice_label):
 		var message := last_notice if Time.get_ticks_msec() < notice_until else ""
 		if room_notice_label.text != message:

@@ -77,13 +77,14 @@ func run() -> void:
 			screen._copy_external()
 			check(DisplayServer.clipboard_get() == endpoint, "copy shares only the public endpoint")
 		check(FileAccess.open(ready, FileAccess.WRITE).store_string(endpoint), "endpoint is shared")
-		if not await wait_for(func(): return not room.state.seats[1].is_empty(), "friend joins"):
+		check(room.state.my_seat == 0 and room.state.host_seat == 0, "creating the room starts in east")
+		if not await wait_for(func(): return room.state.seats[2].get("name") == "海棠", "friend chooses west"):
 			quit(failures)
 			return
 		check(room.state.turn_seconds == 60, "opening defaults to 60 seconds")
 		check(desk.preferences.values.nickname == "玉兰" and desk.preferences.values.host_port == port, "host preferences saved")
 		await capture("room-owner")
-		screen.seat_rows[1].transfer.pressed.emit()
+		screen.seat_rows[2].transfer.pressed.emit()
 		screen.confirm.confirmed.emit()
 		screen.confirm.hide()
 	else:
@@ -93,7 +94,12 @@ func run() -> void:
 		screen.entry_name.text = "海棠"
 		screen.join_endpoint.text = FileAccess.get_file_as_string(ready)
 		screen.join_button.pressed.emit()
-		if not await wait_for(func(): return room.state.get("owner", -1) == 1, "guest receives ownership"):
+		if not await wait_for(func(): return room.state.get("my_seat", -1) == 1, "guest temporarily sits in south"):
+			quit(failures)
+			return
+		screen.seat_rows[2].move.pressed.emit()
+		if not await wait_for(func(): return room.state.get("my_seat", -1) == 2 and room.state.get("owner", -1) == 2,
+			"guest sits in west and receives ownership"):
 			quit(failures)
 			return
 		check(desk.preferences.values.nickname == "海棠", "joined nickname saved after acceptance")
@@ -108,19 +114,28 @@ func run() -> void:
 		room._wire_preferences_confirmed(999999, true)
 		check(desk.preferences.values.skin == "guobiao" and desk.preferences.values.nickname == "海棠",
 			"an unsolicited receipt cannot change local preferences")
-		for seat in [2, 3]:
+		for seat in [1, 3]:
 			screen.seat_rows[seat].add.pressed.emit()
 			if not await wait_for(func(): return not room.state.seats[seat].is_empty(), "AI seat added"):
 				quit(failures)
 				return
-			screen.seat_rows[seat].name.text = "小松" if seat == 2 else "小竹"
-			screen.seat_rows[seat].difficulty.select(0 if seat == 2 else 2)
+			screen.seat_rows[seat].name.text = "小松" if seat == 1 else "小竹"
+			screen.seat_rows[seat].difficulty.select(0 if seat == 1 else 2)
 			screen.seat_rows[seat].save.pressed.emit()
 		if not await wait_for(func(): return room.state.seats[3].get("name") == "小竹" and room.state.rounds == 1,
 			"room settings synced"):
 			quit(failures)
 			return
+		screen.seat_rows[0].move.pressed.emit()
+		screen.seat_rows[3].move.pressed.emit()
+		if not await wait_for(func(): return room.state.host_seat == 3 and room.state.seats[0].get("name") == "小竹",
+			"owner swaps the east host with the north AI"):
+			quit(failures)
+			return
+		check(room.state.seats[0].difficulty == "hard", "swapped AI difficulty follows the occupant")
 		await capture("room-settings")
+		screen.seat_rows[1].move.pressed.emit()
+		check(screen.arranging_seat == 1, "owner has an unfinished seat selection")
 		screen.start_button.pressed.emit()
 
 	var roll_deadline := Time.get_ticks_msec() + 15000
@@ -130,10 +145,14 @@ func run() -> void:
 			desk.dealer_roll_button.pressed.emit()
 		await process_frame
 
-	if not await wait_for(func(): return room.state.get("phase") == "playing", "table starts on both peers"):
+	if not await wait_for(func(): return room.state.get("phase") == "playing" and not desk.online_view.is_empty(),
+		"table opens after each client's dice animation"):
 		quit(failures)
 		return
-	check(room.state.owner == 1 and room.state.turn_seconds == 15, "room owner and turn time are synchronized")
+	check(room.state.owner == 2 and room.state.host_seat == 3 and room.state.turn_seconds == 15,
+		"room owner, transport host, and turn time are synchronized")
+	check(room.state.my_seat == (3 if host else 2) and desk.seat_wind(0) == ("北" if host else "西"),
+		"both peers keep their selected winds after opening")
 	if host:
 		check(desk.preferences.values.skin == "riichi" and desk.preferences.values.turn_seconds == 60,
 			"guest skin and room changes do not overwrite host preferences")
@@ -143,9 +162,10 @@ func run() -> void:
 	check(desk.header.visible and not screen.visible and desk.online_view.seat == 0, "online table opens in local perspective")
 	check(desk.player_name(0) == ("玉兰" if host else "海棠"), "local seat nickname")
 	check(desk.online_view.players[0].has("hand") and not desk.online_view.players[1].has("hand"), "hand privacy through UI")
-	check(is_instance_valid(desk.countdown_label) and room.seconds_left() in range(0, 76), "countdown displays from server state")
 	room.state_changed.connect(func(): check_action_banner(desk, room))
 	desk.skip_intro()
+	check(desk.center_dial.visible and desk.countdown_label.text.is_valid_int()
+		and int(desk.countdown_label.text) in range(0, 16), "center countdown displays the synchronized action limit")
 	await create_timer(0.60).timeout
 	await capture("table-" + role)
 	var deadline := Time.get_ticks_msec() + 65000
@@ -190,8 +210,9 @@ func run() -> void:
 		desk.end_table()
 	await wait_for(func(): return room.state.get("phase") == "lobby", "both peers return to the same room")
 	check(screen.visible and not desk.header.visible, "return restores room UI")
+	check(screen.arranging_seat == -1, "returning to the lobby clears pre-game seat selections")
 	if failures == 0:
-		print("Online desktop ", role, " passed: direct join, transfer, AI settings, countdown, ",
+		print("Online desktop ", role, " passed: seat selection, owner swap, transfer, AI settings, center countdown, ",
 			observed_claims, " claim prompts, ", actions, " actions and settlement.")
 	if host:
 		await create_timer(0.25).timeout
