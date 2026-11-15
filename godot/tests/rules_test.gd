@@ -167,7 +167,8 @@ func test_claim_visibility() -> void:
 		game.current = 3
 		game.players[3].hand = [4]
 		play(game, 3, "discard", 4)
-		play(game, 2, "pass")
+		check(game.actions(2).is_empty(), "AI cannot pong the same tile before drawing")
+		check(game.actions(0).any(func(move): return move.type == "chow"), "chow remains available on the second discard")
 		check(not game.act(0, old_id), "previous discard action cannot be submitted")
 	game = fixture()
 	game.current = 3

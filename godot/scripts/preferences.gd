@@ -6,7 +6,7 @@ const MAX_IMAGE_EDGE := 4096
 const DEFAULTS := {
 	"nickname": "", "rounds": 15, "difficulty": "normal", "luck": "normal",
 	"host_port": 36712, "room_rounds": 15, "turn_seconds": 60, "muted": false,
-	"skin": "riichi", "table_id": "",
+	"skin": "riichi", "table_id": "", "interaction_effects": true,
 }
 const JPEG_FRAME_MARKERS := [0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf]
 
@@ -189,7 +189,7 @@ func _validated_value(key: String, value: Variant) -> Variant:
 			return value if value in ["riichi", "guobiao"] else null
 		"table_id":
 			return value if value == "" or _valid_id(value) else null
-		"muted":
+		"muted", "interaction_effects":
 			return value if value is bool else null
 	return null
 

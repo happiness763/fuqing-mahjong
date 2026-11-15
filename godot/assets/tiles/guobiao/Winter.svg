@@ -1,15 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 150 200">
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
   <title>冬</title>
-  <g transform="translate(14 10) scale(0.71)"><path d="M46 14 Q37 30 19 43 M38 25 L74 23 Q56 50 13 64 M33 34 Q55 57 86 63 M40 64 L57 71 M35 79 Q48 81 65 91" fill="none" stroke="#194c69" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M60 87 L66 91" fill="none" stroke="#194c69" stroke-width="9.36" stroke-linecap="round" stroke-linejoin="round"/>
-  </g><path d="M88 27 H119 V57 H88Z" fill="none" stroke="#194c69" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-  <g transform="translate(90 29) scale(0.26)"><path d="M18 24 L23 79 M19 28 Q49 23 83 24 L77 78 M25 75 L77 73 M41 29 Q41 52 29 60 M59 29 L57 51 Q59 61 72 54" fill="none" stroke="#194c69" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M21 77 L26 80" fill="none" stroke="#194c69" stroke-width="10.53" stroke-linecap="round" stroke-linejoin="round"/>
-  </g><path d="M44 177 Q67 158 71 131 M68 147 Q88 146 102 133" fill="none" stroke="#244b36" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M37 153 Q61 140 72 109 Q85 133 105 135 Q87 142 74 138 Q60 151 37 153Z" fill="#194c69" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M51 128 Q67 114 73 95 Q86 113 95 118 Q84 122 76 116 Q69 125 51 128Z" fill="#14705a" stroke="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M36 164 Q53 160 63 151 M83 148 Q103 147 114 139" fill="none" stroke="#194c69" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="35" cy="128" r="4" fill="#194c69" stroke="none" stroke-width="1"/>
-  <circle cx="111" cy="112" r="4" fill="#194c69" stroke="none" stroke-width="1"/>
-  <circle cx="120" cy="156" r="3.5" fill="#194c69" stroke="none" stroke-width="1"/>
+  <g transform="translate(114 25) scale(0.37)">
+    <path d="M46 14 Q37 30 19 43 M38 25 L74 23 Q56 50 13 64 M33 34 Q55 57 86 63 M40 64 L57 71 M35 79 Q48 81 65 91" fill="none" stroke="#a81e25" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g transform="translate(35 43)">
+    <path d="M4 11 V-11 L-8 3 H8" fill="none" stroke="#a81e25" stroke-width="4.25" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <path d="M43 145 Q65 128 91 110 Q107 99 118 86" fill="none" stroke="#22463a" stroke-width="4.05" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M62 127q10 -14 -7 -29 M63 126q7 -13 18 -10" fill="none" stroke="#22463a" stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M66 122q7 -6 13 -4" fill="none" stroke="#22463a" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="58.78" cy="85.37" r="3.3" fill="none" stroke="#a81e25" stroke-width="2.1"/>
+  <circle cx="58.93" cy="92.42" r="3.3" fill="none" stroke="#a81e25" stroke-width="2.1"/>
+  <circle cx="52.27" cy="94.75" r="3.3" fill="none" stroke="#a81e25" stroke-width="2.1"/>
+  <circle cx="48" cy="89.13" r="3.3" fill="none" stroke="#a81e25" stroke-width="2.1"/>
+  <circle cx="52.02" cy="83.34" r="3.3" fill="none" stroke="#a81e25" stroke-width="2.1"/>
+  <circle cx="54" cy="89" r="2.6" fill="#a81e25"/>
+  <path d="M85 110q10 -14 -7 -29 M86 109q7 -13 18 -10" fill="none" stroke="#22463a" stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M89 105q7 -6 13 -4" fill="none" stroke="#22463a" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="77" cy="72" r="11.5" fill="none" stroke="#a81e25" stroke-width="2.8"/>
+  <path d="M82 69q-8 -6 -9 2q0 5 6 4" fill="none" stroke="#a81e25" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M106 93q10 -14 -7 -29 M107 92q7 -13 18 -10" fill="none" stroke="#22463a" stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M110 88q7 -6 13 -4" fill="none" stroke="#22463a" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="102.78" cy="51.37" r="3.3" fill="none" stroke="#a81e25" stroke-width="2.1"/>
+  <circle cx="102.93" cy="58.42" r="3.3" fill="none" stroke="#a81e25" stroke-width="2.1"/>
+  <circle cx="96.27" cy="60.75" r="3.3" fill="none" stroke="#a81e25" stroke-width="2.1"/>
+  <circle cx="92" cy="55.13" r="3.3" fill="none" stroke="#a81e25" stroke-width="2.1"/>
+  <circle cx="96.02" cy="49.34" r="3.3" fill="none" stroke="#a81e25" stroke-width="2.1"/>
+  <circle cx="98" cy="55" r="2.6" fill="#a81e25"/>
 </svg>

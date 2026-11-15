@@ -56,7 +56,7 @@ func run() -> void:
 	var desk = Desk.instantiate()
 	desk.preferences_root = OS.get_temp_dir().path_join("fuqing-desktop-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	root.add_child(desk)
-	check(ProjectSettings.get_setting("application/config/version") == "1.2.5a", "project version")
+	check(ProjectSettings.get_setting("application/config/version") == "1.2.6", "project version")
 	check(desk.game == null and desk.lobby.round_field.text == "15", "lobby defaults to 15 rounds")
 	check(Art.FRAME == Rect2(28, 16, 1042, 768), "table frame fills the window")
 	check(Art.FELT == Rect2(41, 29, 1016, 742), "felt follows the frame")
@@ -154,15 +154,12 @@ func run() -> void:
 	if is_instance_valid(desk.modal):
 		print("Desktop round finished: ", desk.result_title(desk.game.result))
 		await capture("settlement.png")
-		var display_rng := RandomNumberGenerator.new()
-		display_rng.seed = 20261111
-		if is_instance_valid(board_art):
-			desk._display_rng.seed = display_rng.seed
 		click(by_text(desk.modal, "下一局"))
 		check(desk.game.round_number == 2, "next round opens")
+		desk.skip_intro()
 		if is_instance_valid(board_art):
-			var expected := Vector2i(display_rng.randi_range(1, 6), display_rng.randi_range(1, 6))
-			check(board_art.dice == expected, "next round samples new dice")
+			var expected := Vector2i(int(desk.game.gold_dice[0]), int(desk.game.gold_dice[1]))
+			check(board_art.dice == expected, "next round displays its own authoritative gold dice")
 	await finish_round(desk)
 	check(desk.game.is_table_finished() and is_instance_valid(desk.modal), "last round opens table settlement")
 	if is_instance_valid(desk.modal):
@@ -422,10 +419,10 @@ func test_waiting_presentation(desk) -> void:
 	desk.clear_board()
 	desk.dynamic = Control.new()
 	desk.add_child(desk.dynamic)
-	desk.render_board(view, [], false, false, -1)
+	desk.render_board(view, [], false, false)
 	check(not desk.dynamic.has_node("RobKongOffer"), "waiting on a rob claim hides its tile")
 	var rob_moves := [Game.action("win", {"kind": "rob"}), Game.action("pass")]
-	desk.render_board(view, rob_moves, false, false, -1)
+	desk.render_board(view, rob_moves, false, false)
 	desk.render_controls(view, rob_moves)
 	var offer: Panel = desk.dynamic.get_node_or_null("RobKongOffer")
 	check(is_instance_valid(offer) and offer.find_children("*", "Button", false, false)[0].number == 4

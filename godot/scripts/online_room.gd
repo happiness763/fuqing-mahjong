@@ -3,12 +3,14 @@ extends Node
 signal state_changed
 signal preferences_confirmed(changes: Dictionary)
 signal notice(message: String)
+signal interaction(source: int, target: int, kind: String)
 
 const Game = preload("res://scripts/game.gd")
 const Opponent = preload("res://scripts/opponent.gd")
 const Rules = preload("res://scripts/rules.gd")
+const Interactions = preload("res://scripts/table_interaction.gd")
 const OpeningIntro = preload("res://scripts/opening_intro.gd")
-const VERSION := "1.2.5a"
+const VERSION := "1.2.6"
 const SERVER := 1
 const DEFAULT_PORT := 36712
 const CONNECT_MS := 8000
@@ -18,6 +20,7 @@ const AI_DELAY_MS := 320
 const INTRO_MS := 4500
 const ROLL_AI_MS := 600
 const ROLL_HUMAN_MS := 8000
+const ROLL_RESULT_HOLD_MS := 140
 const TURN_OPTIONS := [0, 15, 30, 60]
 const DIFFICULTIES := ["easy", "normal", "hard"]
 
@@ -34,6 +37,7 @@ var _owner := 0
 var _seat_order := 0
 var _seats: Array[Dictionary] = []
 var _pending_peers: Dictionary = {}
+var _interaction_after := {}
 var _preference_serial := 0
 var _pending_preferences := {}
 var _rounds := 15
@@ -43,6 +47,8 @@ var _rolling := false
 var _roll_state: Dictionary = {}
 var _roll_deadline_ms := -1
 var _roll_ai_due_ms := -1
+var _roll_lands_ms := -1
+var _last_rolled_seat := -1
 var _stage := 0
 var _deadline_ms := -1
 var _ai_due_ms := -1
@@ -235,11 +241,14 @@ func _reset_session() -> void:
 	_token = ""
 	_seats.clear()
 	_pending_peers.clear()
+	_interaction_after.clear()
 	_game = null
 	_rolling = false
 	_roll_state = {}
 	_roll_deadline_ms = -1
 	_roll_ai_due_ms = -1
+	_roll_lands_ms = -1
+	_last_rolled_seat = -1
 	_deadline_ms = -1
 	_ai_due_ms = -1
 	_clear_state()
@@ -469,6 +478,9 @@ func _handle_request(peer_id: int, op: String, data: Dictionary, receipt := 0) -
 	var seat := _seat_for_peer(peer_id)
 	if seat < 0:
 		return
+	if op == "interaction":
+		_broadcast_interaction(seat, data, received_at)
+		return
 	var error := _apply_request(seat, op, data, received_at)
 	if error.is_empty():
 		_publish()
@@ -494,12 +506,37 @@ func _wire_preferences_confirmed(receipt: int, accepted: bool) -> void:
 		preferences_confirmed.emit(changes)
 
 
+func _broadcast_interaction(source: int, data: Dictionary, now: int) -> void:
+	if _game == null or _game.phase == "result" or now < int(_interaction_after.get(source, 0)):
+		return
+	var target: Variant = data.get("target")
+	var kind: Variant = data.get("kind")
+	if not target is int or not kind is String or target == source or target < 0 or target >= _seats.size():
+		return
+	var recipient: Dictionary = _seats[target]
+	if recipient.is_empty() or not Interactions.PROPS.has(kind):
+		return
+	_interaction_after[source] = now + Interactions.COOLDOWN_MS
+	for peer_id in multiplayer.get_peers():
+		if _seat_for_peer(peer_id) >= 0:
+			_wire_interaction.rpc_id(peer_id, source, target, kind)
+	interaction.emit(source, target, kind)
+
+
+@rpc("authority", "call_remote", "reliable", 1)
+func _wire_interaction(source: int, target: int, kind: String) -> void:
+	if _role == "client" and state.get("phase") == "playing":
+		interaction.emit(source, target, kind)
+
+
 func _apply_request(seat: int, op: String, data: Dictionary, received_at: int) -> String:
 	if op == "roll":
 		if not _rolling:
 			return "当前不在掷骰阶段。"
 		if seat != Rules.dealer_roll_current(_roll_state):
 			return "还没轮到你掷骰。"
+		if received_at < _roll_lands_ms:
+			return "请等骰子停稳。"
 		_roll_apply(seat)
 		return ""
 	if op == "play":
@@ -677,6 +714,8 @@ func _start_rolling() -> void:
 	_roll_state = Rules.dealer_roll_state(_roll_rng)
 	_roll_deadline_ms = -1
 	_roll_ai_due_ms = -1
+	_roll_lands_ms = -1
+	_last_rolled_seat = -1
 	_schedule_roll()
 
 
@@ -688,7 +727,7 @@ func _schedule_roll() -> void:
 	var seat := Rules.dealer_roll_current(_roll_state)
 	if seat < 0:
 		return
-	var now := Time.get_ticks_msec()
+	var now := maxi(Time.get_ticks_msec(), _roll_lands_ms)
 	if _seats[seat].get("kind", "ai") == "ai":
 		_roll_ai_due_ms = now + ROLL_AI_MS
 	else:
@@ -696,7 +735,15 @@ func _schedule_roll() -> void:
 
 
 func _process_roll(now: int) -> void:
-	if _roll_ai_due_ms >= 0 and now >= _roll_ai_due_ms:
+	if _roll_state.get("finished", false):
+		if now >= _roll_lands_ms + ROLL_RESULT_HOLD_MS:
+			_finish_rolling()
+			_publish()
+	elif _roll_lands_ms >= 0 and now >= _roll_lands_ms:
+		_roll_lands_ms = -1
+		if _roll_deadline_ms >= 0:
+			_publish()
+	elif _roll_ai_due_ms >= 0 and now >= _roll_ai_due_ms:
 		_roll_current()
 	elif _roll_deadline_ms >= 0 and now >= _roll_deadline_ms:
 		_roll_current()
@@ -710,14 +757,13 @@ func _roll_current() -> void:
 	_publish()
 
 
-func _roll_apply(_seat: int) -> void:
+func _roll_apply(seat: int) -> void:
 	if not _rolling:
 		return
 	Rules.dealer_roll_apply(_roll_state, _roll_rng)
-	if _roll_state.get("finished", false):
-		_finish_rolling()
-	else:
-		_schedule_roll()
+	_last_rolled_seat = seat
+	_roll_lands_ms = Time.get_ticks_msec() + OpeningIntro.DICE_DURATION_MS
+	_schedule_roll()
 
 
 func _finish_rolling() -> void:
@@ -785,6 +831,8 @@ func _snapshot(seat: int) -> Dictionary:
 		snapshot.local_addresses = _local_addresses.duplicate()
 	if _rolling:
 		snapshot.roll = _roll_state.duplicate(true)
+		snapshot.last_rolled_seat = _last_rolled_seat
+		snapshot.roll_ready = _roll_lands_ms < 0
 		snapshot.roll_remaining_ms = -1 if _roll_deadline_ms < 0 else maxi(0, _roll_deadline_ms - Time.get_ticks_msec())
 		return snapshot
 	if _game != null:

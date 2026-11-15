@@ -5,6 +5,10 @@ const Opponent = preload("res://scripts/opponent.gd")
 
 var players: Array = []
 var wall: Array = []
+var _wall_size := 0
+var _wall_slots: Array = []
+var _wall_opening: Array = []
+var _wall_takes: Array = []
 var scores := [0, 0, 0, 0]
 var dealer := 0
 var current := 0
@@ -32,6 +36,7 @@ var last_flowers: Array = []
 var flower_revision := 0
 var _online := false
 var _claim_serial := 0
+var _passed_claims: Array[Dictionary] = []
 var _rng := RandomNumberGenerator.new()
 var _dice_rng := RandomNumberGenerator.new()
 var _next_gold_dice: Array = []
@@ -74,6 +79,9 @@ func start_round() -> void:
 				best_score = value
 		players = best.players
 		wall = best.wall
+		_wall_size = best.wall_size
+		_wall_slots = best.wall_slots
+		_wall_opening = best.wall_opening
 		gold = best.gold
 		indicator = best.indicator
 		gold_index = best.gold_index
@@ -81,6 +89,7 @@ func start_round() -> void:
 		deal_flowers = best.flowers
 		deal_draws = best.draws
 	last_discard = {}
+	_passed_claims = [{}, {}, {}, {}]
 	pending = {}
 	result = {}
 	current = dealer
@@ -92,11 +101,32 @@ func start_round() -> void:
 
 func opening_deal() -> Dictionary:
 	return {"players": players, "wall": wall, "gold": gold, "indicator": indicator, "gold_index": gold_index,
+		"wall_size": _wall_size, "wall_slots": _wall_slots, "wall_opening": _wall_opening,
 		"initial_hands": deal_initial_hands, "flowers": deal_flowers, "draws": deal_draws}
+
+
+func _reset_wall_geometry() -> void:
+	_wall_size = wall.size()
+	_wall_slots = range(_wall_size)
+	_wall_opening = []
+	_wall_takes = []
+
+
+func _take_wall(index: int, seat: int, kind: String, end: String, events: Array) -> int:
+	events.append({"slot": _wall_slots.pop_at(index), "seat": seat, "kind": kind, "end": end})
+	return wall.pop_at(index)
+
+
+func _wall_view() -> Dictionary:
+	if _wall_slots.size() != wall.size():
+		return {"size": wall.size(), "slots": range(wall.size()), "opening": [], "takes": []}
+	return {"size": _wall_size, "slots": _wall_slots.duplicate(),
+		"opening": _wall_opening.duplicate(true), "takes": _wall_takes.duplicate(true)}
 
 
 func deal(shuffled: Array) -> void:
 	wall = shuffled
+	_reset_wall_geometry()
 	players = []
 	for seat in range(4):
 		players.append({"hand": [], "melds": [], "flowers": [], "river": [], "discarded_gold": false,
@@ -104,8 +134,8 @@ func deal(shuffled: Array) -> void:
 	var order := Rules.order_from(dealer)
 	for index in range(16):
 		for seat in order:
-			players[seat].hand.append(wall.pop_front())
-	players[dealer].hand.append(wall.pop_front())
+			players[seat].hand.append(_take_wall(0, seat, "deal", "head", _wall_opening))
+	players[dealer].hand.append(_take_wall(0, dealer, "deal", "head", _wall_opening))
 	deal_initial_hands = players.map(func(player): return player.hand.duplicate())
 	deal_draws = []
 	if wall.is_empty():
@@ -117,7 +147,7 @@ func deal(shuffled: Array) -> void:
 		if gold_dice.size() == 2:
 			sum = int(gold_dice[0]) + int(gold_dice[1])
 		gold_index = posmod(wall.size() - 1 - 2 * (sum - 1), wall.size())
-		indicator = wall.pop_at(gold_index)
+		indicator = _take_wall(gold_index, -1, "gold", "indicator", _wall_opening)
 		gold = indicator
 	for player in players:
 		player.flowers = player.hand.filter(func(tile): return Rules.is_flower(tile, gold))
@@ -135,9 +165,13 @@ func deal(shuffled: Array) -> void:
 		var next_debts := [0, 0, 0, 0]
 		for seat in order:
 			for count in range(flower_debts[seat]):
-				var tile: int = wall.pop_back()
+				var tile := _take_wall(-1, seat, "replacement", "tail", _wall_opening)
 				var flower := Rules.is_flower(tile, gold)
-				deal_draws.append({"round": flower_round, "seat": seat, "tile": tile, "flower": flower})
+				var take: Dictionary = _wall_opening.back()
+				take.round = flower_round
+				if flower:
+					take.kind = "flower"
+				deal_draws.append({"round": flower_round, "seat": seat, "tile": tile, "flower": flower, "slot": take.slot})
 				if flower:
 					players[seat].flowers.append(tile)
 					deal_flowers.append({"round": flower_round, "seat": seat, "tile": tile})
@@ -448,7 +482,8 @@ func reaction_actions(seat: int, source: int, tile: int) -> Array:
 	if Rules.is_gold(tile, gold):
 		return []
 	var options: Array = []
-	var kind := win_kind(seat, tile)
+	var blocked: Array = _passed_claims[seat].get(tile, [])
+	var kind := "" if "win" in blocked else win_kind(seat, tile)
 	if not kind.is_empty():
 		var win_move := action("win", {"kind": kind})
 		win_move.pattern = win_pattern(seat, players[seat].hand, tile, kind)
@@ -460,7 +495,7 @@ func reaction_actions(seat: int, source: int, tile: int) -> Array:
 	var restricted := (seat == posmod(dealer - 1, 4) and not is_upstream
 		and Rules.gold_count(player.hand, gold) == 0)
 	var counts := Rules.counts(player.hand)
-	if counts[tile] >= 2:
+	if counts[tile] >= 2 and "pong" not in blocked:
 		var pong := {"tile": tile, "tiles": [tile, tile]}
 		if restricted:
 			var remainder: Array = player.hand.duplicate()
@@ -486,10 +521,18 @@ func reaction_actions(seat: int, source: int, tile: int) -> Array:
 
 
 func act(seat: int, id: String) -> bool:
-	for move in actions(seat):
+	var offered := actions(seat)
+	for move in offered:
 		if move.id != id:
 			continue
 		action_revision += 1
+		if phase == "reaction" and move.type == "pass":
+			var blocked: Array = _passed_claims[seat].get(pending.tile, [])
+			for option in offered:
+				if option.type in ["pong", "win"] and option.type not in blocked:
+					blocked.append(option.type)
+			if not blocked.is_empty():
+				_passed_claims[seat][pending.tile] = blocked
 		if phase in ["opening", "reaction", "robKong"]:
 			if _uses_ordered_claims():
 				if move.type == "pass":
@@ -642,10 +685,15 @@ func self_kong(seat: int, move: Dictionary) -> void:
 
 func draw_tile(seat: int, supplement: bool) -> void:
 	var player: Dictionary = players[seat]
+	if _wall_slots.size() != wall.size():
+		_reset_wall_geometry()
+	if wall.size() > Rules.RESERVE:
+		_passed_claims[seat].clear()
 	last_flowers = []
 	var flower_round := 0
 	while wall.size() > Rules.RESERVE:
-		var tile: int = wall.pop_back() if supplement else wall.pop_front()
+		var tile := _take_wall(-1 if supplement else 0, seat, "draw",
+			"tail" if supplement else "head", _wall_takes)
 		if not Rules.is_flower(tile, gold):
 			player.hand.append(tile)
 			current = seat
@@ -660,6 +708,7 @@ func draw_tile(seat: int, supplement: bool) -> void:
 			if not last_flowers.is_empty():
 				flower_revision += 1
 			return
+		_wall_takes.back().kind = "flower"
 		flower_round += 1
 		player.flowers.append(tile)
 		last_flowers.append({"round": flower_round, "seat": seat, "tile": tile})
@@ -713,7 +762,8 @@ func view(seat: int) -> Dictionary:
 	return {
 		"seat": seat, "dealer": dealer, "round": round_number, "gold": gold, "indicator": indicator,
 		"round_limit": round_limit, "table_finished": is_table_finished(),
-		"scores": scores.duplicate(), "current": current, "phase": phase, "remaining": wall.size() - Rules.RESERVE,
+		"scores": scores.duplicate(), "current": current, "phase": phase, "remaining": maxi(0, wall.size() - Rules.RESERVE),
+		"wall": _wall_view(),
 		"opening": pending.get("kind", "") if sees_claim else "",
 		"rob_tile": pending.tile if phase == "robKong" and sees_claim else -1,
 		"last_discard": last_discard, "latest": latest, "result": result,

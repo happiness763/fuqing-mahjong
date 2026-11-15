@@ -1,8 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 150 200">
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
   <title>三萬</title>
-  <g transform="translate(29 11) scale(0.91)"><path d="M24 25 Q50 21 78 22 M30 49 Q51 46 73 46 M12 77 Q47 73 88 73" fill="none" stroke="#192e34" stroke-width="8.7" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M73 73 L87 70" fill="none" stroke="#192e34" stroke-width="10.178999999999998" stroke-linecap="round" stroke-linejoin="round"/>
-  </g><g transform="translate(22 88) scale(1.06)"><path d="M16 21 L83 18 M35 10 L39 26 M65 9 L61 26 M29 34 L29 56 M29 35 L72 32 L70 54 M30 45 L70 43 M31 56 L69 54 M49 34 L50 81 M18 67 L19 92 M19 68 L80 63 L78 87 L68 91 M33 82 L65 76 M59 72 L67 82" fill="none" stroke="#a5292c" stroke-width="6.9" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M72 88 L76 88" fill="none" stroke="#a5292c" stroke-width="8.073" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
+  <path d="M62 26 Q74 25 94 21 Q102 18 107 23 Q111 29 103 31 L70 36 Q61 36 58 32 Q56 27 62 26Z M65 44 Q77 44 94 40 Q103 38 106 44 Q107 48 100 49 L71 54 Q62 55 60 50 Q58 45 65 44Z M51 65 Q70 66 106 60 Q118 58 122 65 Q124 70 116 71 Q86 67 56 75 Q47 77 45 71 Q43 66 51 65Z" fill="#181b1d"/>
+  <path d="M52 100 Q76 100 105 92 Q115 90 119 96 Q121 101 113 102 Q80 102 59 109 Q51 111 47 105 Q44 101 52 100Z" fill="#a81e25"/>
+  <path d="M64 90 Q68 87 74 93 L78 106 Q80 112 75 113 Q71 114 68 107 L63 96 Q60 92 64 90Z M92 85 Q98 84 104 89 Q106 92 102 96 L95 109 Q91 113 88 110 Q87 107 91 98 Q93 92 89 90 Q88 87 92 85Z" fill="#a81e25"/>
+  <path d="M61 115 Q66 113 72 117 L97 112 Q107 108 113 115 Q117 118 113 123 L109 138 Q108 143 101 141 L73 144 Q68 148 65 142 L60 121 Q57 116 61 115Z M70 122 L72 138 L101 134 L105 118Z" fill="#a81e25" fill-rule="evenodd"/>
+  <path d="M70 131 Q85 130 104 125 M81 119 Q85 130 84 160" fill="none" stroke="#a81e25" stroke-width="6.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M52 149 Q57 146 62 149 Q85 148 108 142 Q119 140 124 148 Q121 154 119 169 Q117 181 109 181 Q105 173 99 170 Q97 167 103 168 L111 170 Q114 160 114 149 Q88 152 62 156 L63 173 Q64 180 59 180 Q53 181 52 175 L49 156 Q47 151 52 149Z" fill="#a81e25"/>
+  <path d="M70 159 Q84 162 100 155 L104 162 Q91 165 76 170 Q70 171 67 165 Q65 161 70 159Z M96 153 Q103 151 108 159 Q111 165 106 167 Q102 168 100 163 L94 157 Q92 154 96 153Z" fill="#a81e25"/>
 </svg>

@@ -1,6 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 150 200">
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
   <title>北</title>
-  <g transform="translate(14 35) scale(1.22)"><path d="M39 13 L38 85 M16 39 L37 36 M13 74 Q25 69 37 60 M59 14 L57 68 Q55 83 69 83 L77 83 Q86 82 86 66 M80 32 L58 49" fill="none" stroke="#192e34" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M14 74 L20 73 M84 74 L86 66" fill="none" stroke="#192e34" stroke-width="9.36" stroke-linecap="round" stroke-linejoin="round"/>
+  <g transform="translate(26 35) scale(1.17)">
+    <path d="M39 13 L38 85" fill="none" stroke="#181b1d" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M16 39 L37 36" fill="none" stroke="#181b1d" stroke-width="7.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M13 74 Q25 69 37 60" fill="none" stroke="#181b1d" stroke-width="7.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M59 14 L57 68 Q55 83 69 83 L77 83 Q86 82 86 66" fill="none" stroke="#181b1d" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M80 32 L58 49" fill="none" stroke="#181b1d" stroke-width="7.4" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 </svg>
