@@ -355,7 +355,7 @@ func run() -> void:
 	check(host._find_local_addresses(candidates) == ["192.168.10.104", "2001:db8::1", "169.254.1.2"],
 		"address picker prefers private IPv4 and puts link-local candidates last")
 	check(host.state.owner == 0 and host.state.seats[0].name == "房东", "creator owns the first seat")
-	check(host.state.turn_seconds == 60 and host.state.rounds == 15, "room defaults to 60 seconds and 15 rounds")
+	check(host.state.turn_seconds == 60 and host.state.rounds == 25, "room defaults to 60 seconds and 25 rounds")
 	check(not rejected.host("占端口", port).is_empty(), "an occupied UDP port is reported")
 	check(rejected.join("房东", "127.0.0.1", port) == "", "duplicate name is checked by the server")
 	await wait_for(func(): return messages.size() == 1, "duplicate name produces a rejection")
@@ -367,7 +367,7 @@ func run() -> void:
 	check(not client.state.has("local_addresses"), "local addresses are only listed for the owner")
 	client.request("settings", {"rounds": 2, "turn_seconds": 0})
 	await create_timer(0.1).timeout
-	check(host.state.rounds == 15, "non-owner settings are rejected")
+	check(host.state.rounds == 25, "non-owner settings are rejected")
 	host.request("transfer", {"seat": 1})
 	await wait_for(func(): return client.state.get("owner") == 1, "management transfer reaches client")
 	check(not host.state.has("local_addresses") and client.state.has("local_addresses"), "address controls follow ownership")

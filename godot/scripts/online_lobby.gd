@@ -370,7 +370,7 @@ func _refresh_addresses(state: Dictionary) -> void:
 
 
 func _refresh_settings(state: Dictionary) -> void:
-	var rounds: int = state.get("rounds", 15)
+	var rounds: int = state.get("rounds", 25)
 	var seconds: int = state.get("turn_seconds", 60)
 	var turn_index := maxi(0, TURN_SECONDS.find(seconds))
 	if previous_rounds < 0 or (rounds != previous_rounds and _number(round_field.text, 1, 32) in [previous_rounds, rounds]):

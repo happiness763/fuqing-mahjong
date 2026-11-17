@@ -10,7 +10,7 @@ const Opponent = preload("res://scripts/opponent.gd")
 const Rules = preload("res://scripts/rules.gd")
 const Interactions = preload("res://scripts/table_interaction.gd")
 const OpeningIntro = preload("res://scripts/opening_intro.gd")
-const VERSION := "1.2.8a"
+const VERSION := "1.2.9"
 const SERVER := 1
 const DEFAULT_PORT := 36712
 const CONNECT_MS := 8000
@@ -40,7 +40,7 @@ var _pending_peers: Dictionary = {}
 var _interaction_after := {}
 var _preference_serial := 0
 var _pending_preferences := {}
-var _rounds := 15
+var _rounds := 25
 var _turn_seconds := 60
 var _game: Game
 var _rolling := false
@@ -75,7 +75,7 @@ func _exit_tree() -> void:
 	_close_transport()
 
 
-func host(nick: String, port: int = DEFAULT_PORT, rounds := 15, turn_seconds := 60) -> String:
+func host(nick: String, port: int = DEFAULT_PORT, rounds := 25, turn_seconds := 60) -> String:
 	if not _can_open():
 		return "请先离开当前房间。"
 	nick = nick.strip_edges()

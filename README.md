@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/happiness763/fuqing-mahjong/releases/latest"><strong>下载 Windows 版</strong></a>
   · <a href="#玩法速览">玩法速览</a>
-  · <a href="release/联机说明-v1.2.8a.md">联机说明</a>
+  · <a href="release/联机说明-v1.2.9.md">联机说明</a>
   · <a href="#参与开发">参与开发</a>
 </p>
 
@@ -15,14 +15,16 @@
 
 ## 快速开桌
 
-从 [GitHub Releases](https://github.com/happiness763/fuqing-mahjong/releases/latest) 下载 Windows ZIP，解压后运行里面的 `FuqingMahjong-*.exe`。当前发布版为 **v1.2.8a**。
+从 [GitHub Releases](https://github.com/happiness763/fuqing-mahjong/releases/latest) 下载 Windows ZIP，解压后运行里面的 `FuqingMahjong-*.exe`。当前发布版为 **v1.2.9**。
 
 | 模式 | 怎么开局 |
 | --- | --- |
-| **单机** | 选局数、AI 难度和运气，点「开始游戏」。默认 15 局。三档难度为简单、普通、困难。 |
+| **单机** | 从首页点「开始游戏」进入开桌设置，选局数（默认 25）、AI 难度和运气，再点「开始游戏」。三档难度为简单、普通、困难。 |
 | **联机** | 房主开房并分享「地址:端口」。朋友填昵称、粘贴地址后加入，在大厅选东、南、西、北的空座。房主可加 AI 补齐四席，再开始游戏。 |
 
-联机请使用同一版本。房主可设置 15 秒、30 秒、60 秒或不限时，默认 60 秒。跨网络开房需转发 UDP 端口，具体步骤见 [联机说明](release/联机说明-v1.2.8a.md)。
+联机请使用同一版本。房主可设置 15 秒、30 秒、60 秒或不限时，默认 60 秒。跨网络开房需转发 UDP 端口，具体步骤见 [联机说明](release/联机说明-v1.2.9.md)。
+
+首页「数据统计」和对局菜单里的「数据统计」可查看本机累计战绩、单局详情、最近 100 局历史和成就；数据只保存在本机。整桌结算会列出每位牌手的胡牌次数和点炮次数。
 
 ### 键鼠操作
 
@@ -111,4 +113,4 @@ godot --headless --path godot --script res://tests/online_room_test.gd
 
 </details>
 
-[更新说明](release/更新说明-v1.2.8a.md) · [首巡流局与闲金设计](docs/superpowers/specs/2026-11-17-godot-mahjong-v1.2.8-design.md) · [牌面来源](godot/assets/tiles/CREDITS.md) · [第三方许可](release/licenses/)
+[更新说明](release/更新说明-v1.2.9.md) · [数据统计与首页设计](docs/superpowers/specs/2026-11-17-godot-mahjong-v1.2.9-design.md) · [牌面来源](godot/assets/tiles/CREDITS.md) · [第三方许可](release/licenses/)

@@ -28,6 +28,8 @@ var last_discard := {}
 var pending := {}
 var latest := {}
 var result := {}
+var discard_count := 0
+var draw_count := 0
 var revision := 0
 var action_revision := 0
 var gold_dice: Array = []
@@ -66,6 +68,8 @@ func set_next_gold_dice(dice: Array) -> void:
 
 func start_round() -> void:
 	hand_id += 1
+	discard_count = 0
+	draw_count = 0
 	_first_discard = -1
 	_first_cycle_count = 0
 	action_revision += 1
@@ -142,6 +146,7 @@ func deal(shuffled: Array) -> void:
 	players = []
 	for seat in range(4):
 		players.append({"hand": [], "melds": [], "flowers": [], "river": [], "discarded_gold": false,
+			"gold_discards": 0, "pass_pong": 0, "pass_win": 0, "discard_count": 0, "draw_count": 0,
 			"lock_discards": [], "locked": false, "gold_gap": []})
 	var order := Rules.order_from(dealer)
 	for index in range(16):
@@ -554,6 +559,10 @@ func act(seat: int, id: String) -> bool:
 			for option in offered:
 				if option.type in ["pong", "win"] and option.type not in blocked:
 					blocked.append(option.type)
+					if option.type == "pong":
+						players[seat].pass_pong = int(players[seat].get("pass_pong", 0)) + 1
+					else:
+						players[seat].pass_win = int(players[seat].get("pass_win", 0)) + 1
 			if not blocked.is_empty():
 				_passed_claims[seat][pending.tile] = blocked
 		if phase in ["opening", "reaction", "robKong"]:
@@ -585,11 +594,14 @@ func discard(seat: int, tile: int, declare_gap := false) -> void:
 	var player: Dictionary = players[seat]
 	player.hand.erase(tile)
 	player.river.append(tile)
+	discard_count += 1
+	player.discard_count = int(player.get("discard_count", 0)) + 1
 	if not player.lock_discards.is_empty():
 		player.locked = true
 		player.lock_discards = []
 	if Rules.is_gold(tile, gold):
 		player.discarded_gold = true
+		player.gold_discards = int(player.get("gold_discards", 0)) + 1
 	drawn = -1
 	last_discard = {"seat": seat, "tile": tile}
 	note("discard", seat, tile)
@@ -736,6 +748,8 @@ func draw_tile(seat: int, supplement: bool) -> void:
 			"tail" if supplement else "head", _wall_takes)
 		if not Rules.is_flower(tile, gold):
 			player.hand.append(tile)
+			draw_count += 1
+			player.draw_count = int(player.get("draw_count", 0)) + 1
 			current = seat
 			phase = "turn"
 			can_self_win = true
@@ -803,6 +817,7 @@ func view(seat: int) -> Dictionary:
 		"first_cycle": first_cycle,
 		"round_limit": round_limit, "table_finished": is_table_finished(),
 		"scores": scores.duplicate(), "current": current, "phase": phase, "remaining": maxi(0, wall.size() - Rules.RESERVE),
+		"discard_count": discard_count, "draw_count": draw_count,
 		"wall": _wall_view(),
 		"opening": pending.get("kind", "") if sees_claim else "",
 		"rob_tile": pending.tile if phase == "robKong" and sees_claim else -1,

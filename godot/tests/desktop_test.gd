@@ -56,8 +56,8 @@ func run() -> void:
 	var desk = Desk.instantiate()
 	desk.preferences_root = OS.get_temp_dir().path_join("fuqing-desktop-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	root.add_child(desk)
-	check(ProjectSettings.get_setting("application/config/version") == "1.2.8a", "project version")
-	check(desk.game == null and desk.lobby.round_field.text == "15", "lobby defaults to 15 rounds")
+	check(ProjectSettings.get_setting("application/config/version") == "1.2.9", "project version")
+	check(desk.game == null and desk.lobby.round_field.text == "25", "lobby defaults to 25 rounds")
 	check(Art.FRAME == Rect2(28, 16, 1042, 768), "table frame fills the window")
 	check(Art.FELT == Rect2(41, 29, 1016, 742), "felt follows the frame")
 	check(Art.CENTER == Vector2(549, 400), "table center is recentered")
@@ -72,6 +72,30 @@ func run() -> void:
 	check(not desk.lobby.online_button.disabled, "online mode is available")
 	check(desk.lobby.selections.difficulty == "normal" and desk.lobby.selections.luck == "normal",
 		"default difficulty and luck")
+	check(desk.lobby.menu_layer.visible and not desk.lobby.setup_layer.visible,
+		"initial page shows the menu")
+	var menu_buttons: Array = desk.lobby.menu_layer.find_children("*", "Button", true, false).map(
+		func(node): return node.text)
+	check(menu_buttons == ["开始游戏", "数据统计", "设置", "玩法规则"],
+		"four initial choices are in the requested order")
+	await capture("lobby-menu.png")
+	click(desk.lobby.menu_stats_button)
+	check(is_instance_valid(desk.stats_panel), "initial page opens data statistics")
+	desk.close_modal(false)
+	click(desk.lobby.menu_settings_button)
+	check(is_instance_valid(desk.settings_panel), "initial page opens settings")
+	desk.close_modal(false)
+	click(desk.lobby.menu_rules_button)
+	check(is_instance_valid(desk.modal), "initial page opens rules")
+	click(by_text(desk.modal, "×"))
+	check(not is_instance_valid(desk.modal), "initial rules page closes")
+	click(desk.lobby.menu_start_button)
+	check(desk.lobby.setup_layer.visible and not desk.lobby.menu_layer.visible,
+		"start opens the table setup")
+	click(desk.lobby.back_button)
+	check(desk.lobby.menu_layer.visible and not desk.lobby.setup_layer.visible,
+		"setup returns to the initial menu")
+	click(desk.lobby.menu_start_button)
 	await capture("lobby.png")
 	desk.lobby.round_field.text = "33"
 	desk.lobby.round_field.text_changed.emit("33")
@@ -126,11 +150,19 @@ func run() -> void:
 	var menu_labels: Array = desk.menu_panel.find_children("*", "Button", true, false).map(func(node): return node.text)
 	check(menu_labels.has("声音  开") and menu_labels.has("玩法规则") and menu_labels.has("返回首页"),
 		"menu has sound, rules and leave")
+	check(menu_labels.has("数据统计"), "menu has data statistics")
 	check(not menu_labels.has("操作说明"), "the old operation hints are gone")
 	click(by_text(desk.menu_panel, "玩法规则"))
 	check(is_instance_valid(desk.modal), "rules opens")
 	click(by_text(desk.modal, "×"))
 	check(not is_instance_valid(desk.modal) and not desk.menu_open(), "rules closes")
+	click(desk.menu_button)
+	var stats_menu := by_text(desk.menu_panel, "数据统计")
+	check(is_instance_valid(stats_menu), "statistics menu entry")
+	click(stats_menu)
+	check(is_instance_valid(desk.stats_panel), "menu opens the statistics page")
+	if is_instance_valid(desk.stats_panel):
+		desk.close_modal(false)
 	click(desk.menu_button)
 	click(by_text(desk.menu_panel, "声音  开"))
 	check(desk.muted, "sound can be muted")
@@ -155,6 +187,28 @@ func run() -> void:
 	if is_instance_valid(desk.modal):
 		print("Desktop round finished: ", desk.result_title(desk.game.result))
 		await capture("settlement.png")
+		var round_stats_button := by_text(desk.modal, "本局统计")
+		check(is_instance_valid(round_stats_button), "settlement links to round statistics")
+		click(round_stats_button)
+		check(is_instance_valid(desk.stats_panel), "round statistics opens")
+		if is_instance_valid(desk.stats_panel):
+			await create_timer(0.2).timeout
+			await capture("stats-round.png")
+			click(by_text(desk.stats_panel, "历史"))
+			check(desk.stats_panel.tab == "history", "history tab opens")
+			await create_timer(0.12).timeout
+			await capture("stats-history.png")
+			click(by_text(desk.stats_panel, "成就"))
+			check(desk.stats_panel.tab == "achievements", "achievements tab opens")
+			await create_timer(0.12).timeout
+			await capture("stats-achievements.png")
+			click(by_text(desk.stats_panel, "总览"))
+			check(desk.stats_panel.tab == "overview", "overview tab opens")
+			await create_timer(0.12).timeout
+			await capture("stats-overview.png")
+			desk.close_modal(false)
+			desk.show_result()
+			check(is_instance_valid(desk.modal), "settlement can be restored after statistics")
 		click(by_text(desk.modal, "下一局"))
 		check(desk.game.round_number == 2, "next round opens")
 		desk.skip_intro()
@@ -165,8 +219,13 @@ func run() -> void:
 	check(desk.game.is_table_finished() and is_instance_valid(desk.modal), "last round opens table settlement")
 	if is_instance_valid(desk.modal):
 		await capture("final-scores.png")
+		var final_labels: Array = desk.modal.find_children("*", "Label", true, false).map(
+			func(node): return node.text)
+		check(final_labels.has("胡牌") and final_labels.has("点炮"),
+			"end-of-table settlement shows wins and deal-ins")
 		click(by_text(desk.modal, "返回首页"))
 		check(desk.game == null and desk.lobby.round_field.text == "2", "lobby preserves settings")
+		click(desk.lobby.menu_start_button)
 		click(desk.lobby.start_button)
 		desk.finish_dealer_roll()
 	desk.skip_intro()

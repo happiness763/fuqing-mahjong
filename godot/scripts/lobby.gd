@@ -6,6 +6,13 @@ const INK := Color("#f3e5cb")
 const MUTED := Color("#b0bd9e")
 
 var desk
+var menu_layer: Control
+var setup_layer: Control
+var menu_start_button: Button
+var menu_stats_button: Button
+var menu_settings_button: Button
+var menu_rules_button: Button
+var back_button: Button
 var slider: HSlider
 var round_field: LineEdit
 var round_error: Label
@@ -43,12 +50,41 @@ func setup(table, settings: Dictionary) -> void:
 	var version := str(ProjectSettings.get_setting("application/config/version"))
 	desk.label(self, "v" + version, Rect2(94, 680, 250, 24), 15, MUTED)
 
-	desk.label(self, "开桌设置", Rect2(704, 103, 400, 45), 32, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
-	desk.label(self, "模式", Rect2(704, 163, 112, 36), 18, INK)
-	desk.button(self, "单机模式", Rect2(809, 163, 168, 42), Callable(), "primary")
-	online_button = desk.button(self, "联机模式", Rect2(987, 163, 175, 42), desk.show_online)
+	setup_layer = Control.new()
+	setup_layer.size = size
+	setup_layer.visible = false
+	add_child(setup_layer)
+	menu_layer = Control.new()
+	menu_layer.size = size
+	add_child(menu_layer)
+	_build_setup()
+	_build_menu()
+	show_menu()
 
-	desk.label(self, "局数", Rect2(704, 250, 95, 36), 18, INK)
+
+func _build_menu() -> void:
+	desk.label(menu_layer, "开桌", Rect2(704, 103, 400, 45), 32, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
+	desk.label(menu_layer, "选择一项开始", Rect2(704, 155, 458, 26), 16, MUTED)
+	menu_start_button = desk.button(menu_layer, "开始游戏", Rect2(704, 267, 458, 84), show_setup, "primary")
+	menu_start_button.add_theme_font_size_override("font_size", 24)
+	menu_stats_button = desk.button(menu_layer, "数据统计", Rect2(704, 375, 458, 72),
+		func(): desk.show_stats("overview"))
+	menu_stats_button.add_theme_font_size_override("font_size", 20)
+	menu_settings_button = desk.button(menu_layer, "设置", Rect2(704, 471, 458, 72), desk.show_settings)
+	menu_settings_button.add_theme_font_size_override("font_size", 20)
+	menu_rules_button = desk.button(menu_layer, "玩法规则", Rect2(704, 567, 458, 72), desk.show_rules)
+	menu_rules_button.add_theme_font_size_override("font_size", 20)
+
+
+func _build_setup() -> void:
+	desk.label(setup_layer, "开桌设置", Rect2(704, 103, 400, 45), 32, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
+	back_button = desk.button(setup_layer, "返回", Rect2(1068, 103, 94, 36), show_menu)
+	back_button.add_theme_font_size_override("font_size", 15)
+	desk.label(setup_layer, "模式", Rect2(704, 163, 112, 36), 18, INK)
+	desk.button(setup_layer, "单机模式", Rect2(809, 163, 168, 42), Callable(), "primary")
+	online_button = desk.button(setup_layer, "联机模式", Rect2(987, 163, 175, 42), desk.show_online)
+
+	desk.label(setup_layer, "局数", Rect2(704, 250, 95, 36), 18, INK)
 	slider = HSlider.new()
 	slider.position = Vector2(809, 255)
 	slider.size = Vector2(246, 29)
@@ -59,7 +95,7 @@ func setup(table, settings: Dictionary) -> void:
 	slider.add_theme_stylebox_override("slider", Art.box(Color("#172f24"), Color("#597158"), 5))
 	slider.add_theme_stylebox_override("grabber_area", Art.box(Color("#92a378"), Color("#92a378"), 5))
 	slider.add_theme_stylebox_override("grabber_area_highlight", Art.box(Color("#b5c08e"), Color("#b5c08e"), 5))
-	add_child(slider)
+	setup_layer.add_child(slider)
 	round_field = LineEdit.new()
 	round_field.position = Vector2(1068, 249)
 	round_field.size = Vector2(94, 42)
@@ -71,27 +107,44 @@ func setup(table, settings: Dictionary) -> void:
 	round_field.add_theme_color_override("font_color", INK)
 	round_field.add_theme_stylebox_override("normal", Art.box(Color("#192e25"), Color("#75906d")))
 	round_field.add_theme_stylebox_override("focus", Art.box(Color.TRANSPARENT, GOLD, 8, 2))
-	add_child(round_field)
-	round_error = desk.label(self, "1–32 局", Rect2(809, 294, 353, 24), 14, MUTED)
+	setup_layer.add_child(round_field)
+	round_error = desk.label(setup_layer, "1–32 局", Rect2(809, 294, 353, 24), 14, MUTED)
 	slider.value_changed.connect(change_slider)
 	round_field.text_changed.connect(change_input)
 	round_field.text_submitted.connect(func(_value): start())
 
 	choice_row("难度", "difficulty", ["简单", "普通", "困难"], ["easy", "normal", "hard"], 355)
 	choice_row("运气", "luck", ["非酋", "普通", "欧皇"], ["unlucky", "normal", "lucky"], 451)
-	start_button = desk.button(self, "开始游戏", Rect2(704, 570, 458, 58), start, "primary")
+	start_button = desk.button(setup_layer, "开始游戏", Rect2(704, 570, 458, 58), start, "primary")
 	start_button.add_theme_font_size_override("font_size", 23)
-	settings_button = desk.button(self, "设置", Rect2(704, 652, 222, 39), desk.show_settings)
-	desk.button(self, "玩法规则", Rect2(940, 652, 222, 39), desk.show_rules)
-	start_button.grab_focus()
+	settings_button = desk.button(setup_layer, "设置", Rect2(704, 652, 222, 39), desk.show_settings)
+	desk.button(setup_layer, "玩法规则", Rect2(940, 652, 222, 39), desk.show_rules)
+
+
+func show_menu() -> void:
+	if is_instance_valid(setup_layer):
+		setup_layer.hide()
+	if is_instance_valid(menu_layer):
+		menu_layer.show()
+	if is_instance_valid(menu_start_button):
+		menu_start_button.grab_focus()
+
+
+func show_setup() -> void:
+	if is_instance_valid(menu_layer):
+		menu_layer.hide()
+	if is_instance_valid(setup_layer):
+		setup_layer.show()
+	if is_instance_valid(start_button):
+		start_button.grab_focus()
 
 
 func choice_row(title: String, key: String, labels: Array, values: Array, y: int) -> void:
-	desk.label(self, title, Rect2(704, y, 95, 42), 18, INK)
+	desk.label(setup_layer, title, Rect2(704, y, 95, 42), 18, INK)
 	var group := ButtonGroup.new()
 	choice_buttons[key] = {}
 	for index in range(labels.size()):
-		var node: Button = desk.button(self, labels[index], Rect2(809 + index * 119, y, 113, 42), Callable())
+		var node: Button = desk.button(setup_layer, labels[index], Rect2(809 + index * 119, y, 113, 42), Callable())
 		node.toggle_mode = true
 		node.button_group = group
 		node.button_pressed = selections[key] == values[index]

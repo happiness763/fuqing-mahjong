@@ -30,8 +30,8 @@ func check(condition: bool, label: String) -> void:
 func test_preferences(preferences: Script, path: String) -> void:
 	var prefs = preferences.new(path)
 	check(prefs.values == {
-		"nickname": "", "rounds": 15, "difficulty": "normal", "luck": "normal",
-		"host_port": 36712, "room_rounds": 15, "turn_seconds": 60, "muted": false,
+		"nickname": "", "rounds": 25, "difficulty": "normal", "luck": "normal",
+		"host_port": 36712, "room_rounds": 25, "turn_seconds": 60, "muted": false,
 		"skin": "riichi", "table_id": "", "interaction_effects": true,
 	}, "a fresh install starts with defaults")
 	var changes := {"nickname": "榕城茶客", "rounds": 24, "difficulty": "hard", "luck": "unlucky",
@@ -52,14 +52,14 @@ func test_preferences(preferences: Script, path: String) -> void:
 	config.values.table_id = "../outside"
 	write_bytes(config_path, JSON.stringify(config).to_utf8_buffer())
 	recovered = preferences.new(path)
-	check(recovered.values.rounds == 15 and recovered.values.host_port == 36712,
+	check(recovered.values.rounds == 25 and recovered.values.host_port == 36712,
 		"out-of-range and noninteger settings each restore their defaults")
 	check(recovered.values.skin == "riichi" and recovered.values.difficulty == "normal" and recovered.values.table_id == "",
 		"unknown, missing and unsafe values restore their defaults")
 	check(recovered.values.nickname == "榕城茶客" and recovered.values.muted,
 		"valid neighboring settings survive corruption")
 	write_bytes(config_path, "{ unfinished".to_utf8_buffer())
-	check(preferences.new(path).values.rounds == 15, "an unparseable config can be opened safely")
+	check(preferences.new(path).values.rounds == 25, "an unparseable config can be opened safely")
 	DirAccess.remove_absolute(config_path)
 	check(prefs.update({"rounds": 9}) == OK, "a config can be recreated")
 	DirAccess.rename_absolute(config_path, config_path + ".previous")

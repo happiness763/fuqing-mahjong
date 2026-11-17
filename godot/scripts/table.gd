@@ -14,6 +14,8 @@ const OnlineLobby = preload("res://scripts/online_lobby.gd")
 const OnlineRoom = preload("res://scripts/online_room.gd")
 const OnlineTableView = preload("res://scripts/online_table_view.gd")
 const OpeningIntro = preload("res://scripts/opening_intro.gd")
+const Stats = preload("res://scripts/stats.gd")
+const StatsPanel = preload("res://scripts/stats_panel.gd")
 const TableWall = preload("res://scripts/table_wall.gd")
 const Interactions = preload("res://scripts/table_interaction.gd")
 const SLIDE_DURATION := 0.23
@@ -63,9 +65,16 @@ var modal_tracks_stage := false
 var transfer_button: Button
 var leave_button: Button
 var nickname_font: Font
-var settings := {"rounds": 15, "difficulty": "normal", "luck": "normal"}
+var settings := {"rounds": 25, "difficulty": "normal", "luck": "normal"}
 var preferences_root := "user://"
 var preferences: Preferences
+var stats
+var stats_table_id := ""
+var stats_round_hand_id := -1
+var stats_round_started_ms := 0
+var stats_round_started_at := 0
+var stats_recorded_hand_id := -1
+var stats_panel: Control
 var settings_panel: Control
 var applied_skin := ""
 var selected_index := -1
@@ -136,6 +145,7 @@ func _ready() -> void:
 	title_font = system_font(["KaiTi", "SimSun", "Microsoft YaHei", "Noto Serif CJK SC"])
 	nickname_font = system_font(["Microsoft YaHei UI", "Microsoft YaHei", "SimSun", "Segoe UI"])
 	preferences = Preferences.new(preferences_root)
+	stats = Stats.new(preferences_root)
 	for key in settings:
 		settings[key] = preferences.values[key]
 	board_art = Art.new()
@@ -304,15 +314,16 @@ func build_header() -> void:
 	add_child(header)
 	menu_button = button(header, "菜单", Rect2(1083, 16, 169, 44), toggle_menu)
 	menu_button.z_index = 20
-	menu_panel = panel(header, Rect2(1083, 64, 169, 230), Color("#203a2e"), Color("#ab8852"), 12)
+	menu_panel = panel(header, Rect2(1083, 64, 169, 272), Color("#203a2e"), Color("#ab8852"), 12)
 	menu_panel.visible = false
 	menu_panel.z_index = 21
 	sound_button = menu_row(menu_panel, 0, "声音  开", _menu_sound)
 	menu_row(menu_panel, 1, "玩法规则", _menu_rules)
-	transfer_button = menu_row(menu_panel, 2, "移交房主", _menu_transfer)
+	menu_row(menu_panel, 2, "数据统计", _menu_stats)
+	transfer_button = menu_row(menu_panel, 3, "移交房主", _menu_transfer)
 	transfer_button.hide()
-	menu_row(menu_panel, 3, "设置", show_settings)
-	leave_button = menu_row(menu_panel, 4, "返回首页", _menu_leave)
+	menu_row(menu_panel, 4, "设置", show_settings)
+	leave_button = menu_row(menu_panel, 5, "返回首页", _menu_leave)
 
 
 func menu_row(parent: Control, index: int, copy: String, handler: Callable) -> Button:
@@ -364,6 +375,11 @@ func _menu_sound() -> void:
 func _menu_rules() -> void:
 	close_menu()
 	show_rules()
+
+
+func _menu_stats() -> void:
+	close_menu()
+	show_stats("overview")
 
 
 func _menu_transfer() -> void:
@@ -418,6 +434,17 @@ func show_settings() -> void:
 	settings_panel.setup(self)
 
 
+func show_stats(initial_tab := "overview", entry := {}) -> void:
+	close_menu()
+	if board_view().get("phase") == "result":
+		shown_round = -1
+	var dialog := open_modal("数据统计", 1040, 700)
+	modal.z_index = 40
+	stats_panel = StatsPanel.new()
+	dialog.add_child(stats_panel)
+	stats_panel.setup(self, initial_tab, entry)
+
+
 func apply_saved_appearance() -> void:
 	muted = preferences.values.muted
 	sound_button.text = "声音  关" if muted else "声音  开"
@@ -447,6 +474,9 @@ func show_lobby() -> void:
 	ai_timer.stop()
 	redeal_timer.stop()
 	game = null
+	stats_table_id = ""
+	stats_round_hand_id = -1
+	stats_recorded_hand_id = -1
 	_reset_wall()
 	clear_selection()
 	clear_board()
@@ -521,6 +551,9 @@ func room_state_changed() -> void:
 		show_online_dealer_roll(snapshot)
 		return
 	if phase != "playing":
+		stats_table_id = ""
+		stats_round_hand_id = -1
+		stats_recorded_hand_id = -1
 		var was_rolling := online_rolling
 		online_rolling = false
 		close_online_dealer_roll()
@@ -553,6 +586,10 @@ func room_state_changed() -> void:
 		return
 
 	var entering := online_view.is_empty()
+	if entering and stats_table_id.is_empty():
+		stats_table_id = _new_stats_table_id()
+		stats_round_hand_id = -1
+		stats_recorded_hand_id = -1
 	if entering and dealer_roll_online and dealer_roll_animating:
 		return
 	var stage: int = snapshot.stage
@@ -658,6 +695,9 @@ func begin_game(selections: Dictionary) -> void:
 	if not is_instance_valid(lobby):
 		return
 	settings = selections.duplicate()
+	stats_table_id = _new_stats_table_id()
+	stats_round_hand_id = -1
+	stats_recorded_hand_id = -1
 	remove_child(lobby)
 	lobby.queue_free()
 	lobby = null
@@ -669,6 +709,113 @@ func begin_game(selections: Dictionary) -> void:
 		game = Game.new(-1, settings.rounds, settings.luck, false, int(state.winner))
 		game.dealer_rolls = state
 		start_intro())
+
+
+func _new_stats_table_id() -> String:
+	return "%d-%d" % [int(Time.get_unix_time_from_system()), randi()]
+
+
+func _track_stats(view: Dictionary) -> void:
+	if stats == null:
+		return
+	var phase := str(view.get("phase", ""))
+	var hand_id := int(view.get("hand_id", -1))
+	if phase not in ["result", "redeal"] and hand_id != stats_round_hand_id:
+		stats_round_hand_id = hand_id
+		stats_round_started_ms = Time.get_ticks_msec()
+		stats_round_started_at = int(Time.get_unix_time_from_system())
+	if phase in ["result", "redeal"] and hand_id != stats_recorded_hand_id:
+		if stats_table_id.is_empty():
+			stats_table_id = _new_stats_table_id()
+		stats.record_round(_build_stats_entry(view))
+		stats_recorded_hand_id = hand_id
+
+
+func _build_stats_entry(view: Dictionary) -> Dictionary:
+	var result: Dictionary = view.get("result", {})
+	var winner := int(result.get("winner", -1))
+	var from_seat := int(result.get("from", -1))
+	var method := str(result.get("method", result.get("kind", "")))
+	var gold := int(view.get("gold", -1))
+	var deltas: Array = result.get("deltas", [0, 0, 0, 0])
+	var names: Array = []
+	var players: Array = []
+	for seat in range(4):
+		var player: Dictionary = view.players[seat]
+		var meld_counts := {"chow": 0, "pong": 0, "kong": 0, "addedKong": 0, "concealedKong": 0}
+		for meld in player.melds:
+			if meld is Dictionary and meld_counts.has(meld.get("type", "")):
+				meld_counts[meld.type] = int(meld_counts.get(meld.type, 0)) + 1
+		var shown_hand: Array = Array(player.get("hand", [])).duplicate()
+		names.append(player_name(seat))
+		players.append({
+			"hand": shown_hand if seat == winner else [],
+			"melds": Array(player.get("melds", [])).duplicate(true),
+			"flowers": Array(player.get("flowers", [])).duplicate(),
+			"meld_counts": meld_counts,
+			"flower_count": Array(player.get("flowers", [])).size(),
+			"gold_count": Rules.gold_count(shown_hand, gold),
+			"discarded_gold": bool(player.get("discarded_gold", false)),
+			"gold_discards": int(player.get("gold_discards", 0)),
+			"gold_gap": Array(player.get("gold_gap", [])).duplicate(),
+			"pass_pong": int(player.get("pass_pong", 0)),
+			"pass_win": int(player.get("pass_win", 0)),
+			"discard_count": int(player.get("discard_count", 0)),
+			"draw_count": int(player.get("draw_count", 0)),
+			"delta": int(deltas[seat]) if seat < deltas.size() else 0,
+			"score": int(view.scores[seat]) if seat < view.scores.size() else 0,
+			"is_dealer": seat == int(view.get("dealer", -1)),
+			"is_winner": seat == winner,
+			"is_deal_in": seat == from_seat and method == "discard",
+			"is_robbed": seat == from_seat and method == "rob",
+		})
+	var mode := "online" if not online_view.is_empty() else "single"
+	var difficulty := "normal"
+	var luck := "normal"
+	if mode == "single":
+		difficulty = str(settings.get("difficulty", "normal"))
+		luck = str(settings.get("luck", "normal"))
+	var now := Time.get_ticks_msec()
+	var duration := maxi(0, now - stats_round_started_ms) if stats_round_started_ms > 0 else 0
+	var finished := bool(view.get("table_finished", false))
+	var standings: Array = []
+	var rank := 0
+	if finished:
+		if online_view.is_empty() and game != null:
+			standings = game.standings()
+		else:
+			standings = Array(view.get("standings", [])).duplicate(true)
+		for row in standings:
+			if row is Dictionary and int(row.get("seat", -1)) == 0:
+				rank = int(row.get("rank", 0))
+	var winner_hand: Array = []
+	var winner_melds: Array = []
+	var winner_flowers: Array = []
+	if winner >= 0 and winner < players.size():
+		winner_hand = Array(players[winner].get("hand", [])).duplicate()
+		winner_melds = Array(players[winner].get("melds", [])).duplicate(true)
+		winner_flowers = Array(players[winner].get("flowers", [])).duplicate()
+	return {
+		"table_id": stats_table_id, "round": int(view.get("round", 0)),
+		"hand_id": int(view.get("hand_id", -1)),
+		"mode": mode, "round_limit": int(view.get("round_limit", 0)),
+		"difficulty": difficulty, "luck": luck,
+		"dealer": int(view.get("dealer", -1)),
+		"started_ms": stats_round_started_ms, "started_at": stats_round_started_at,
+		"ended_ms": now,
+		"ended_at": int(Time.get_unix_time_from_system()), "duration_ms": duration,
+		"discards": int(view.get("discard_count", 0)), "tile_draws": int(view.get("draw_count", 0)),
+		"remaining": int(view.get("remaining", 0)),
+		"result": result.duplicate(true), "scores": view.scores.duplicate(),
+		"table_finished": finished, "table_rank": rank, "standings": standings.duplicate(true),
+		"redeal": str(result.get("kind", "")) == "firstCycleDraw",
+		"gold": gold, "indicator": int(view.get("indicator", -1)),
+		"gold_dice": Array(view.get("gold_dice", [])).duplicate(),
+		"gold_index": int(view.get("gold_index", -1)),
+		"dealer_rolls": view.get("dealer_rolls", {}).duplicate(true),
+		"names": names, "players": players,
+		"winner_hand": winner_hand, "winner_melds": winner_melds, "winner_flowers": winner_flowers,
+	}
 
 
 func show_dealer_roll(state: Dictionary, on_done: Callable) -> void:
@@ -1327,6 +1474,7 @@ func refresh(animate := false) -> void:
 	var view := board_view()
 	if view.is_empty():
 		return
+	_track_stats(view)
 	var redealing: bool = view.phase == "redeal"
 	if redealing and not is_instance_valid(redeal_notice):
 		clear_hand_activity(view)
@@ -1906,6 +2054,15 @@ func render_controls(view: Dictionary, moves: Array) -> void:
 		if discards:
 			options.append(["出牌", confirm_discard, "primary", "discard"])
 
+	if stats != null and not stats_table_id.is_empty():
+		var table_stats: Dictionary = stats.table_summary(stats_table_id)
+		if int(table_stats.get("rounds", 0)) > 0:
+			var table_seats: Array = table_stats.get("seats", [])
+			var my_table: Dictionary = table_seats[0] if not table_seats.is_empty() else {}
+			label(dynamic, "本桌统计", Rect2(1094, 518, 149, 16), 11, MUTED)
+			label(dynamic, "你 胡%d 点%d · %d 局" % [
+				int(my_table.get("wins", 0)), int(my_table.get("deal_ins", 0)),
+				int(table_stats.get("rounds", 0))], Rect2(1094, 535, 149, 18), 12, INK)
 	label(dynamic, "牌桌状态", Rect2(1094, 570, 149, 22), 16, MUTED)
 	status_label = label(dynamic, detail, Rect2(1093, 596, 149, 56), 15,
 		GOLD if not moves.is_empty() else INK)
@@ -2080,10 +2237,12 @@ func suspend_focus(branch: Node) -> void:
 func close_modal(resume := true) -> void:
 	if is_instance_valid(modal):
 		var closing_settings := is_instance_valid(settings_panel)
+		var closing_stats := is_instance_valid(stats_panel)
 		remove_child(modal)
 		modal.queue_free()
 		modal = null
 		settings_panel = null
+		stats_panel = null
 		modal_tracks_stage = false
 		chooser_countdown = null
 		for control in suspended_focus:
@@ -2091,7 +2250,7 @@ func close_modal(resume := true) -> void:
 				control.focus_mode = Control.FOCUS_ALL
 		suspended_focus.clear()
 		if resume:
-			if not closing_settings:
+			if closing_stats or not closing_settings:
 				refresh()
 			else:
 				var view := board_view()
@@ -2212,7 +2371,8 @@ func show_result() -> void:
 	var title := result_title(result)
 	if finished:
 		title = "整桌结算 · " + title
-	var dialog := open_modal(title, 626, 463)
+	var dialog_width := 720 if finished else 626
+	var dialog := open_modal(title, dialog_width, 463)
 	modal_tracks_stage = not online_view.is_empty()
 	var copy := "已到保留牌尾，本局积分不变。"
 	if result.winner >= 0:
@@ -2236,16 +2396,26 @@ func show_result() -> void:
 			win_name(method), "平胡" if result.kind == "discard" else win_name(result.kind), source,
 			result.base_points, result.flower_points, ordinary_gold_points, flower_golds, result.base,
 			result.base, result.multiplier, result.offset, result.per_payer, payers]
-	var summary := label(dialog, copy, Rect2(24, 136, 578, 82), 15, MUTED)
+	var copy_label := label(dialog, copy, Rect2(24, 136, dialog_width - 48, 82), 15, MUTED)
 	if not online_view.is_empty():
-		summary.add_theme_font_override("font", nickname_font)
-	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	panel(dialog, Rect2(24, 222, 578, 169), Color("#1c3228"), Color("#47604d"))
-	label(dialog, "牌手", Rect2(40, 231, 130, 20), 13, MUTED)
-	label(dialog, "本局", Rect2(349, 231, 85, 20), 13, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
-	label(dialog, "累计", Rect2(497, 231, 85, 20), 13, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
+		copy_label.add_theme_font_override("font", nickname_font)
+	copy_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	panel(dialog, Rect2(24, 222, dialog_width - 48, 169), Color("#1c3228"), Color("#47604d"))
+	var table_stats: Dictionary = stats.table_summary(stats_table_id) if stats != null else {}
+	var table_seats: Array = table_stats.get("seats", [])
 	if finished:
-		label(dialog, "排名", Rect2(204, 231, 70, 20), 13, MUTED)
+		label(dialog, "牌手", Rect2(40, 231, 130, 20), 13, MUTED)
+		label(dialog, "排名", Rect2(176, 231, 46, 20), 13, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
+		var hu_heading := label(dialog, "胡牌", Rect2(228, 231, 50, 20), 13, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
+		hu_heading.tooltip_text = "本桌胡牌次数"
+		var dian_heading := label(dialog, "点炮", Rect2(284, 231, 50, 20), 13, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
+		dian_heading.tooltip_text = "本桌点炮次数，不含被抢杠"
+		label(dialog, "本局", Rect2(344, 231, 80, 20), 13, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
+		label(dialog, "累计", Rect2(452, 231, 80, 20), 13, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
+	else:
+		label(dialog, "牌手", Rect2(40, 231, 130, 20), 13, MUTED)
+		label(dialog, "本局", Rect2(349, 231, 85, 20), 13, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
+		label(dialog, "累计", Rect2(497, 231, 85, 20), 13, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
 	var standings: Array = []
 	if finished:
 		standings = game.standings() if online_view.is_empty() else view.standings
@@ -2254,11 +2424,23 @@ func show_result() -> void:
 		var y := 257 + index * 30
 		set_player_font(label(dialog, player_name(seat), Rect2(40, y, 150, 25), 16))
 		if finished:
-			label(dialog, str(standings[index].rank), Rect2(204, y, 70, 25), 16, GOLD)
-		label(dialog, points(result.deltas[seat]), Rect2(349, y, 85, 25),
-			17, score_color(result.deltas[seat]), HORIZONTAL_ALIGNMENT_RIGHT)
-		label(dialog, points(view.scores[seat]), Rect2(497, y, 85, 25),
-			17, score_color(view.scores[seat]), HORIZONTAL_ALIGNMENT_RIGHT)
+			label(dialog, str(standings[index].rank), Rect2(176, y, 46, 25), 16, GOLD,
+				HORIZONTAL_ALIGNMENT_RIGHT)
+			var table_seat: Dictionary = table_seats[seat] if seat < table_seats.size() else {}
+			label(dialog, str(int(table_seat.get("wins", 0))), Rect2(228, y, 50, 25), 16, INK,
+				HORIZONTAL_ALIGNMENT_RIGHT)
+			label(dialog, str(int(table_seat.get("deal_ins", 0))), Rect2(284, y, 50, 25), 16, INK,
+				HORIZONTAL_ALIGNMENT_RIGHT)
+			label(dialog, points(result.deltas[seat]), Rect2(344, y, 80, 25),
+				17, score_color(result.deltas[seat]), HORIZONTAL_ALIGNMENT_RIGHT)
+			label(dialog, points(view.scores[seat]), Rect2(452, y, 80, 25),
+				17, score_color(view.scores[seat]), HORIZONTAL_ALIGNMENT_RIGHT)
+		else:
+			label(dialog, points(result.deltas[seat]), Rect2(349, y, 85, 25),
+				17, score_color(result.deltas[seat]), HORIZONTAL_ALIGNMENT_RIGHT)
+			label(dialog, points(view.scores[seat]), Rect2(497, y, 85, 25),
+				17, score_color(view.scores[seat]), HORIZONTAL_ALIGNMENT_RIGHT)
+	button(dialog, "本局统计", Rect2(24, 410, 106, 35), show_stats.bind("round"))
 	button(dialog, "查看牌桌", Rect2(372, 410, 106, 35), close_modal)
 	if not online_view.is_empty() and not is_room_owner():
 		label(dialog, "等待房主", Rect2(488, 410, 114, 35), 15, MUTED, HORIZONTAL_ALIGNMENT_CENTER)
