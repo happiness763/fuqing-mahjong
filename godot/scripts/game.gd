@@ -2,6 +2,7 @@ extends RefCounted
 
 const Rules = preload("res://scripts/rules.gd")
 const Opponent = preload("res://scripts/opponent.gd")
+const REDEAL_DELAY_MS := 1800
 
 var players: Array = []
 var wall: Array = []
@@ -13,6 +14,9 @@ var scores := [0, 0, 0, 0]
 var dealer := 0
 var current := 0
 var round_number := 1
+var hand_id := 0
+var _first_discard := -1
+var _first_cycle_count := 0
 var round_limit := 15
 var luck := "normal"
 var gold := -1
@@ -61,6 +65,9 @@ func set_next_gold_dice(dice: Array) -> void:
 
 
 func start_round() -> void:
+	hand_id += 1
+	_first_discard = -1
+	_first_cycle_count = 0
 	action_revision += 1
 	if _next_gold_dice.size() == 2:
 		gold_dice = _next_gold_dice.duplicate()
@@ -187,6 +194,13 @@ func next_round() -> bool:
 	if result.winner >= 0 and result.winner != dealer:
 		dealer = (dealer + 1) % 4
 	round_number += 1
+	start_round()
+	return true
+
+
+func restart_after_draw() -> bool:
+	if phase != "redeal":
+		return false
 	start_round()
 	return true
 
@@ -380,7 +394,9 @@ func win_kind(seat: int, incoming := -1) -> String:
 	var self_draw := incoming < 0
 	if not player.gold_gap.is_empty():
 		return ""
-	if not self_draw and (player.discarded_gold or Rules.idle_gold(hand, meld_count, gold)):
+	# Only a single-gold idle wait blocks a discard win or robbing a kong.
+	if not self_draw and (player.discarded_gold or
+			(Rules.gold_count(hand, gold) == 1 and Rules.idle_gold(hand, meld_count, gold))):
 		return ""
 	if self_draw and Rules.gold_count(hand, gold) >= 3:
 		return "three"
@@ -393,13 +409,17 @@ func win_kind(seat: int, incoming := -1) -> String:
 func win_pattern(seat: int, hand: Array, incoming: int, method: String) -> String:
 	var player: Dictionary = players[seat]
 	var full: Array = hand if incoming < 0 else hand + [incoming]
-	var idle := false
-	if method == "self" and drawn >= 0 and not Rules.is_gold(drawn, gold):
-		var prior: Array = hand.duplicate()
-		prior.erase(drawn)
-		idle = Rules.idle_gold(prior, player.melds.size(), gold)
+	var idle := _qualifies_idle_on_draw(full, player.melds.size(), method)
 	var base: int = Rules.base_value(full, player.flowers, player.melds, gold, seat, dealer).base
 	return Rules.best_pattern(full, player.melds, gold, method, base, idle)
+
+
+func _qualifies_idle_on_draw(hand: Array, meld_count: int, method: String) -> bool:
+	if method != "self" or drawn < 0 or Rules.is_gold(drawn, gold) or not hand.has(drawn):
+		return false
+	var prior := hand.duplicate()
+	prior.erase(drawn)
+	return Rules.idle_gold(prior, meld_count, gold)
 
 
 func listening_discards(hand: Array, open_count: int) -> Array:
@@ -415,12 +435,10 @@ func listening_discards(hand: Array, open_count: int) -> Array:
 
 func actions(seat: int) -> Array:
 	var options := _action_options(seat)
-	if not _online:
-		return options
 	var stamped: Array = []
 	for move in options:
 		var option: Dictionary = move.duplicate(true)
-		option.id += "@%d" % action_revision
+		option.id += "@%d" % action_revision if _online else "#%d" % hand_id
 		stamped.append(option)
 	return stamped
 
@@ -572,6 +590,10 @@ func discard(seat: int, tile: int, declare_gap := false) -> void:
 	note("discard", seat, tile)
 	if declare_gap:
 		latest.gold_gap = true
+	if _record_first_discard(seat, tile):
+		result = {"kind": "firstCycleDraw", "winner": -1, "from": -1, "deltas": [0, 0, 0, 0]}
+		phase = "redeal"
+		return
 	var next_seat := (seat + 1) % 4
 	var order := Rules.order_from(next_seat).slice(0, 3)
 	var offers := {}
@@ -581,6 +603,17 @@ func discard(seat: int, tile: int, declare_gap := false) -> void:
 			offers[other] = choices
 	if not begin_claims("reaction", order, offers, {"from": seat, "tile": tile}):
 		draw_tile(next_seat, false)
+
+
+func _record_first_discard(seat: int, tile: int) -> bool:
+	if _first_cycle_count < 0:
+		return false
+	if seat != (dealer + _first_cycle_count) % 4 or (_first_cycle_count > 0 and tile != _first_discard):
+		_first_cycle_count = -1
+		return false
+	_first_discard = tile
+	_first_cycle_count += 1
+	return _first_cycle_count == 4
 
 
 func resolve_claims() -> void:
@@ -637,6 +670,7 @@ func _resolve_claim(winner: int, move: Dictionary) -> void:
 		player.hand.append(tile)
 		finish_win(winner, source, move.kind)
 		return
+	_first_cycle_count = -1
 	for own_tile in move.tiles:
 		player.hand.erase(own_tile)
 	var tiles: Array = move.tiles + [tile]
@@ -673,6 +707,7 @@ func self_kong(seat: int, move: Dictionary) -> void:
 			player.hand.erase(tile)
 		player.melds.append({"type": move.type, "tiles": [tile, tile, tile, tile], "from": seat})
 	else:
+		_first_cycle_count = -1
 		player.hand.erase(tile)
 		for meld in player.melds:
 			if meld.type == "pong" and meld.tiles[0] == tile:
@@ -720,11 +755,7 @@ func draw_tile(seat: int, supplement: bool) -> void:
 
 func finish_win(winner: int, source: int, kind: String) -> void:
 	var player: Dictionary = players[winner]
-	var idle := false
-	if kind == "self" and drawn >= 0 and not Rules.is_gold(drawn, gold):
-		var prior: Array = player.hand.duplicate()
-		prior.erase(drawn)
-		idle = Rules.idle_gold(prior, player.melds.size(), gold)
+	var idle := _qualifies_idle_on_draw(player.hand, player.melds.size(), kind)
 	finish(Rules.score(winner, source, kind, player.hand, player.flowers, player.melds, gold, dealer, idle))
 
 
@@ -759,8 +790,12 @@ func view(seat: int) -> Dictionary:
 	for draw in deal_draws:
 		if int(draw.seat) == seat or bool(draw.flower):
 			visible_draws.append(draw)
+	var first_cycle := {}
+	if _first_cycle_count in range(1, 4) and phase in ["turn", "reaction"]:
+		first_cycle = {"tile": _first_discard, "count": _first_cycle_count, "next_seat": (dealer + _first_cycle_count) % 4}
 	return {
-		"seat": seat, "dealer": dealer, "round": round_number, "gold": gold, "indicator": indicator,
+		"seat": seat, "dealer": dealer, "round": round_number, "hand_id": hand_id, "gold": gold, "indicator": indicator,
+		"first_cycle": first_cycle,
 		"round_limit": round_limit, "table_finished": is_table_finished(),
 		"scores": scores.duplicate(), "current": current, "phase": phase, "remaining": maxi(0, wall.size() - Rules.RESERVE),
 		"wall": _wall_view(),

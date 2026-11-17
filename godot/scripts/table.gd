@@ -26,6 +26,7 @@ const PORTRAITS := [Color("#d8ab70"), Color("#a2b38e"), Color("#87aa99"), Color(
 const INK := Color("#f3e5cb")
 const MUTED := Color("#b0bd9e")
 const GOLD := Color("#edc780")
+const REDEAL_NOTICE := "首巡四家同牌 · 流局"
 const BUTTON := Color("#294638")
 const FONT_DARK := Color("#202e25")
 const GOLD_AREA := Rect2(842, 52, 194, 112)
@@ -36,7 +37,7 @@ var board_art: Control
 var center_dial: CenterDial
 var wall_art: TableWall
 var wall_flights: Control
-var wall_round := -1
+var wall_hand := -1
 var wall_gold_from := Vector2.INF
 var wall_draw_from := Vector2.INF
 var interactions: Interactions
@@ -112,6 +113,8 @@ var faces: Array[Texture2D] = []
 var dynamic: Control
 var modal: Control
 var ai_timer: Timer
+var redeal_timer: Timer
+var redeal_notice: Panel
 var audio: AudioStreamPlayer
 var sounds: Dictionary
 var sound_button: Button
@@ -157,6 +160,10 @@ func _ready() -> void:
 	ai_timer.one_shot = true
 	add_child(ai_timer)
 	ai_timer.timeout.connect(run_ai)
+	redeal_timer = Timer.new()
+	redeal_timer.one_shot = true
+	add_child(redeal_timer)
+	redeal_timer.timeout.connect(restart_after_draw)
 	intro_timer = Timer.new()
 	intro_timer.one_shot = true
 	add_child(intro_timer)
@@ -438,6 +445,7 @@ func show_lobby() -> void:
 	intro_timer.stop()
 	board_art.set_dice(Vector2i.ZERO)
 	ai_timer.stop()
+	redeal_timer.stop()
 	game = null
 	_reset_wall()
 	clear_selection()
@@ -459,6 +467,7 @@ func clear_board() -> void:
 	human_buttons.clear()
 	controls.clear()
 	center_dial.hide()
+	redeal_notice = null
 	room_notice_label = null
 	status_label = null
 
@@ -550,11 +559,11 @@ func room_state_changed() -> void:
 	var owner: int = snapshot.owner
 	var reconnecting: bool = snapshot.get("reconnecting", false)
 	var next_view := OnlineTableView.from_room(snapshot)
-	var round_changed: bool = entering or next_view.round != online_view.round
+	var hand_changed: bool = entering or next_view.round != online_view.round or hand_key(next_view) != hand_key(online_view)
 	var stage_changed := online_stage != stage
 	var owner_changed := owner != online_owner
 	var resync := reconnecting or online_reconnecting or (not entering and stage > online_stage + 1)
-	if not (entering or stage_changed or owner_changed or reconnecting != online_reconnecting
+	if not (hand_changed or stage_changed or owner_changed or reconnecting != online_reconnecting
 		or next_view.seat_info != online_view.seat_info):
 		return
 	if stage_changed or reconnecting:
@@ -562,13 +571,8 @@ func room_state_changed() -> void:
 			close_modal(false)
 		clear_selection()
 		pending_stage = -1
-	if resync or (stage_changed and not round_changed and (intro_active() or flower_active)):
-		intro = null
-		intro_timer.stop()
-		cancel_flower_sequence()
-		draw_flower_active = false
-		last_flower_revision = int(next_view.get("flower_revision", 0))
-		_clear_wall_flights()
+	if not hand_changed and (resync or (stage_changed and (intro_active() or flower_active))):
+		cancel_hand_animations(next_view)
 	if owner_changed and next_view.phase == "result":
 		if modal_tracks_stage:
 			close_modal(false)
@@ -582,22 +586,17 @@ func room_state_changed() -> void:
 		online_lobby.hide()
 		header.show()
 		leave_button.text = "退出房间"
-		last_revision = -1
-		shown_round = -1
-		last_flower_revision = int(next_view.get("flower_revision", 0))
 		online_rolling = false
 		close_online_dealer_roll()
-	if round_changed:
-		interactions.reset()
-		cancel_flower_sequence()
-		draw_flower_active = false
-		log_lines.clear()
 	transfer_button.visible = is_room_owner() and not reconnecting
-	var fresh_opening := round_changed and not resync and (not entering or stage == 1)
-	if fresh_opening and next_view.phase != "result" and next_view.latest.type == "start":
+	var fresh_opening := hand_changed and not resync and (not entering or stage == 1)
+	if fresh_opening and next_view.latest.type == "start" \
+		and next_view.phase not in ["result", "redeal"]:
 		start_intro()
 	else:
-		refresh(stage_changed and not entering and not resync)
+		if hand_changed:
+			reset_hand_presentation(next_view)
+		refresh(stage_changed and not hand_changed and not resync)
 
 
 func show_room_notice(message: String) -> void:
@@ -622,11 +621,15 @@ func board_view() -> Dictionary:
 	return game.view(0) if game != null else {}
 
 
+func hand_key(view: Dictionary) -> int:
+	return int(view.get("hand_id", view.get("round", -1)))
+
+
 func local_moves() -> Array:
 	if intro_active() or draw_flower_active or flower_active or is_instance_valid(dealer_roll_panel):
 		return []
 	if not online_view.is_empty():
-		if online_reconnecting or pending_stage == online_stage:
+		if online_reconnecting or pending_stage == online_stage or online_view.phase == "redeal":
 			return []
 		return room.state.get("moves", [])
 	return game.actions(0) if game != null else []
@@ -665,10 +668,6 @@ func begin_game(selections: Dictionary) -> void:
 	show_dealer_roll(state, func():
 		game = Game.new(-1, settings.rounds, settings.luck, false, int(state.winner))
 		game.dealer_rolls = state
-		log_lines.clear()
-		last_revision = -1
-		shown_round = -1
-		clear_selection()
 		start_intro())
 
 
@@ -896,11 +895,9 @@ func start_intro() -> void:
 	var view := board_view()
 	if view.is_empty():
 		return
-	board_art.cancel_dice_roll()
+	reset_hand_presentation(view)
 	if board_art.dice == Vector2i.ZERO:
 		board_art.set_dice(Vector2i(1, 2))
-	_reset_wall()
-	last_flower_revision = int(view.get("flower_revision", 0))
 	intro = OpeningIntro.new()
 	intro.start(int(view.get("dealer", 0)))
 	intro_timer.stop()
@@ -993,7 +990,7 @@ func _clear_wall_flights() -> void:
 func _reset_wall() -> void:
 	_clear_wall_flights()
 	wall_art.set_slots([], 0)
-	wall_round = -1
+	wall_hand = -1
 
 
 func _wall_source(slot: int) -> Vector2:
@@ -1037,9 +1034,9 @@ func _refresh_wall(view: Dictionary, animate: bool) -> void:
 		values.sort()
 	var previous := wall_art.slots
 	wall_art.set_slots(values, int(view.dealer))
-	var same_round := wall_round == int(view.round)
-	wall_round = int(view.round)
-	if not same_round or not (animate or intro_active() or flower_active):
+	var same_hand := wall_hand == hand_key(view)
+	wall_hand = hand_key(view)
+	if not same_hand or not (animate or intro_active() or flower_active):
 		return
 	var flights := [0, 0, 0, 0]
 	for event in events:
@@ -1160,6 +1157,7 @@ func cancel_flower_sequence() -> void:
 	flower_done = Callable()
 	if is_instance_valid(flower_fx):
 		for child in flower_fx.get_children():
+			flower_fx.remove_child(child)
 			child.queue_free()
 
 
@@ -1288,10 +1286,40 @@ func next_round() -> void:
 		return
 	if not game.next_round():
 		return
-	close_modal(false)
-	log_lines.clear()
-	clear_selection()
 	start_intro()
+
+
+func cancel_hand_animations(view: Dictionary) -> void:
+	intro = null
+	intro_timer.stop()
+	board_art.cancel_dice_roll()
+	cancel_flower_sequence()
+	draw_flower_active = false
+	last_flower_revision = int(view.get("flower_revision", 0))
+	_clear_wall_flights()
+
+
+func reset_hand_presentation(view: Dictionary) -> void:
+	clear_hand_activity(view)
+	_reset_wall()
+	pending_stage = -1
+	shown_round = -1
+	last_revision = -1
+	log_lines.clear()
+
+
+func clear_hand_activity(view: Dictionary) -> void:
+	cancel_hand_animations(view)
+	close_menu()
+	close_modal(false)
+	clear_selection()
+	clear_action_banner()
+	interactions.reset()
+
+
+func restart_after_draw() -> void:
+	if game != null and game.restart_after_draw():
+		start_intro()
 
 
 func refresh(animate := false) -> void:
@@ -1299,9 +1327,14 @@ func refresh(animate := false) -> void:
 	var view := board_view()
 	if view.is_empty():
 		return
+	var redealing: bool = view.phase == "redeal"
+	if redealing and not is_instance_valid(redeal_notice):
+		clear_hand_activity(view)
+		if online_view.is_empty():
+			redeal_timer.start(Game.REDEAL_DELAY_MS / 1000.0)
 	var intro_running := intro_active()
 	if not intro_running:
-		board_art.set_dice(_gold_dice(view))
+		board_art.set_dice(Vector2i.ZERO if redealing else _gold_dice(view))
 	intro_visible_hand = -1
 	intro_flowers = not intro_running or intro.stage in ["flowers", "done"]
 	intro_gold = not intro_running or intro.stage in ["gold", "flowers", "done"]
@@ -1339,7 +1372,9 @@ func refresh(animate := false) -> void:
 	render_controls(view, moves)
 	if is_instance_valid(modal):
 		suspend_focus(dynamic)
-	if not view.result.is_empty():
+	if redealing:
+		return
+	if view.phase == "result":
 		if shown_round != view.round and not is_instance_valid(modal) and not flower_active and not intro_running:
 			show_result()
 	elif online_view.is_empty() and (not is_instance_valid(modal) or is_instance_valid(settings_panel)) and not intro_running and not draw_flower_active and not flower_active:
@@ -1502,7 +1537,7 @@ func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: b
 	if intro_active() or flower_active:
 		playable = maxi(0, wall_art.slots.size() - Rules.RESERVE)
 	label(dynamic, "可摸 %d 张" % playable, Rect2(71, 67, 135, 25), 14, MUTED)
-	center_dial.visible = not intro_active()
+	center_dial.visible = not intro_active() and view.phase != "redeal"
 	var public_turn: bool = view.phase == "turn" and not online_reconnecting
 	center_dial.set_seats(view.get("winds", WINDS), int(view.current) if public_turn else -1)
 	if not online_view.is_empty():
@@ -1542,6 +1577,11 @@ func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: b
 		draw_seat(view, seat, SEAT_POSITIONS[seat])
 		draw_river(view, seat, animate_discard)
 	draw_hand(view, moves, deal)
+	if view.phase == "redeal":
+		var bounds := Rect2(Art.CENTER - Vector2(90, 23), Vector2(180, 46))
+		redeal_notice = panel(dynamic, bounds, Color("#21392e"), GOLD, 12)
+		redeal_notice.name = "RedealNotice"
+		label(redeal_notice, REDEAL_NOTICE, Rect2(Vector2.ZERO, bounds.size), 18, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 
 
 func draw_seat(view: Dictionary, seat: int, origin: Vector2) -> void:
@@ -1554,7 +1594,7 @@ func draw_seat(view: Dictionary, seat: int, origin: Vector2) -> void:
 	var portrait := Rect2(origin + Vector2(5, 5), Vector2(29, 29))
 	interactions.portrait_rects[seat] = portrait
 	panel(dynamic, portrait, PORTRAITS[seat], PORTRAITS[seat])
-	if seat != 0 and view.phase != "result":
+	if seat != 0 and view.phase not in ["result", "redeal"]:
 		var hitbox := Button.new()
 		hitbox.name = "InteractionSeat%d" % seat
 		hitbox.position = portrait.position
@@ -1824,7 +1864,9 @@ func render_controls(view: Dictionary, moves: Array) -> void:
 	elif intro_running:
 		detail = intro.status_text()
 		options = []
-	elif not view.result.is_empty():
+	elif view.phase == "redeal":
+		detail = "即将重新发牌"
+	elif view.phase == "result":
 		detail = result_title(view.result)
 		options.append(["结算明细", show_result, "normal", "result"])
 		if not online_view.is_empty() and not is_room_owner():
@@ -2053,7 +2095,7 @@ func close_modal(resume := true) -> void:
 				refresh()
 			else:
 				var view := board_view()
-				if not view.is_empty() and not view.result.is_empty() and shown_round != view.round:
+				if view.get("phase") == "result" and shown_round != view.round:
 					show_result()
 
 
@@ -2106,7 +2148,7 @@ func _process(_delta: float) -> void:
 func update_online_clock() -> void:
 	var remaining: int = room.seconds_left()
 	var limit: int = room.state.get("turn_seconds", 0)
-	var timed: bool = limit > 0 and remaining >= 0 and not online_reconnecting and online_view.phase != "result"
+	var timed: bool = limit > 0 and remaining >= 0 and not online_reconnecting and online_view.phase not in ["result", "redeal"]
 	var seconds := mini(limit, remaining)
 	var digits := "%02d" % seconds if timed and center_dial.visible else ""
 	if countdown_label.text != digits:
@@ -2138,15 +2180,20 @@ func show_rules() -> void:
 开局依次处理天胡、三金倒、抢金。闲家按行牌顺序优先抢金，直接拿桌面金成胡。闲家都放弃后，符合条件的庄家可用一张手牌换金成胡。
 
 [color=#edc780]争牌与抢杠[/color]
-吃只限上家。胡优先于碰杠，碰杠优先于吃，同级从出牌者下家起依次处理。打出的金不能被认领，打过金或处于闲金单吊的玩家只能自摸。有人补杠时，其他牌手可按座次用第四张牌抢杠胡。
+吃只限上家。胡优先于碰杠，碰杠优先于吃，同级从出牌者下家起依次处理。打出的金不能被认领。打过金的玩家只能自摸，手中只有一张金且单吊该金的玩家也只能自摸。有人补杠时，其他牌手可按座次用第四张牌抢杠胡。
 
 庄家上家手中无金时，可照常响应自己上家的弃牌。其余两家的弃牌可胡，也可在碰后能听时碰。例外碰牌后须打出一张能保持听牌的牌，此后锁牌并摸打，仍可胡、暗杠、补杠和抢杠。锁牌后摸到金立即自摸。
+
+[color=#edc780]首巡流局[/color]
+从庄家第一次正常出牌起，若四家首张弃牌的牌面完全相同，第四张打出时立即流局。前三张照常争牌。首巡实际吃、碰、明杠或补杠会取消判定。暗杠、补花和放弃争牌不影响判定。短暂提示后自动重发，庄家、局号和积分照旧。
 
 [color=#edc780]报听金坎[/color]
 金为数牌时，可打出听牌弃牌并亮出同花色、夹着金牌的两张坎搭子。报听后摸打，不能吃碰杠，只能自摸金补成这副顺子胡牌。
 
 [color=#edc780]胡牌与结算[/color]
 平胡由五组加一对将组成。平胡分 P = 底分 ＋ 花分 ＋ 普通金张数 ＋ 2 × 花金张数。胡家为庄底分 3，闲家底分 1。每张实际花、每个明杠或补杠各计 1 花，暗杠计 2 花。
+
+闲金要求在自摸前留出一张金单吊，余牌连同副露和杠能凑齐五组。手中有两张金时，另一张可补成顺子或刻子。自摸非金成将即符合闲金。
 
 平胡 P，自摸和抢杠 2P，闲金 2P＋10，三金倒、抢金和碰碰胡 3P，金雀和金坎 4P＋40，金龙、天胡、正清和单吊 5P＋50。金雀用双金作将，金龙用三金作一组刻子，碰碰胡为五组刻子加一对将，单吊为五副明牌全部亮出、手中只留最后一张与来牌成将，按正清计分，正清允许金代替同一花色的数牌。多种牌型成立时取最高分。多家同时能胡同一张牌时，牌型大的优先，不能截胡；牌型相同时，从出牌者下家起按行牌顺序决定。点炮由出牌者付，抢杠由被抢杠者付，自摸及开局特殊胡法由其他三家各付。
 """.strip_edges()
@@ -2155,6 +2202,8 @@ func show_rules() -> void:
 
 func show_result() -> void:
 	var view := board_view()
+	if view.get("phase") != "result":
+		return
 	var result: Dictionary = view.get("result", {})
 	if result.is_empty():
 		return

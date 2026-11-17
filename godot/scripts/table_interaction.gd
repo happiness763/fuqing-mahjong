@@ -38,7 +38,7 @@ func reset() -> void:
 func can_send(target: int) -> bool:
 	var view: Dictionary = desk.board_view()
 	return target in range(1, 4) and portrait_rects.has(target) and not view.is_empty() \
-		and view.phase != "result" and not is_instance_valid(desk.modal) and not desk.menu_open() \
+		and view.phase not in ["result", "redeal"] and not is_instance_valid(desk.modal) and not desk.menu_open() \
 		and not desk.intro_active() and not desk.online_reconnecting
 
 

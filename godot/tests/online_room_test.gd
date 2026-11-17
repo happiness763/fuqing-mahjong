@@ -170,6 +170,51 @@ func test_public_gold_gap(host, client) -> void:
 		and client.state.view.latest.gold_gap, "public declaration includes the chosen discard while the remaining hand is private")
 
 
+func test_first_cycle_redeal(host, client) -> void:
+	var game := Game.new(181, 1, "normal", true, 1)
+	game.phase = "turn"
+	game.gold = 33
+	game.wall.resize(42)
+	game.wall.fill(8)
+	game.scores = [3, -1, -1, -1]
+	for player in game.players:
+		player.hand = [4, 7]
+		player.river = []
+		player.melds = []
+	for seat in [1, 2, 3]:
+		game.discard(seat, 4)
+	host._game = game
+	host._begin_stage()
+	host._publish()
+	var old_hand: int = host.state.view.hand_id
+	var stage: int = host.state.stage
+	if not await wait_for(func(): return client.state.stage == stage, "first three discards are synchronized"):
+		return
+	var discard: Dictionary = host.state.moves.filter(func(move): return move.type == "discard" and move.tile == 4).front()
+	host.request("play", {"stage": stage, "id": discard.id})
+	if not await wait_for(func(): return client.state.view.phase == "redeal", "client sees the four-discard redeal notice"):
+		return
+	check(host.state.view.result == client.state.view.result and client.state.moves.is_empty(),
+		"redeal is announced to both peers with no moves")
+	check(client.seconds_left() == -1 and not client.state.view.players[0].has("hand"),
+		"redeal conceals hands and stops the clock")
+	host.request("next", {"stage": host.state.stage})
+	check(host.state.view.hand_id == old_hand, "owner cannot skip the synchronized notice")
+	var previous_peer: int = client.multiplayer.get_unique_id()
+	client.set_process(false)
+	client.multiplayer.multiplayer_peer.disconnect_peer(1)
+	await wait_for(func(): return not host.state.seats[1].connected, "client disconnects during the notice")
+	await wait_for(func(): return host.state.view.hand_id == old_hand + 1, "server automatically deals the same round")
+	client.set_process(true)
+	if not await wait_for(func(): return (client.state.view.hand_id == old_hand + 1
+		and client.multiplayer.get_unique_id() != previous_peer), "reconnect resumes the redealt hand", 6000):
+		return
+	check(host.state.view.round == 1 and client.state.view.round == 1 and client.state.view.dealer == 1,
+		"redeal keeps the original round and dealer on both peers")
+	check(client.state.view.scores == [3, -1, -1, -1] and client.state.view.result.is_empty(),
+		"the new hand keeps scores and clears the previous result")
+
+
 func test_lobby_seating() -> void:
 	var host = make_room("SeatingHost")
 	var guest = make_room("SeatingGuest")
@@ -375,6 +420,7 @@ func run() -> void:
 	await test_private_opening(host, client)
 	await test_private_rob_kong(host, client)
 	await test_public_gold_gap(host, client)
+	await test_first_cycle_redeal(host, client)
 	# Use a fixture with the creator to act, regardless of the random opening above.
 	set_dealer_turn(host, 0)
 	var stage: int = host.state.stage

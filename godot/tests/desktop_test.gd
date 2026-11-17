@@ -56,7 +56,7 @@ func run() -> void:
 	var desk = Desk.instantiate()
 	desk.preferences_root = OS.get_temp_dir().path_join("fuqing-desktop-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	root.add_child(desk)
-	check(ProjectSettings.get_setting("application/config/version") == "1.2.7", "project version")
+	check(ProjectSettings.get_setting("application/config/version") == "1.2.8", "project version")
 	check(desk.game == null and desk.lobby.round_field.text == "15", "lobby defaults to 15 rounds")
 	check(Art.FRAME == Rect2(28, 16, 1042, 768), "table frame fills the window")
 	check(Art.FELT == Rect2(41, 29, 1016, 742), "felt follows the frame")
@@ -515,7 +515,7 @@ func test_multiple_chow(desk) -> void:
 	game.players[1].hand = []
 	game.players[2].hand = [4, 4]
 	desk.refresh()
-	desk.perform(3, Game.action("discard", {"tile": 4}))
+	desk.perform(3, game.actions(3).front())
 	check(not desk.controls.has("chow"), "floating chow waits for higher priority AI")
 	desk.perform(2, game.actions(2).back())
 	check(desk.controls.chow.text == "吃" and desk.controls.chow.size.y >= 64, "one large chow button")
@@ -579,7 +579,7 @@ func test_draw_after_pass(desk) -> void:
 	game.players[0].hand = [2, 3, 7, 8, 10, 11, 12, 13, 13, 16, 19, 21, 22, 24, 25, 25]
 	game.players[3].hand = [4]
 	desk.refresh()
-	desk.perform(3, Game.action("discard", {"tile": 4}))
+	desk.perform(3, game.actions(3).front())
 	check(game.phase == "reaction", "discard offers a chow")
 	desk.perform(0, game.actions(0).back())
 	check(game.current == 0 and game.drawn == 18, "pass advances to player's draw")
