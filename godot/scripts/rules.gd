@@ -113,11 +113,15 @@ static func winning(hand: Array, open_count: int, gold: int, gold_pair := false)
 
 
 static func idle_gold(hand: Array, open_count: int, gold: int) -> bool:
-	if open_count < 0 or open_count > 5 or hand.size() != (5 - open_count) * 3 + 1 or gold_count(hand, gold) != 1:
+	if open_count < 0 or open_count > 5 or hand.size() != (5 - open_count) * 3 + 1:
+		return false
+	var wilds := gold_count(hand, gold)
+	if wilds < 1 or wilds > 2:
 		return false
 	if hand.any(func(tile): return tile < 0 or tile >= TILE_TYPES or is_flower(tile, gold)):
 		return false
-	return groups_fit(counts(hand.filter(func(tile): return not is_gold(tile, gold))), 0, {})
+	# Reserve one gold for the pair with the next draw.
+	return groups_fit(counts(hand.filter(func(tile): return not is_gold(tile, gold))), wilds - 1, {})
 
 
 static func gold_gap(hand: Array, open_count: int, gold: int, gap: Array) -> bool:

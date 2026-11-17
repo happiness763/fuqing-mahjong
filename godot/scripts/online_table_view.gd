@@ -34,6 +34,9 @@ static func from_room(state: Dictionary) -> Dictionary:
 	view.current = local_seat(view.current, viewer)
 	view.dealer = local_seat(view.dealer, viewer)
 	view.actor = local_seat(state.get("actor", -1), viewer)
+	var first_cycle: Dictionary = view.get("first_cycle", {})
+	if not first_cycle.is_empty():
+		first_cycle.next_seat = local_seat(first_cycle.next_seat, viewer)
 	view.players = rotate_seats(view.players, viewer)
 	view.scores = rotate_seats(view.scores, viewer)
 	view.seat_info = rotate_seats(state.seats, viewer)

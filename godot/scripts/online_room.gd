@@ -10,7 +10,7 @@ const Opponent = preload("res://scripts/opponent.gd")
 const Rules = preload("res://scripts/rules.gd")
 const Interactions = preload("res://scripts/table_interaction.gd")
 const OpeningIntro = preload("res://scripts/opening_intro.gd")
-const VERSION := "1.2.7"
+const VERSION := "1.2.8"
 const SERVER := 1
 const DEFAULT_PORT := 36712
 const CONNECT_MS := 8000
@@ -50,6 +50,7 @@ var _roll_ai_due_ms := -1
 var _roll_lands_ms := -1
 var _last_rolled_seat := -1
 var _stage := 0
+var _redeal_due_ms := -1
 var _deadline_ms := -1
 var _ai_due_ms := -1
 var _local_deadline_ms := -1
@@ -521,7 +522,7 @@ func _wire_preferences_confirmed(receipt: int, accepted: bool) -> void:
 
 
 func _broadcast_interaction(source: int, data: Dictionary, now: int) -> void:
-	if _game == null or _game.phase == "result" or now < int(_interaction_after.get(source, 0)):
+	if _game == null or _game.phase in ["result", "redeal"] or now < int(_interaction_after.get(source, 0)):
 		return
 	var target: Variant = data.get("target")
 	var kind: Variant = data.get("kind")
@@ -851,12 +852,18 @@ func _begin_stage(intro_ms := 0) -> void:
 	_stage += 1
 	var actor := _game.online_actor()
 	var now := Time.get_ticks_msec()
+	_redeal_due_ms = now + Game.REDEAL_DELAY_MS if _game.phase == "redeal" else -1
 	_deadline_ms = now + intro_ms + _turn_seconds * 1000 if actor >= 0 and _turn_seconds > 0 else -1
 	_ai_due_ms = now + intro_ms + AI_DELAY_MS if actor >= 0 and _seats[actor].kind == "ai" else -1
 
 
 func _process_stage(now: int) -> void:
 	if _game == null:
+		return
+	if _game.phase == "redeal":
+		if now >= _redeal_due_ms and _game.restart_after_draw():
+			_begin_stage(_opening_grace_ms())
+			_publish()
 		return
 	var actor := _game.online_actor()
 	if actor < 0:

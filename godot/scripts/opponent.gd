@@ -65,12 +65,19 @@ func pick(view: Dictionary, moves: Array) -> Dictionary:
 		for seat in range(view.players.size()):
 			if seat != view.seat:
 				_opponents.append(view.players[seat])
+	var first_cycle: Dictionary = view.get("first_cycle", {})
+	var follow_tile: int = first_cycle.get("tile", -1) if first_cycle.get("next_seat", -1) == view.seat else -1
+	if Rules.is_gold(follow_tile, _gold):
+		follow_tile = -1
 	for move in moves:
 		if move.type == "pass":
-			return choose_claim(hand, open, moves, move)
+			var preserve_cycle := follow_tile in hand and weak_first_cycle_hand(hand, open)
+			return choose_claim(hand, open, moves, move, preserve_cycle)
 
 	var best: Dictionary = moves[0]
 	var best_score := -INF
+	var follow: Dictionary = {}
+	var follow_score := -INF
 	var scores: Array[float] = []
 	for move in moves:
 		var tile: int = move.tile
@@ -78,6 +85,9 @@ func pick(view: Dictionary, moves: Array) -> Dictionary:
 		match move.type:
 			"discard":
 				score = discard_value(hand, open, tile)
+				if tile == follow_tile:
+					follow = move
+					follow_score = score
 			"declareGoldGap":
 				score = discard_value(hand, open, tile) + 0.35 if _gold_outs > 0 else -INF
 			"concealedKong":
@@ -88,6 +98,10 @@ func pick(view: Dictionary, moves: Array) -> Dictionary:
 			best_score = score
 			best = move
 		scores.append(score)
+	# The fourth matching discard immediately redeals, so a weak hand can give up more for it.
+	var follow_tolerance := 1.35 if first_cycle.get("count", 0) == 3 else 0.32
+	if not follow.is_empty() and follow_score >= best_score - follow_tolerance and weak_first_cycle_hand(hand, open):
+		return follow
 	if _difficulty == "easy":
 		var near: Array = []
 		for index in range(scores.size()):
@@ -104,9 +118,18 @@ func gold_outs(visible: Array, hand: Array) -> int:
 	return maxi(0, copies - Rules.gold_count(visible, _gold) - Rules.gold_count(hand, _gold))
 
 
-func choose_claim(hand: Array, open: int, moves: Array, skip: Dictionary) -> Dictionary:
+func weak_first_cycle_hand(hand: Array, open: int) -> bool:
+	# Use the same group assessment on every difficulty, including easy's rough ranking.
+	var natural := _own.duplicate()
+	if _gold >= 0 and _gold < Rules.NUMBERED:
+		natural[_gold] = 0
+	var shape := open * 2 + strength(natural, 5 - open, true) + Rules.gold_count(hand, _gold) * 1.45
+	return shape < 8.0
+
+
+func choose_claim(hand: Array, open: int, moves: Array, skip: Dictionary, preserve_cycle: bool) -> Dictionary:
 	var best := skip
-	var best_score := rating(hand, open) + 0.23
+	var best_score := rating(hand, open) + (0.48 if preserve_cycle else 0.23)
 	for move in moves:
 		if move.type == "pass":
 			continue
