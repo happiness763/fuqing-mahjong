@@ -1,6 +1,6 @@
 # 福清麻将 · 融城茶馆
 
-四人福清麻将小游戏。当前 Godot 版为 **v1.2.8**，可与三名 AI 单机对局，也可以通过局域网或 UDP 内网穿透和朋友开房。
+四人福清麻将小游戏。当前 Godot 版为 **v1.2.8a**，可与三名 AI 单机对局，也可以通过局域网或 UDP 内网穿透和朋友开房。
 
 ## 运行和测试
 
@@ -36,7 +36,7 @@ godot --headless --path godot --script res://tests/online_room_test.gd
 
 ## 联机和资源
 
-- [v1.2.8 联机说明](release/联机说明-v1.2.8.md)
-- [v1.2.8 更新说明](release/更新说明-v1.2.8.md)
+- [v1.2.8a 联机说明](release/联机说明-v1.2.8a.md)
+- [v1.2.8a 更新说明](release/更新说明-v1.2.8a.md)
 - [v1.2.8 设计稿](docs/superpowers/specs/2026-11-17-godot-mahjong-v1.2.8-design.md)
 - [牌面来源](godot/assets/tiles/CREDITS.md)及 [第三方许可](release/licenses/)

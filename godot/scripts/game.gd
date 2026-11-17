@@ -120,7 +120,12 @@ func _reset_wall_geometry() -> void:
 
 
 func _take_wall(index: int, seat: int, kind: String, end: String, events: Array) -> int:
-	events.append({"slot": _wall_slots.pop_at(index), "seat": seat, "kind": kind, "end": end})
+	var slot_index := _wall_slots.size() + index if index < 0 else index
+	var slot: int = _wall_slots[slot_index]
+	# Keep the logical draw order and remove the exposed layer of the selected stack.
+	if slot % 2 == 1 and slot_index > 0 and _wall_slots[slot_index - 1] == slot - 1:
+		slot_index -= 1
+	events.append({"slot": _wall_slots.pop_at(slot_index), "seat": seat, "kind": kind, "end": end})
 	return wall.pop_at(index)
 
 

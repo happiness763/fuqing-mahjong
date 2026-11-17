@@ -21,6 +21,7 @@ func _initialize() -> void:
 func run() -> void:
 	test_wall_layout()
 	test_geometry()
+	test_stack_take_order()
 	test_kong_takes()
 	await test_table()
 	if failures == 0:
@@ -92,11 +93,11 @@ func test_geometry() -> void:
 		"dealing starts at the head")
 	check(initial.opening[64].slot == 64 and initial.opening[64].kind == "deal",
 		"the dealer's extra tile leaves the head")
-	check(initial.opening[65] == {"slot": 141, "seat": -1, "kind": "gold", "end": "indicator"},
-		"the dice select a slot measured against the original wall")
-	check(initial.opening[66].slot == 143 and initial.opening[67].slot == 142,
+	check(initial.opening[65] == {"slot": 140, "seat": -1, "kind": "gold", "end": "indicator"},
+		"the dice select the exposed slot of the original stack")
+	check(initial.opening[66].slot == 142 and initial.opening[67].slot == 143,
 		"opening flowers are replaced from the tail in order")
-	check(initial.slots.front() == 65 and initial.slots.back() == 140 and initial.slots.size() == 76,
+	check(initial.slots.front() == 65 and initial.slots.back() == 141 and initial.slots.size() == 76,
 		"physical positions survive removals")
 	check(initial == game.view(2).wall, "the geometry itself is identical for every recipient")
 	game.wall[0] = 28
@@ -104,7 +105,7 @@ func test_geometry() -> void:
 	var next: Dictionary = game.view(0).wall
 	check(next.takes == [
 		{"slot": 65, "seat": 1, "kind": "flower", "end": "head"},
-		{"slot": 140, "seat": 1, "kind": "draw", "end": "tail"},
+		{"slot": 141, "seat": 1, "kind": "draw", "end": "tail"},
 	], "ordinary flowers remove one head tile before replacement moves to the tail")
 	check(next.slots.front() == 66 and next.slots.back() == 139 and next.slots.size() == 74,
 		"head and tail moves preserve all intervening positions")
@@ -123,8 +124,34 @@ func test_geometry() -> void:
 		var lucky := Game.new(46, 15, luck_mode)
 		var chosen: Dictionary = lucky.view(0).wall
 		check(chosen.slots.size() == lucky.wall.size() and chosen.opening.size() + chosen.slots.size() == 144
-			and chosen.opening.count({"slot": 65 + lucky.gold_index, "seat": -1, "kind": "gold", "end": "indicator"}) == 1,
+			and chosen.opening.count({"slot": 64 + lucky.gold_index, "seat": -1, "kind": "gold", "end": "indicator"}) == 1,
 			"luck selection restores the corresponding slots and indicator")
+
+
+func test_stack_take_order() -> void:
+	var game := Game.new(43)
+	var deck := []
+	deck.resize(144)
+	deck.fill(10)
+	deck[141] = 26
+	deck[142] = 9
+	deck[143] = 8
+	game.gold_dice = [1, 1]
+	game.deal(deck)
+	check(game.indicator == 26, "wall layers do not change which face the dice select")
+	game.draw_tile(0, true)
+	check(game.drawn == 8, "the first supplement keeps the logical tail tile")
+	game.draw_tile(0, true)
+	check(game.drawn == 9, "the next supplement keeps the next logical tail tile")
+	var wall: Dictionary = game.view(0).wall
+	var occupied := range(wall.size)
+	for event in wall.opening + wall.takes:
+		var slot: int = event.slot
+		check(occupied.has(slot), "each wall take removes a still-occupied slot")
+		check(slot % 2 == 0 or not occupied.has(slot - 1),
+			"slot %d cannot be removed from under an occupied upper tile" % slot)
+		occupied.erase(slot)
+	check(occupied == wall.slots, "replaying every take leaves the published wall intact")
 
 
 func test_kong_takes() -> void:
@@ -160,9 +187,14 @@ func test_kong_takes() -> void:
 		if kind == "robbedKong":
 			check(after == before and game.result.get("method") == "rob", "a successful rob leaves every wall slot intact")
 		else:
-			check(after.slots == before.slots.slice(0, -1) and after.takes.size() == 1
-				and after.takes[0].end == "tail" and after.takes[0].slot == before.slots.back(),
-				"%s takes exactly one supplement from the actual tail slot" % kind)
+			var tail_slot: int = before.slots.back()
+			if tail_slot % 2 == 1 and before.slots.has(tail_slot - 1):
+				tail_slot -= 1
+			var expected: Array = before.slots.duplicate()
+			expected.erase(tail_slot)
+			check(after.slots == expected and after.takes.size() == 1
+				and after.takes[0].end == "tail" and after.takes[0].slot == tail_slot and game.drawn == 10,
+				"%s takes exactly one supplement from the exposed tail slot" % kind)
 
 
 func take_action(game: Game, seat: int, kind: String) -> void:
@@ -204,11 +236,11 @@ func test_table() -> void:
 	check(desk.wall_art.slots.size() == 80, "four deal batches leave 80 wall tiles")
 	desk.intro.advance()
 	desk.refresh()
-	check(desk.wall_art.slots.size() == 79 and 141 in desk.wall_art.slots,
+	check(desk.wall_art.slots.size() == 79 and 140 in desk.wall_art.slots,
 		"the dealer takes a tile and the indicator stays covered during dice")
 	desk.intro.advance()
 	desk.refresh()
-	check(desk.wall_art.slots.size() == 78 and 141 not in desk.wall_art.slots and desk.wall_gold_from.is_finite(),
+	check(desk.wall_art.slots.size() == 78 and 140 not in desk.wall_art.slots and 141 in desk.wall_art.slots and desk.wall_gold_from.is_finite(),
 		"the gold reveal removes and flips the exact indicator")
 	desk.advance_intro()
 	desk.flower_timer.stop()
@@ -217,7 +249,7 @@ func test_table() -> void:
 	check(desk.wall_art.slots.size() == 78, "exposing an already-dealt flower does not move the wall")
 	desk.advance_flower()
 	desk.flower_timer.stop()
-	check(desk.wall_art.slots.size() == 77 and 143 not in desk.wall_art.slots,
+	check(desk.wall_art.slots.size() == 77 and 142 not in desk.wall_art.slots and 143 in desk.wall_art.slots,
 		"opening replacement flower takes its tail slot exactly once")
 	desk.skip_intro()
 	check(desk.wall_art.slots == game.view(0).wall.slots and desk.wall_flights.get_child_count() == 0,
@@ -234,7 +266,7 @@ func test_table() -> void:
 	check(desk.wall_art.slots.size() == 76, "the next flower and replacement wait for their turns to animate")
 	desk.advance_flower()
 	desk.flower_timer.stop()
-	check(65 not in desk.wall_art.slots and 140 in desk.wall_art.slots,
+	check(65 not in desk.wall_art.slots and 141 in desk.wall_art.slots,
 		"a normal flower leaves the head and holds its replacement on the tail")
 	desk.advance_flower()
 	desk.flower_timer.stop()
