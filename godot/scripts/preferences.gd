@@ -7,6 +7,7 @@ const DEFAULTS := {
 	"nickname": "", "rounds": 25, "difficulty": "normal", "luck": "normal",
 	"host_port": 36712, "room_rounds": 25, "turn_seconds": 60, "muted": false,
 	"skin": "riichi", "table_id": "", "interaction_effects": true, "fullscreen": false,
+	"effects": "full",
 }
 const JPEG_FRAME_MARKERS := [0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf]
 
@@ -191,6 +192,8 @@ func _validated_value(key: String, value: Variant) -> Variant:
 			return value if value == "" or _valid_id(value) else null
 		"muted", "interaction_effects", "fullscreen":
 			return value if value is bool else null
+		"effects":
+			return value if value in ["full", "simple", "off"] else null
 	return null
 
 

@@ -33,10 +33,11 @@ func test_preferences(preferences: Script, path: String) -> void:
 		"nickname": "", "rounds": 25, "difficulty": "normal", "luck": "normal",
 		"host_port": 36712, "room_rounds": 25, "turn_seconds": 60, "muted": false,
 		"skin": "riichi", "table_id": "", "interaction_effects": true, "fullscreen": false,
+		"effects": "full",
 	}, "a fresh install starts with defaults")
 	var changes := {"nickname": "榕城茶客", "rounds": 24, "difficulty": "hard", "luck": "unlucky",
 		"host_port": 36720, "room_rounds": 8, "turn_seconds": 0, "muted": true, "skin": "guobiao",
-		"interaction_effects": false, "fullscreen": true}
+		"interaction_effects": false, "fullscreen": true, "effects": "simple"}
 	check(prefs.update(changes) == OK, "valid preferences are saved")
 	check(prefs.update({"rounds": 0, "muted": false}) != OK, "invalid changes are rejected together")
 	check(prefs.update({"nickname": "茶\n客"}) != OK, "nicknames with embedded control characters are rejected")
@@ -50,6 +51,7 @@ func test_preferences(preferences: Script, path: String) -> void:
 	config.values.skin = "unknown"
 	config.values.erase("difficulty")
 	config.values.erase("fullscreen")
+	config.values.erase("effects")
 	config.values.table_id = "../outside"
 	write_bytes(config_path, JSON.stringify(config).to_utf8_buffer())
 	recovered = preferences.new(path)
@@ -58,6 +60,7 @@ func test_preferences(preferences: Script, path: String) -> void:
 	check(recovered.values.skin == "riichi" and recovered.values.difficulty == "normal" and recovered.values.table_id == "",
 		"unknown, missing and unsafe values restore their defaults")
 	check(not recovered.values.fullscreen, "older preference files start in windowed mode")
+	check(recovered.values.effects == "full", "older preference files use full effects")
 	check(recovered.values.nickname == "榕城茶客" and recovered.values.muted,
 		"valid neighboring settings survive corruption")
 	write_bytes(config_path, "{ unfinished".to_utf8_buffer())

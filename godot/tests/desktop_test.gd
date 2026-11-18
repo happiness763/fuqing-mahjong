@@ -56,9 +56,21 @@ func run() -> void:
 	var desk = Desk.instantiate()
 	desk.preferences_root = OS.get_temp_dir().path_join("fuqing-desktop-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	root.add_child(desk)
-	check(ProjectSettings.get_setting("application/config/version") == "1.2.9a", "project version")
+	check(ProjectSettings.get_setting("application/config/version") == "1.3.0", "project version")
 	check(is_instance_valid(desk.action_font) and desk.action_font.has_char("胡".unicode_at(0)),
 		"action captions use the bundled display font")
+	check(is_instance_valid(desk.fx) and desk.effects in ["full", "simple", "off"],
+		"the effects layer is ready with a valid intensity")
+	check(desk.fx.style_for({"kind": "dragon", "method": "self"}).get("tier", "") == "top",
+		"dragon uses the full-screen top effect")
+	check(desk.fx.style_for({"kind": "sparrow", "method": "discard"}).get("motif", "") == "feathers",
+		"big patterns have their own motif")
+	desk.preferences.update({"effects": "off"})
+	desk.apply_saved_appearance()
+	check(desk.fx.mode == "off" and not desk.board_art.ambience_enabled, "effects can be switched off")
+	desk.preferences.update({"effects": "full"})
+	desk.apply_saved_appearance()
+	check(desk.fx.mode == "full", "effects can be restored")
 	check(desk.game == null and desk.lobby.round_field.text == "25", "lobby defaults to 25 rounds")
 	check(Art.FRAME == Rect2(28, 16, 1042, 768), "table frame fills the window")
 	check(Art.FELT == Rect2(41, 29, 1016, 742), "felt follows the frame")
@@ -185,7 +197,16 @@ func run() -> void:
 		check(board_art.dice == first_roll, "dice stay fixed through a modal and discard")
 
 	await finish_round(desk)
-	check(desk.game.phase == "result" and is_instance_valid(desk.modal), "round completes and opens settlement")
+	check(desk.game.phase == "result", "round completes")
+	if desk.fx_hold_active:
+		check(not is_instance_valid(desk.modal) and desk.controls.has("skip"),
+			"the win effect plays before the settlement opens")
+		await create_timer(0.45).timeout
+		await capture("win-hold.png")
+		await create_timer(1.8).timeout
+	check(is_instance_valid(desk.modal), "settlement opens after the win effect")
+	check(is_instance_valid(desk.fx) and (desk.fx.win_active or not desk.fx.win_text.is_empty()),
+		"the win effect plays with the settlement")
 	if is_instance_valid(desk.modal):
 		print("Desktop round finished: ", desk.result_title(desk.game.result))
 		await capture("settlement.png")
@@ -218,6 +239,9 @@ func run() -> void:
 			var expected := Vector2i(int(desk.game.gold_dice[0]), int(desk.game.gold_dice[1]))
 			check(board_art.dice == expected, "next round displays its own authoritative gold dice")
 	await finish_round(desk)
+	if desk.fx_hold_active:
+		desk._finish_fx_hold()
+		await process_frame
 	check(desk.game.is_table_finished() and is_instance_valid(desk.modal), "last round opens table settlement")
 	if is_instance_valid(desk.modal):
 		await capture("final-scores.png")
@@ -243,6 +267,8 @@ func run() -> void:
 	await test_flower_gold(desk)
 	await test_gold_gap_declaration(desk)
 	test_waiting_presentation(desk)
+	await test_win_effect(desk)
+	test_big_win_effects(desk)
 	await test_scoring_presentation(desk)
 	test_dense_board(desk)
 	var roll_state := Rules.dealer_roll_state(RandomNumberGenerator.new())
@@ -537,7 +563,77 @@ func test_waiting_presentation(desk) -> void:
 		"a big discard win shows its pattern on the claim button")
 
 
+func test_win_effect(desk) -> void:
+	desk.close_modal(false)
+	desk.shown_round = -1
+	desk.fx_result_hand = -1
+	desk.game = Game.new(43)
+	var game = desk.game
+	game.phase = "reaction"
+	game.players[3].river = [17, 22]
+	game.pending = {"from": 3, "tile": 22}
+	game._resolve_claim(2, {"type": "win", "kind": "discard"})
+	desk.refresh()
+	check(int(game.result.get("tile", -1)) == 22, "a discard win publishes the winning tile")
+	check("win_source" in desk.fx and "win_target" in desk.fx, "the win effect uses both card anchors")
+	if "win_source" in desk.fx and "win_target" in desk.fx:
+		check(Art.RIVERS[3].encloses(desk.fx.win_source) and desk.fx.win_target.position.y < 125,
+			"discard light starts at the claimed river slot and ends at the winning hand")
+	await create_timer(0.22).timeout
+	await capture("win-trail.png")
+	await create_timer(0.20).timeout
+	await capture("win-impact.png")
+	desk._finish_fx_hold()
+	desk.close_modal(false)
+
+	desk.shown_round = -1
+	desk.fx_result_hand = -1
+	desk.game = Game.new(45)
+	game = desk.game
+	game.current = 0
+	game.drawn = game.players[0].hand.back()
+	game.finish_win(0, -1, "self")
+	desk.refresh()
+	check(int(game.result.get("tile", -1)) == game.drawn, "a self-draw result records the drawn tile")
+	if "win_source" in desk.fx and "win_target" in desk.fx:
+		check(not desk.fx.win_source.has_area() and desk.fx.win_target == desk.human_buttons.back().get_rect(),
+			"self draw highlights the actual drawn card without a river trail")
+	await create_timer(0.23).timeout
+	await capture("win-self-impact.png")
+	desk._finish_fx_hold()
+	desk.close_modal(false)
+
+
+func test_big_win_effects(desk) -> void:
+	var big_win = desk.fx.big_win
+	var view: Dictionary = desk.board_view()
+	view.gold = 4
+	view.players[0].hand = [3, 4, 4, 4, 5]
+	view.players[0].gold_gap = [3, 5]
+	view.result = {"winner": 0, "kind": "goldGap", "method": "goldGap", "tile": 4}
+	for kind in ["dragon", "heaven", "pure", "dandiao", "sparrow", "goldGap", "three", "grab", "pengpeng", "idle"]:
+		view.result.kind = kind
+		desk.fx.play_win(view)
+		check(desk.fx.big_win_active and is_equal_approx(desk.fx.win_duration, 2.0)
+			and big_win.kind == kind, "each special pattern has a two-second presentation: " + kind)
+	desk.fx.stop_win()
+	view.result.kind = "goldGap"
+	big_win.prepare(view, "goldGap", desk.GOLD_AREA)
+	check(big_win.groups == [[3, 4, 5]], "gold gap places the winning gold between the declared tiles")
+	view.players[0].hand = [1, 1, 2, 2, 4, 7, 7, 7]
+	view.players[0].melds = []
+	big_win.prepare(view, "pengpeng", desk.GOLD_AREA)
+	check(big_win.groups == [[2, 2, 4], [7, 7, 7], [1, 1]],
+		"all-triplets stage includes the actual gold substitute and pair")
+	view.result.kind = "discard"
+	view.result.method = "discard"
+	desk.fx.play_win(view)
+	check(not desk.fx.big_win_active and desk.fx.win_duration < 2.0, "ordinary wins retain the shorter presentation")
+	desk.fx.stop_win()
+
+
 func test_scoring_presentation(desk) -> void:
+	desk.fx_hold_results = false
 	desk.close_modal(false)
 	desk.shown_round = -1
 	desk.game = Game.new(43)
@@ -567,6 +663,7 @@ func test_scoring_presentation(desk) -> void:
 	desk.record(view)
 	check(desk.log_lines.slice(0, 2) == ["阿岚 自摸", "你 打出 四筒 · 报听金坎"],
 		"an automatic win preserves the discard and declaration that triggered it")
+	desk.fx_hold_results = true
 
 
 func finish_round(desk) -> void:

@@ -18,6 +18,7 @@ const Stats = preload("res://scripts/stats.gd")
 const StatsPanel = preload("res://scripts/stats_panel.gd")
 const TableWall = preload("res://scripts/table_wall.gd")
 const Interactions = preload("res://scripts/table_interaction.gd")
+const Effects = preload("res://scripts/table_effects.gd")
 const SLIDE_DURATION := 0.23
 const SLIDE_FADE := 0.16
 const UI_FONT = preload("res://assets/fonts/NotoSansSC.woff2")
@@ -40,6 +41,13 @@ var game
 var action_font: FontVariation
 var windowed_bounds := Rect2i()
 var windowed_mode := Window.MODE_WINDOWED
+var fx: Control
+var effects := "full"
+var fx_result_hand := -1
+var winning_tile_rect := Rect2()
+var fx_hold_active := false
+var fx_hold_results := true
+var fx_hold_timer: Timer
 var board_art: Control
 var center_dial: CenterDial
 var wall_art: TableWall
@@ -173,6 +181,9 @@ func _ready() -> void:
 	wall_flights.z_index = 1
 	add_child(wall_flights)
 	build_header()
+	fx = Effects.new()
+	fx.setup(self, action_font, session_font, SEAT_POSITIONS, Art.CENTER)
+	add_child(fx)
 	configure_display()
 	apply_saved_appearance()
 	ai_timer = Timer.new()
@@ -187,6 +198,10 @@ func _ready() -> void:
 	intro_timer.one_shot = true
 	add_child(intro_timer)
 	intro_timer.timeout.connect(advance_intro)
+	fx_hold_timer = Timer.new()
+	fx_hold_timer.one_shot = true
+	add_child(fx_hold_timer)
+	fx_hold_timer.timeout.connect(_finish_fx_hold)
 	flower_fx = Control.new()
 	flower_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	flower_fx.z_index = 15
@@ -207,6 +222,12 @@ func _ready() -> void:
 		"discard": strike(266.0, 0.097, 42),
 		"claim": strike(520.0, 0.150, 64),
 		"interaction": strike(315.0, 0.095, 31),
+		"win": chime([523.25, 659.25, 783.99], 0.55),
+		"win_gold": chime([783.99, 1046.5, 1318.5], 0.5),
+		"win_jade": chime([659.25, 830.61], 0.55),
+		"win_stamp": chime([130.81, 196.0], 0.24),
+		"win_heaven": chime([523.25, 784.0, 1046.5, 1568.0], 0.95),
+		"win_coin": chime([1046.5, 1318.5], 0.2),
 	}
 	interactions = Interactions.new()
 	add_child(interactions)
@@ -255,6 +276,25 @@ func play_sound(kind: String) -> void:
 		return
 	audio.stream = sounds[kind]
 	audio.play()
+
+
+func chime(frequencies: Array, duration: float, volume := 0.62) -> AudioStreamWAV:
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = 24000
+	var samples := int(duration * stream.mix_rate)
+	var data := PackedByteArray()
+	data.resize(samples * 2)
+	for index in range(samples):
+		var t := float(index) / stream.mix_rate
+		var amplitude := 0.0
+		for frequency: Variant in frequencies:
+			amplitude += sin(TAU * float(frequency) * t)
+		amplitude /= maxf(1.0, float(frequencies.size()))
+		var envelope := exp(-t * 2.6) * minf(1.0, index / 36.0)
+		data.encode_s16(index * 2, int(amplitude * envelope * volume * 28000))
+	stream.data = data
+	return stream
 
 
 func label(parent: Node, copy: String, rect: Rect2, font_size: int, color := INK,
@@ -455,8 +495,22 @@ func show_stats(initial_tab := "overview", entry := {}) -> void:
 	stats_panel.setup(self, initial_tab, entry)
 
 
+func effective_effects() -> String:
+	var mode := str(preferences.values.get("effects", "full"))
+	if mode == "off":
+		return "off"
+	if OS.get_name() == "Android" and OS.get_processor_count() <= 4:
+		return "simple"
+	return mode
+
+
 func apply_saved_appearance() -> void:
 	apply_fullscreen(bool(preferences.values.fullscreen))
+	effects = effective_effects()
+	if is_instance_valid(fx):
+		fx.set_mode(effects)
+	if is_instance_valid(board_art):
+		board_art.set_ambience(effects == "full")
 	muted = preferences.values.muted
 	sound_button.text = "声音  关" if muted else "声音  开"
 	board_art.set_table_texture(preferences.table_texture(preferences.values.table_id))
@@ -557,6 +611,14 @@ func show_lobby() -> void:
 	clear_selection()
 	clear_board()
 	clear_action_banner()
+	if is_instance_valid(fx):
+		fx_result_hand = -1
+		fx_hold_active = false
+		if is_instance_valid(fx_hold_timer):
+			fx_hold_timer.stop()
+		fx.stop_win()
+		fx.set_active(-1)
+		fx.set_urgent(false)
 	transfer_button.hide()
 	leave_button.text = "返回首页"
 	header.hide()
@@ -701,6 +763,8 @@ func room_state_changed() -> void:
 		leave_button.text = "退出房间"
 		online_rolling = false
 		close_online_dealer_roll()
+		if is_instance_valid(fx):
+			fx.play_entrance()
 	transfer_button.visible = is_room_owner() and not reconnecting
 	var fresh_opening := hand_changed and not resync and (not entering or stage == 1)
 	if fresh_opening and next_view.latest.type == "start" \
@@ -774,10 +838,13 @@ func begin_game(selections: Dictionary) -> void:
 	stats_table_id = _new_stats_table_id()
 	stats_round_hand_id = -1
 	stats_recorded_hand_id = -1
+	fx_result_hand = -1
 	remove_child(lobby)
 	lobby.queue_free()
 	lobby = null
 	header.show()
+	if is_instance_valid(fx):
+		fx.play_entrance()
 	dealer_roll_shown_round = -1
 	dealer_roll_rng.randomize()
 	var state := Rules.dealer_roll_state(dealer_roll_rng)
@@ -1600,7 +1667,8 @@ func refresh(animate := false) -> void:
 		return
 	if view.phase == "result":
 		if shown_round != view.round and not is_instance_valid(modal) and not flower_active and not intro_running:
-			show_result()
+			if not _begin_result_hold(view):
+				show_result()
 	elif online_view.is_empty() and (not is_instance_valid(modal) or is_instance_valid(settings_panel)) and not intro_running and not draw_flower_active and not flower_active:
 		for seat in range(1, 4):
 			if not game.actions(seat).is_empty():
@@ -1757,6 +1825,7 @@ func _flip_wall_gold(card: Control, gold_display: Control) -> void:
 
 
 func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: bool) -> void:
+	winning_tile_rect = Rect2()
 	label(dynamic, "第 %02d / %02d 局" % [view.round, view.round_limit], Rect2(71, 40, 170, 27), 17, GOLD)
 	var playable: int = view.remaining
 	if intro_active() or flower_active:
@@ -1765,6 +1834,8 @@ func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: b
 	center_dial.visible = not intro_active() and view.phase != "redeal"
 	var public_turn: bool = view.phase == "turn" and not online_reconnecting
 	center_dial.set_seats(view.get("winds", WINDS), int(view.current) if public_turn else -1)
+	if is_instance_valid(fx):
+		fx.set_active(int(view.current) if public_turn else -1)
 	if not online_view.is_empty():
 		room_notice_label = label(dynamic, "", Rect2(216, 30, 230, 30), 13, GOLD)
 		room_notice_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -1842,13 +1913,21 @@ func draw_seat(view: Dictionary, seat: int, origin: Vector2) -> void:
 	var gold_gap: Array = player.get("gold_gap", [])
 	if seat != 0 and player.has("hand"):
 		var values: Array = player.hand.duplicate()
+		var winning := winning_tile_for(view, seat, values)
+		if winning >= 0:
+			values.erase(winning)
 		values.sort()
+		if winning >= 0:
+			values.append(winning)
 		var columns := 17 if wide else 8
 		for index in range(values.size()):
 			var items_in_row := mini(columns, values.size() - (index - index % columns))
 			var row: int = floori(float(index) / columns)
 			var left := origin.x + (width - items_in_row * 14) * 0.5
-			tile(dynamic, values[index], Rect2(left + (index % columns) * 14, origin.y + 43 + row * 21, 12, 18), view.gold)
+			var bounds := Rect2(left + (index % columns) * 14, origin.y + 43 + row * 21, 12, 18)
+			tile(dynamic, values[index], bounds, view.gold)
+			if winning >= 0 and index == values.size() - 1:
+				winning_tile_rect = bounds
 	if not player.melds.is_empty():
 		var anchor := origin + Vector2(width * 0.5, 61 if wide else 112)
 		if seat == 0:
@@ -1912,20 +1991,16 @@ func draw_meld(meld: Dictionary, gold: int, origin: Vector2, seat: int) -> void:
 			x += 25
 
 
-func draw_river(view: Dictionary, seat: int, animate: bool) -> void:
-	var entry := [Vector2(0, 68), Vector2(88, 0), Vector2(0, -65), Vector2(-88, 0)]
-	var river: Array = view.players[seat].river
-	if river.is_empty():
-		return
+func river_slots(seat: int, count: int) -> Array[Rect2]:
 	var region: Rect2 = Art.RIVERS[seat].grow(-6)
 	var side := seat in [1, 3]
 	var columns := 5 if side else 14
 	var rows := 3 if side else 2
 	var spacing := Vector2(29, 38)
-	if river.size() > columns * rows:
+	if count > columns * rows:
 		var best_scale := 0.0
-		for candidate_columns in range(1, river.size() + 1):
-			var candidate_rows := ceili(float(river.size()) / candidate_columns)
+		for candidate_columns in range(1, count + 1):
+			var candidate_rows := ceili(float(count) / candidate_columns)
 			var fit := minf(region.size.x / (candidate_columns * spacing.x), region.size.y / (candidate_rows * spacing.y))
 			if fit > best_scale:
 				best_scale = fit
@@ -1936,22 +2011,37 @@ func draw_river(view: Dictionary, seat: int, animate: bool) -> void:
 	var step := spacing * scale
 	var dimensions := Vector2(25, 34) * scale
 	var grid_origin := region.get_center() - (grid_size * scale - step + dimensions) * 0.5
-	for index in range(river.size()):
-		var last: bool = view.last_discard.get("seat", -1) == seat and index == river.size() - 1
+	var slots: Array[Rect2] = []
+	for index in range(count):
 		var column := floori(float(index) / rows) if side else index % columns
 		var row := index % rows if side else floori(float(index) / columns)
 		if seat == 1:
 			column = columns - 1 - column
 		var pos := grid_origin + Vector2(column, row) * step
-		var node := tile(dynamic, river[index], Rect2(pos, dimensions), view.gold, Callable(), false, last)
+		slots.append(Rect2(pos, dimensions))
+	return slots
+
+
+func draw_river(view: Dictionary, seat: int, animate: bool) -> void:
+	var entry := [Vector2(0, 68), Vector2(88, 0), Vector2(0, -65), Vector2(-88, 0)]
+	var river: Array = view.players[seat].river
+	if river.is_empty():
+		return
+	var slots := river_slots(seat, river.size())
+	for index in range(river.size()):
+		var last: bool = view.last_discard.get("seat", -1) == seat and index == river.size() - 1
+		var bounds := slots[index]
+		var node := tile(dynamic, river[index], bounds, view.gold, Callable(), false, last)
 		if last:
 			var arrow := Polygon2D.new()
 			arrow.polygon = PackedVector2Array([Vector2(-5, -3), Vector2(5, -3), Vector2(0, 4)])
 			arrow.color = GOLD
-			arrow.position = Vector2(dimensions.x * 0.5, -2)
+			arrow.position = Vector2(bounds.size.x * 0.5, -2)
 			node.add_child(arrow)
 			if animate and view.latest.type == "discard":
 				slide(node, entry[seat])
+				if is_instance_valid(fx):
+					fx.discard_landing(seat, bounds.get_center())
 
 
 func draw_hand(view: Dictionary, moves: Array, deal: bool) -> void:
@@ -1969,12 +2059,16 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool) -> void:
 			hand = hand.slice(0, mini(intro_visible_hand, hand.size()))
 		if flower_hold_drawn and view.drawn >= 0:
 			hand.pop_back()
-	var has_draw: bool = view.drawn >= 0 and not flower_hold_drawn and not flower_preview
-	if has_draw:
-		hand.pop_back()
+	var winning := winning_tile_for(view, 0, hand)
+	var separate := int(view.drawn) if not flower_hold_drawn and not flower_preview else -1
+	if winning >= 0:
+		separate = winning
+	if separate >= 0:
+		hand.erase(separate)
 	hand.sort()
-	if has_draw:
-		hand.append(view.drawn)
+	if separate >= 0:
+		hand.append(separate)
+	var has_draw := separate >= 0
 	var reserve_draw_slot: bool = flower_hold_drawn and view.drawn >= 0
 	var slot_count := hand.size() + int(reserve_draw_slot)
 	var cursor := 549.0 - (slot_count * 59 - 3 + (10 if has_draw or reserve_draw_slot else 0)) * 0.5
@@ -1989,6 +2083,8 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool) -> void:
 			view.gold, handler, chosen, drawn)
 		node.name = "HandTile%d" % index
 		human_buttons.append(node)
+		if winning >= 0 and index == hand.size() - 1:
+			winning_tile_rect = node.get_rect()
 		if index == flower_slide_index:
 			slide_flower_replacement(node)
 		elif deal:
@@ -2093,13 +2189,17 @@ func render_controls(view: Dictionary, moves: Array) -> void:
 		detail = "即将重新发牌"
 	elif view.phase == "result":
 		detail = result_title(view.result)
-		options.append(["结算明细", show_result, "normal", "result"])
-		if not online_view.is_empty() and not is_room_owner():
-			detail += " · 等待房主"
-		elif view.table_finished:
-			options.append([end_table_text(), end_table, "primary", "home"])
+		if fx_hold_active:
+			detail += "  ·  胡牌演出"
+			options.append(["跳过演出", _finish_fx_hold, "normal", "skip"])
 		else:
-			options.append(["下一局", next_round, "primary", "next"])
+			options.append(["结算明细", show_result, "normal", "result"])
+			if not online_view.is_empty() and not is_room_owner():
+				detail += " · 等待房主"
+			elif view.table_finished:
+				options.append([end_table_text(), end_table, "primary", "home"])
+			else:
+				options.append(["下一局", next_round, "primary", "next"])
 	elif view.phase == "opening":
 		detail = "等待中" if moves.is_empty() else "开局" + win_name(view.opening)
 		if moves.any(is_swap):
@@ -2390,6 +2490,12 @@ func update_online_clock() -> void:
 	var digits := "%02d" % seconds if timed and center_dial.visible else ""
 	if countdown_label.text != digits:
 		countdown_label.text = digits
+	var urgent := timed and seconds <= 5
+	if is_instance_valid(fx):
+		fx.set_urgent(urgent)
+	var clock_color := Color("#ff9a7a") if urgent else Color("#97eafa")
+	if countdown_label.get_theme_color("font_color") != clock_color:
+		countdown_label.add_theme_color_override("font_color", clock_color)
 	if is_instance_valid(chooser_countdown):
 		var caption := "正在重连" if online_reconnecting else ("%d 秒" % seconds if timed else "不限时")
 		if chooser_countdown.text != caption:
@@ -2437,6 +2543,63 @@ func show_rules() -> void:
 	dialog.add_child(body)
 
 
+func winning_tile_for(view: Dictionary, seat: int, hand: Array) -> int:
+	var result: Dictionary = view.get("result", {})
+	var number := int(result.get("tile", -1))
+	if effects != "off" and view.phase == "result" and int(result.get("winner", -1)) == seat and number in hand:
+		return number
+	return -1
+
+
+func _play_result_effects(view: Dictionary) -> void:
+	if not is_instance_valid(fx) or int(view.hand_id) == fx_result_hand:
+		return
+	fx_result_hand = int(view.hand_id)
+	var result: Dictionary = view.get("result", {})
+	var source := Rect2()
+	var from := int(result.get("from", -1))
+	if from in range(4) and result.get("method", result.get("kind")) == "discard" and result.has("tile"):
+		# The engine has already transferred the winning discard out of the river.
+		source = river_slots(from, view.players[from].river.size() + 1).back()
+	fx.play_win(view, source, winning_tile_rect)
+	for seat in range(4):
+		var delta := int(result.get("deltas", [0, 0, 0, 0])[seat])
+		if delta != 0:
+			fx.score_delta(seat, delta)
+
+
+func _begin_result_hold(view: Dictionary) -> bool:
+	if not fx_hold_results or not is_instance_valid(fx) or effects == "off":
+		return false
+	var result: Dictionary = view.get("result", {})
+	if int(result.get("winner", -1)) < 0:
+		return false
+	if fx_hold_active:
+		return true
+	_play_result_effects(view)
+	if is_instance_valid(action_banner):
+		action_banner.hide()
+	fx_hold_active = true
+	shown_round = view.round
+	var delay := clampf(float(fx.win_duration) + 0.2, 1.0, 2.0)
+	fx_hold_timer.start(delay)
+	refresh()
+	return true
+
+
+func _finish_fx_hold() -> void:
+	if not fx_hold_active:
+		return
+	fx_hold_active = false
+	fx_hold_timer.stop()
+	if is_instance_valid(fx):
+		fx.stop_win()
+	refresh()
+	var view := board_view()
+	if view.get("phase") == "result":
+		show_result()
+
+
 func show_result() -> void:
 	var view := board_view()
 	if view.get("phase") != "result":
@@ -2445,6 +2608,7 @@ func show_result() -> void:
 	if result.is_empty():
 		return
 	shown_round = view.round
+	_play_result_effects(view)
 	var finished: bool = view.table_finished
 	var title := result_title(result)
 	if finished:
@@ -2540,6 +2704,16 @@ func end_table() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if fx_hold_active:
+		var skip_hold := false
+		if event is InputEventMouseButton and event.pressed:
+			skip_hold = true
+		elif event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_SPACE, KEY_ENTER, KEY_ESCAPE]:
+			skip_hold = true
+		if skip_hold:
+			_finish_fx_hold()
+			get_viewport().set_input_as_handled()
+		return
 	if flower_active:
 		var finish := false
 		if event is InputEventMouseButton and event.pressed:

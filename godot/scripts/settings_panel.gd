@@ -12,6 +12,7 @@ var nickname: LineEdit
 var initial_nickname := ""
 var interaction_effects: CheckButton
 var fullscreen: CheckButton
+var effects_menu: OptionButton
 var skin: OptionButton
 var table_menu: OptionButton
 var notice: Label
@@ -63,6 +64,12 @@ func setup(table) -> void:
 		fullscreen.add_theme_font_override("font", desk.session_font)
 		fullscreen.add_theme_font_size_override("font_size", 16)
 		add_child(fullscreen)
+	desk.label(self, "特效强度", Rect2(425, 247, 100, 24), 15, MUTED)
+	effects_menu = make_menu(Rect2(525, 240, 145, 34))
+	effects_menu.add_item("完整")
+	effects_menu.add_item("简洁")
+	effects_menu.add_item("关闭")
+	effects_menu.select(["full", "simple", "off"].find(preferences.effects))
 	preview_tiles = Control.new()
 	preview_tiles.position = Vector2(28, 211)
 	add_child(preview_tiles)
@@ -192,6 +199,7 @@ func apply() -> void:
 		"interaction_effects": interaction_effects.button_pressed}
 	if is_instance_valid(fullscreen):
 		changes.fullscreen = fullscreen.button_pressed
+	changes.effects = ["full", "simple", "off"][effects_menu.selected]
 	if name_value != initial_nickname:
 		changes.nickname = name_value
 	var previous_name: String = desk.preferences.values.nickname

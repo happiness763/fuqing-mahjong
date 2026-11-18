@@ -14,6 +14,9 @@ const DICE_RING_RADIUS := 62.0
 var dice := Vector2i.ZERO
 var table_texture: Texture2D
 var background_area := Rect2(0, 0, 1280, 800)
+var ambience_enabled := true
+var _ambience_time := 0.0
+var _ambience_accum := 0.0
 var _flecks := PackedVector2Array()
 var _dice_roll: DiceRoll
 var _dice_rolling := false
@@ -73,6 +76,20 @@ func set_background_area(area: Rect2) -> void:
 	queue_redraw()
 
 
+func set_ambience(enabled: bool) -> void:
+	ambience_enabled = enabled
+	queue_redraw()
+
+
+func _process(delta: float) -> void:
+	if ambience_enabled:
+		_ambience_time += delta
+		_ambience_accum += delta
+		if _ambience_accum >= 0.08:
+			_ambience_accum = 0.0
+			queue_redraw()
+
+
 func _draw() -> void:
 	gradient(background_area, Color("#253a30"), Color("#10231d"))
 	draw_style_box(box(Color("#0c1814"), Color("#0c1814"), 24), Rect2(FRAME.position + Vector2(0, 7), FRAME.size).grow(3))
@@ -92,6 +109,16 @@ func _draw() -> void:
 			draw_circle(CENTER, 270 * scale, Color(0.18, 0.46, 0.32, 0.045), true, -1.0, true)
 		for point in _flecks:
 			draw_line(point, point + Vector2(2, -1), Color(0.81, 0.86, 0.68, 0.08), 1.0)
+	if ambience_enabled:
+		for index in range(16):
+			var seed_x := float((index * 137) % 916)
+			var seed_y := float((index * 223) % 660)
+			var drift := sin(_ambience_time * 0.32 + index * 1.7)
+			var point := FELT.position + Vector2(50 + seed_x,
+				40 + fmod(seed_y + _ambience_time * (4.0 + index % 3), 650.0))
+			point.x += drift * 9.0
+			draw_circle(point, 1.2 + float(index % 3) * 0.5,
+				Color(0.84, 0.92, 0.78, 0.035 + 0.025 * (0.5 + 0.5 * drift)))
 	draw_style_box(box(Color.TRANSPARENT, Color("#638064"), 11), FELT.grow(-6))
 	for corner in [Vector2(57, 45), Vector2(1041, 45), Vector2(57, 755), Vector2(1041, 755)]:
 		var horizontal := -1.0 if corner.x > 500 else 1.0

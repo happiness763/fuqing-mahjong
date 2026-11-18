@@ -657,6 +657,7 @@ func _resolve_claim(winner: int, move: Dictionary) -> void:
 			else:
 				phase = "turn"
 			return
+		var winning_tile: int = indicator if kind == "grab" else -1
 		if kind == "grab":
 			if winner == dealer:
 				var discarded: int = move.tile
@@ -664,7 +665,7 @@ func _resolve_claim(winner: int, move: Dictionary) -> void:
 				players[winner].river.append(discarded)
 			players[winner].hand.append(indicator)
 			indicator = -1
-		finish_win(winner, -1, kind)
+		finish_win(winner, -1, kind, winning_tile)
 		return
 
 	var source: int = decided.from
@@ -675,7 +676,7 @@ func _resolve_claim(winner: int, move: Dictionary) -> void:
 		else:
 			players[source].hand.erase(tile)
 			players[winner].hand.append(tile)
-			finish_win(winner, source, "rob")
+			finish_win(winner, source, "rob", tile)
 		return
 	if winner < 0:
 		draw_tile((source + 1) % 4, false)
@@ -685,7 +686,7 @@ func _resolve_claim(winner: int, move: Dictionary) -> void:
 	var player: Dictionary = players[winner]
 	if move.type == "win":
 		player.hand.append(tile)
-		finish_win(winner, source, move.kind)
+		finish_win(winner, source, move.kind, tile)
 		return
 	_first_cycle_count = -1
 	for own_tile in move.tiles:
@@ -772,10 +773,15 @@ func draw_tile(seat: int, supplement: bool) -> void:
 	finish({"kind": "draw", "winner": -1, "from": -1, "deltas": [0, 0, 0, 0]})
 
 
-func finish_win(winner: int, source: int, kind: String) -> void:
+func finish_win(winner: int, source: int, kind: String, winning_tile := -1) -> void:
 	var player: Dictionary = players[winner]
 	var idle := _qualifies_idle_on_draw(player.hand, player.melds.size(), kind)
-	finish(Rules.score(winner, source, kind, player.hand, player.flowers, player.melds, gold, dealer, idle))
+	var settlement := Rules.score(winner, source, kind, player.hand, player.flowers, player.melds, gold, dealer, idle)
+	if winning_tile < 0 and source < 0 and phase == "turn" and current == winner:
+		winning_tile = drawn
+	if winning_tile >= 0:
+		settlement.tile = winning_tile
+	finish(settlement)
 
 
 func finish(settlement: Dictionary) -> void:
