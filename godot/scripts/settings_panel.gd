@@ -11,6 +11,7 @@ var desk
 var nickname: LineEdit
 var initial_nickname := ""
 var interaction_effects: CheckButton
+var fullscreen: CheckButton
 var skin: OptionButton
 var table_menu: OptionButton
 var notice: Label
@@ -54,6 +55,14 @@ func setup(table) -> void:
 	interaction_effects.add_theme_font_override("font", desk.session_font)
 	interaction_effects.add_theme_font_size_override("font_size", 16)
 	add_child(interaction_effects)
+	if OS.get_name() == "Windows":
+		fullscreen = CheckButton.new()
+		fullscreen.text = "全屏（F11）"
+		fullscreen.button_pressed = preferences.fullscreen
+		fullscreen.position = Vector2(425, 207)
+		fullscreen.add_theme_font_override("font", desk.session_font)
+		fullscreen.add_theme_font_size_override("font_size", 16)
+		add_child(fullscreen)
 	preview_tiles = Control.new()
 	preview_tiles.position = Vector2(28, 211)
 	add_child(preview_tiles)
@@ -181,6 +190,8 @@ func apply() -> void:
 	var id: String = table_ids[table_menu.selected]
 	var changes := {"skin": SKIN_IDS[skin.selected], "table_id": "" if id == ":import" else id,
 		"interaction_effects": interaction_effects.button_pressed}
+	if is_instance_valid(fullscreen):
+		changes.fullscreen = fullscreen.button_pressed
 	if name_value != initial_nickname:
 		changes.nickname = name_value
 	var previous_name: String = desk.preferences.values.nickname

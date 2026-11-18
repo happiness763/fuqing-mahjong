@@ -93,7 +93,9 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.pressed:
 		var point: Vector2 = event.position
-		if not menu.get_global_rect().has_point(point) and not portrait_rects.get(selected, Rect2()).has_point(point):
+		var hitbox := desk.dynamic.get_node_or_null("InteractionSeat%d" % selected) as Button
+		var hits_portrait := is_instance_valid(hitbox) and hitbox.get_global_rect().has_point(point)
+		if not hits_portrait and not menu.get_global_rect().has_point(point):
 			close()
 
 

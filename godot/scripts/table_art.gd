@@ -13,6 +13,7 @@ const DICE_RING_RADIUS := 62.0
 
 var dice := Vector2i.ZERO
 var table_texture: Texture2D
+var background_area := Rect2(0, 0, 1280, 800)
 var _flecks := PackedVector2Array()
 var _dice_roll: DiceRoll
 var _dice_rolling := false
@@ -67,8 +68,13 @@ func set_table_texture(texture: Texture2D) -> void:
 	queue_redraw()
 
 
+func set_background_area(area: Rect2) -> void:
+	background_area = area
+	queue_redraw()
+
+
 func _draw() -> void:
-	gradient(Rect2(0, 0, 1280, 800), Color("#253a30"), Color("#10231d"))
+	gradient(background_area, Color("#253a30"), Color("#10231d"))
 	draw_style_box(box(Color("#0c1814"), Color("#0c1814"), 24), Rect2(FRAME.position + Vector2(0, 7), FRAME.size).grow(3))
 	draw_style_box(box(Color("#784830"), Color("#9d6946"), 23, 2), FRAME)
 	draw_style_box(box(Color("#815137"), Color("#b18151"), 20), FRAME.grow(-4))

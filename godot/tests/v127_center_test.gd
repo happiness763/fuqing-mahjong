@@ -80,7 +80,7 @@ func run() -> void:
 		and is_instance_valid(dealer_score_wind) and dealer_score_wind.text.begins_with("南 · 庄"),
 		"both dealer indicators live on the fixed wind line")
 	desk.queue_action_banner("海棠", "碰")
-	var banner_rect: Rect2 = desk.action_banner.get_global_rect()
+	var banner_rect: Rect2 = desk.action_banner.get_rect()
 	check(banner_rect.end.x < 310 and banner_rect.end.y < 205,
 		"the action banner leaves the far wall exposed")
 	desk.clear_action_banner()

@@ -56,7 +56,9 @@ func run() -> void:
 	var desk = Desk.instantiate()
 	desk.preferences_root = OS.get_temp_dir().path_join("fuqing-desktop-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	root.add_child(desk)
-	check(ProjectSettings.get_setting("application/config/version") == "1.2.9", "project version")
+	check(ProjectSettings.get_setting("application/config/version") == "1.2.9a", "project version")
+	check(is_instance_valid(desk.action_font) and desk.action_font.has_char("胡".unicode_at(0)),
+		"action captions use the bundled display font")
 	check(desk.game == null and desk.lobby.round_field.text == "25", "lobby defaults to 25 rounds")
 	check(Art.FRAME == Rect2(28, 16, 1042, 768), "table frame fills the window")
 	check(Art.FELT == Rect2(41, 29, 1016, 742), "felt follows the frame")
@@ -364,6 +366,8 @@ func run() -> void:
 		root.size = Vector2i(864, 540)
 		await create_timer(0.65).timeout
 		await capture("small.png")
+		if OS.get_name() == "Windows":
+			await test_fullscreen(desk)
 	if failures == 0:
 		print("Godot desktop checks passed: relocated gold, stable dice, settings and a two-round table.")
 	desk.audio.stop()
@@ -371,6 +375,35 @@ func run() -> void:
 	desk.queue_free()
 	await process_frame
 	quit(failures)
+
+
+func test_fullscreen(desk) -> void:
+	root.size = Vector2i(1120, 560)
+	await process_frame
+	check(root.get_visible_rect().encloses(desk.menu_button.get_global_rect()),
+		"window scaling keeps the menu visible")
+	if is_instance_valid(desk.controls.get("discard")):
+		check(root.get_visible_rect().encloses(desk.controls.discard.get_global_rect()),
+			"window scaling keeps the discard control visible")
+	var portrait := desk.dynamic.get_node_or_null("InteractionSeat2") as Button
+	if is_instance_valid(portrait):
+		click(portrait)
+		check(is_instance_valid(desk.interactions.menu), "scaled layout keeps portrait interaction clickable")
+		click(portrait)
+		check(not is_instance_valid(desk.interactions.menu), "clicking the portrait again closes its menu")
+	var windowed := Rect2i(root.position, root.size)
+	var shortcut := InputEventKey.new()
+	shortcut.keycode = KEY_F11
+	shortcut.pressed = true
+	root.push_input(shortcut)
+	await process_frame
+	check(root.mode == Window.MODE_FULLSCREEN and desk.preferences.values.fullscreen,
+		"F11 enters and remembers fullscreen")
+	await capture("fullscreen.png")
+	root.push_input(shortcut)
+	await process_frame
+	check(root.mode == Window.MODE_WINDOWED and Rect2i(root.position, root.size) == windowed
+		and not desk.preferences.values.fullscreen, "F11 restores the previous window bounds")
 
 
 func test_gold_display(desk) -> void:

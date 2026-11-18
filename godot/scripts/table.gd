@@ -21,6 +21,8 @@ const Interactions = preload("res://scripts/table_interaction.gd")
 const SLIDE_DURATION := 0.23
 const SLIDE_FADE := 0.16
 const UI_FONT = preload("res://assets/fonts/NotoSansSC.woff2")
+const ACTION_FONT = preload("res://assets/fonts/MaShanZheng-Regular.ttf")
+const DESIGN_SIZE := Vector2(1280, 800)
 const NAMES := ["你", "阿岚", "阿榕", "阿屿"]
 const MARKS := ["你", "岚", "榕", "屿"]
 const WINDS = OnlineTableView.WINDS
@@ -35,6 +37,9 @@ const GOLD_AREA := Rect2(842, 52, 194, 112)
 const SEAT_POSITIONS := [Vector2(63, 640), Vector2(915, 290), Vector2(472, 40), Vector2(58, 290)]
 
 var game
+var action_font: FontVariation
+var windowed_bounds := Rect2i()
+var windowed_mode := Window.MODE_WINDOWED
 var board_art: Control
 var center_dial: CenterDial
 var wall_art: TableWall
@@ -139,9 +144,12 @@ var suspended_focus: Array[Control] = []
 
 
 func _ready() -> void:
-	if DisplayServer.get_name() != "headless":
-		get_window().min_size = Vector2i(864, 540)
+	anchors_preset = Control.PRESET_TOP_LEFT
+	size = DESIGN_SIZE
 	session_font = UI_FONT
+	action_font = FontVariation.new()
+	action_font.base_font = ACTION_FONT
+	action_font.fallbacks = [UI_FONT]
 	title_font = system_font(["KaiTi", "SimSun", "Microsoft YaHei", "Noto Serif CJK SC"])
 	nickname_font = system_font(["Microsoft YaHei UI", "Microsoft YaHei", "SimSun", "Segoe UI"])
 	preferences = Preferences.new(preferences_root)
@@ -165,6 +173,7 @@ func _ready() -> void:
 	wall_flights.z_index = 1
 	add_child(wall_flights)
 	build_header()
+	configure_display()
 	apply_saved_appearance()
 	ai_timer = Timer.new()
 	ai_timer.one_shot = true
@@ -340,7 +349,8 @@ func toggle_menu() -> void:
 	interactions.close()
 	if not is_instance_valid(menu_backdrop):
 		menu_backdrop = Control.new()
-		menu_backdrop.size = Vector2(1280, 800)
+		menu_backdrop.position = board_art.background_area.position
+		menu_backdrop.size = board_art.background_area.size
 		menu_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 		menu_backdrop.z_index = 19
 		menu_backdrop.gui_input.connect(_menu_backdrop_input)
@@ -446,6 +456,7 @@ func show_stats(initial_tab := "overview", entry := {}) -> void:
 
 
 func apply_saved_appearance() -> void:
+	apply_fullscreen(bool(preferences.values.fullscreen))
 	muted = preferences.values.muted
 	sound_button.text = "声音  关" if muted else "声音  开"
 	board_art.set_table_texture(preferences.table_texture(preferences.values.table_id))
@@ -457,6 +468,71 @@ func apply_saved_appearance() -> void:
 				node.texture = faces[node.number]
 				node.guobiao_face = applied_skin == "guobiao"
 				node.queue_redraw()
+
+
+func configure_display() -> void:
+	var window := get_window()
+	window.size_changed.connect(layout_screen)
+	if OS.get_name() == "Windows" and DisplayServer.get_name() != "headless":
+		var usable := DisplayServer.screen_get_usable_rect(window.current_screen)
+		if usable.has_area():
+			var available := (usable.size - Vector2i(32, 48)).max(Vector2i(320, 200))
+			window.min_size = Vector2i(864, 540).min(available)
+			var fit := minf(1.0, minf(available.x / DESIGN_SIZE.x, available.y / DESIGN_SIZE.y))
+			window.size = Vector2i(DESIGN_SIZE * fit)
+			window.position = usable.position + (usable.size - window.size) / 2
+	layout_screen()
+
+
+func layout_screen() -> void:
+	var canvas := get_viewport_rect().size
+	var area := Rect2(Vector2.ZERO, canvas)
+	if OS.get_name() == "Android":
+		var window := get_window()
+		var safe_pixels := DisplayServer.get_display_safe_area()
+		if safe_pixels.has_area() and window.size.x > 0 and window.size.y > 0:
+			var ratio := canvas / Vector2(window.size)
+			area = area.intersection(Rect2(Vector2(safe_pixels.position - window.position) * ratio,
+				Vector2(safe_pixels.size) * ratio))
+			if not area.has_area():
+				area = Rect2(Vector2.ZERO, canvas)
+	var factor := minf(1.0, minf(area.size.x / DESIGN_SIZE.x, area.size.y / DESIGN_SIZE.y))
+	if factor <= 0.0:
+		return
+	scale = Vector2.ONE * factor
+	position = area.position + (area.size - DESIGN_SIZE * factor) * 0.5
+	var background := Rect2(-position / factor, canvas / factor)
+	board_art.set_background_area(background)
+	if is_instance_valid(menu_backdrop):
+		menu_backdrop.position = background.position
+		menu_backdrop.size = background.size
+
+
+func apply_fullscreen(enabled: bool) -> void:
+	if OS.get_name() != "Windows" or DisplayServer.get_name() == "headless":
+		return
+	var window := get_window()
+	if enabled and window.mode != Window.MODE_FULLSCREEN:
+		windowed_mode = window.mode
+		windowed_bounds = Rect2i(window.position, window.size)
+		window.mode = Window.MODE_FULLSCREEN
+	elif not enabled and window.mode == Window.MODE_FULLSCREEN:
+		window.mode = windowed_mode
+		if windowed_mode == Window.MODE_WINDOWED and windowed_bounds.has_area():
+			window.size = windowed_bounds.size
+			window.position = windowed_bounds.position
+
+
+func _input(event: InputEvent) -> void:
+	if OS.get_name() != "Windows" or not event is InputEventKey:
+		return
+	if event.pressed and not event.echo and event.keycode == KEY_F11:
+		var enabled := get_window().mode != Window.MODE_FULLSCREEN
+		if preferences.update({"fullscreen": enabled}) == OK:
+			apply_fullscreen(enabled)
+			if is_instance_valid(settings_panel) and is_instance_valid(settings_panel.fullscreen):
+				settings_panel.fullscreen.set_pressed_no_signal(enabled)
+		get_viewport().set_input_as_handled()
 
 
 func show_lobby() -> void:
@@ -1599,6 +1675,7 @@ func show_action_banner() -> void:
 	var caption_label := label(banner, message.caption, badge, caption_size, fill,
 		HORIZONTAL_ALIGNMENT_CENTER, true)
 	caption_label.name = "Caption"
+	caption_label.add_theme_font_override("font", action_font)
 	var animation := banner.create_tween()
 	animation.tween_interval(1.6 if message.win else 1.05)
 	animation.tween_property(banner, "modulate:a", 0.0, 0.22)
@@ -2131,6 +2208,7 @@ func floating_button(caption: String, rect: Rect2, handler: Callable, needs_sele
 	node.add_theme_color_override("font_outline_color", base.darkened(0.55))
 	node.add_theme_constant_override("outline_size", 5)
 	node.add_theme_font_size_override("font_size", 25 if caption.length() > 1 else 35)
+	node.add_theme_font_override("font", action_font)
 	node.disabled = needs_selection and selected_tile < 0
 	return node
 
