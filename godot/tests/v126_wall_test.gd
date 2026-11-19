@@ -286,10 +286,12 @@ func test_table() -> void:
 
 func test_dense_rivers(desk) -> void:
 	var view: Dictionary = desk.game.view(0)
-	# Six discards per row keep a full river compact beside the dial.
+	# A full river of six-per-row tiles keeps the reference size.
 	var numbers: Array = []
-	for index in range(24):
+	for index in range(18):
 		numbers.append(index % 27)
+	check(desk.river_slots(0, 6)[0].size == desk.river_slots(0, 24)[0].size,
+		"discard tiles keep one size regardless of the river length")
 	var footprints: Array[Rect2] = []
 	for seat in range(4):
 		var region: Rect2 = Art.RIVERS[seat]

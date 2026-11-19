@@ -104,6 +104,12 @@ func _initialize() -> void:
 		for round_number in range(1, 3):
 			var actions_taken := 0
 			while game.phase != "result" and actions_taken < 300:
+				if game.phase == "sea":
+					var before_sea: int = game.sea_done
+					game.advance_sea()
+					check(game.sea_done > before_sea or game.phase == "result", "sea stage advances")
+					actions_taken += 1
+					continue
 				var actor := -1
 				for seat in range(4):
 					if not game.actions(seat).is_empty():

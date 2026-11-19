@@ -2148,15 +2148,14 @@ func river_common_width(size_rows: int) -> float:
 	return maxf(8.0, best)
 
 
-func river_slots(seat: int, count: int, max_count := -1) -> Array[Rect2]:
+func river_slots(seat: int, count: int) -> Array[Rect2]:
 	var slots: Array[Rect2] = []
 	if count <= 0:
 		return slots
 	var region: Rect2 = Art.RIVERS[seat].grow(-4)
 	var side := seat in [1, 3]
 	var gap := 3.0
-	var size_rows := ceili(float(maxi(count, max_count)) / 6.0)
-	var width := river_common_width(size_rows)
+	var width := river_common_width(3)
 	var height := width * 1.36
 	var along := width + gap
 	var depth := height + gap
@@ -2187,10 +2186,7 @@ func draw_river(view: Dictionary, seat: int, animate: bool) -> void:
 	var river: Array = view.players[seat].river
 	if river.is_empty():
 		return
-	var max_count := 0
-	for player in view.players:
-		max_count = maxi(max_count, player.river.size())
-	var slots := river_slots(seat, river.size(), max_count)
+	var slots := river_slots(seat, river.size())
 	for index in range(river.size()):
 		var last: bool = view.last_discard.get("seat", -1) == seat and index == river.size() - 1
 		var bounds := slots[index]
@@ -2679,10 +2675,7 @@ func _play_result_effects(view: Dictionary) -> void:
 	var from := int(result.get("from", -1))
 	if from in range(4) and result.get("method", result.get("kind")) == "discard" and result.has("tile"):
 		# The engine has already transferred the winning discard out of the river.
-		var max_count := 0
-		for player in view.players:
-			max_count = maxi(max_count, player.river.size())
-		source = river_slots(from, view.players[from].river.size() + 1, max_count + 1).back()
+		source = river_slots(from, view.players[from].river.size() + 1).back()
 	fx.play_win(view, source, winning_tile_rect)
 	for seat in range(4):
 		var delta := int(result.get("deltas", [0, 0, 0, 0])[seat])
