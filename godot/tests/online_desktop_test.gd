@@ -87,6 +87,11 @@ func run() -> void:
 		screen.seat_rows[2].transfer.pressed.emit()
 		screen.confirm.confirmed.emit()
 		screen.confirm.hide()
+		if not await wait_for(func(): return room.state.rounds == 1 and room.state.my_seat == 3,
+			"guest finishes the room setup"):
+			quit(failures)
+			return
+		screen.ready_button.pressed.emit()
 	else:
 		if not await wait_for(func(): return FileAccess.file_exists(ready), "host opened"):
 			quit(failures)
@@ -136,6 +141,12 @@ func run() -> void:
 		await capture("room-settings")
 		screen.seat_rows[1].move.pressed.emit()
 		check(screen.arranging_seat == 1, "owner has an unfinished seat selection")
+		screen._clear_arrangement()
+		screen.ready_button.pressed.emit()
+		if not await wait_for(func(): return room.state.seats.all(
+			func(info): return info.get("kind") == "ai" or bool(info.get("ready", false))), "both humans ready"):
+			quit(failures)
+			return
 		screen.start_button.pressed.emit()
 
 	var roll_deadline := Time.get_ticks_msec() + 15000
@@ -207,7 +218,7 @@ func run() -> void:
 			"both computers see the same scores")
 	else:
 		await wait_for(func(): return FileAccess.file_exists(args.qa.path_join("host-scores.txt")), "host sees result")
-		desk.end_table()
+	desk.end_table()
 	await wait_for(func(): return room.state.get("phase") == "lobby", "both peers return to the same room")
 	check(screen.visible and not desk.header.visible, "return restores room UI")
 	check(screen.arranging_seat == -1, "returning to the lobby clears pre-game seat selections")

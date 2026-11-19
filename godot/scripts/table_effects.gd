@@ -159,7 +159,7 @@ func score_delta(seat: int, delta: int) -> void:
 	if mode == "off" or delta == 0:
 		return
 	score_floats.append({
-		"point": Vector2(1152, 128 + seat * 55),
+		"point": seat_positions[seat] + Vector2((154.0 if seat in [0, 2] else 126.0) * 0.5, 68),
 		"start": time,
 		"text": desk.points(delta),
 		"color": desk.score_color(delta),

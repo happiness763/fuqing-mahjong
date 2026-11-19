@@ -46,6 +46,11 @@ var _passed_claims: Array[Dictionary] = []
 var _rng := RandomNumberGenerator.new()
 var _dice_rng := RandomNumberGenerator.new()
 var _next_gold_dice: Array = []
+var sea_total := 0
+var sea_done := 0
+var sea_seat := -1
+var sea_drawn := -1
+var sea_flower := false
 
 
 func _init(seed_value := -1, rounds := 15, luck_setting := "normal", online := false, dealer_seat := 0) -> void:
@@ -66,12 +71,34 @@ func set_next_gold_dice(dice: Array) -> void:
 	_next_gold_dice = dice.duplicate()
 
 
+func kong_counts() -> Array:
+	var open := 0
+	var concealed := 0
+	for player in players:
+		for meld in player.melds:
+			if meld.type == "concealedKong":
+				concealed += 1
+			elif meld.type in ["kong", "addedKong"]:
+				open += 1
+	return [open, concealed]
+
+
+func reserve() -> int:
+	var counts := kong_counts()
+	return Rules.reserve(counts[0], counts[1])
+
+
 func start_round() -> void:
 	hand_id += 1
 	discard_count = 0
 	draw_count = 0
 	_first_discard = -1
 	_first_cycle_count = 0
+	sea_total = 0
+	sea_done = 0
+	sea_seat = -1
+	sea_drawn = -1
+	sea_flower = false
 	action_revision += 1
 	if _next_gold_dice.size() == 2:
 		gold_dice = _next_gold_dice.duplicate()
@@ -135,9 +162,16 @@ func _take_wall(index: int, seat: int, kind: String, end: String, events: Array)
 
 func _wall_view() -> Dictionary:
 	if _wall_slots.size() != wall.size():
-		return {"size": wall.size(), "slots": range(wall.size()), "opening": [], "takes": []}
+		return {"size": wall.size(), "slots": range(wall.size()), "opening": [], "takes": [], "sea_slots": []}
+	var sea_slots := []
+	if phase == "sea":
+		for offset in range(Rules.SEA_COUNT):
+			var index: int = wall.size() - Rules.BASE_RESERVE - 1 - offset
+			if index >= 0 and index < _wall_slots.size():
+				sea_slots.append(_wall_slots[index])
 	return {"size": _wall_size, "slots": _wall_slots.duplicate(),
-		"opening": _wall_opening.duplicate(true), "takes": _wall_takes.duplicate(true)}
+		"opening": _wall_opening.duplicate(true), "takes": _wall_takes.duplicate(true),
+		"sea_slots": sea_slots}
 
 
 func deal(shuffled: Array) -> void:
@@ -475,7 +509,7 @@ func _action_options(seat: int) -> Array:
 		var win_move := action("win", {"kind": kind})
 		win_move.pattern = win_pattern(seat, hand, -1, kind)
 		options.append(win_move)
-	if can_self_win and player.gold_gap.is_empty() and wall.size() > Rules.RESERVE:
+	if can_self_win and player.gold_gap.is_empty() and wall.size() > reserve():
 		var counts := Rules.counts(hand)
 		for tile in range(Rules.NUMBERED):
 			if Rules.is_gold(tile, gold):
@@ -535,7 +569,7 @@ func reaction_actions(seat: int, source: int, tile: int) -> Array:
 				options.append(action("pong", pong))
 		else:
 			options.append(action("pong", pong))
-	if not restricted and counts[tile] >= 3 and wall.size() > Rules.RESERVE:
+	if not restricted and counts[tile] >= 3 and wall.size() > reserve():
 		options.append(action("kong", {"tile": tile, "tiles": [tile, tile, tile]}))
 	if not is_upstream:
 		return options
@@ -693,12 +727,13 @@ func _resolve_claim(winner: int, move: Dictionary) -> void:
 		player.hand.erase(own_tile)
 	var tiles: Array = move.tiles + [tile]
 	tiles.sort()
+	var kong_floor := reserve()
 	player.melds.append({"type": move.type, "tiles": tiles, "from": source, "claimed": tile})
 	if move.has("discards"):
 		player.lock_discards = move.discards.duplicate()
 	note(move.type, winner, tile)
 	if move.type == "kong":
-		draw_tile(winner, true)
+		draw_tile(winner, true, kong_floor)
 	else:
 		current = winner
 		phase = "turn"
@@ -720,6 +755,7 @@ func open_rob_kong(seat: int, move: Dictionary) -> void:
 func self_kong(seat: int, move: Dictionary) -> void:
 	var tile: int = move.tile
 	var player: Dictionary = players[seat]
+	var floor := reserve()
 	if move.type == "concealedKong":
 		for index in range(4):
 			player.hand.erase(tile)
@@ -733,18 +769,20 @@ func self_kong(seat: int, move: Dictionary) -> void:
 				meld.tiles.append(tile)
 				break
 	note(move.type, seat, -1 if move.type == "concealedKong" else tile)
-	draw_tile(seat, true)
+	draw_tile(seat, true, floor)
 
 
-func draw_tile(seat: int, supplement: bool) -> void:
+func draw_tile(seat: int, supplement: bool, floor := -1) -> void:
 	var player: Dictionary = players[seat]
 	if _wall_slots.size() != wall.size():
 		_reset_wall_geometry()
-	if wall.size() > Rules.RESERVE:
+	var replacement := supplement
+	var threshold: int = floor if floor >= 0 else reserve()
+	if wall.size() > threshold:
 		_passed_claims[seat].clear()
 	last_flowers = []
 	var flower_round := 0
-	while wall.size() > Rules.RESERVE:
+	while wall.size() > threshold:
 		var tile := _take_wall(-1 if supplement else 0, seat, "draw",
 			"tail" if supplement else "head", _wall_takes)
 		if not Rules.is_flower(tile, gold):
@@ -770,7 +808,73 @@ func draw_tile(seat: int, supplement: bool) -> void:
 		supplement = true
 	if not last_flowers.is_empty():
 		flower_revision += 1
+	if not replacement:
+		# The next seat to need a normal draw starts the sea stage instead.
+		_start_sea(seat if last_flowers.is_empty() else (seat + 1) % 4)
+		return
+	if not last_flowers.is_empty() and wall.size() <= reserve():
+		_start_sea((seat + 1) % 4)
+		return
 	finish({"kind": "draw", "winner": -1, "from": -1, "deltas": [0, 0, 0, 0]})
+
+
+func _start_sea(seat: int) -> void:
+	var available := clampi(wall.size() - Rules.BASE_RESERVE, 0, Rules.SEA_COUNT)
+	if available <= 0:
+		_finish_sea_draw()
+		return
+	sea_total = available
+	sea_done = 0
+	sea_seat = seat
+	sea_drawn = -1
+	sea_flower = false
+	phase = "sea"
+	current = seat
+	drawn = -1
+	can_self_win = false
+	pending = {}
+	note("seaStart", seat)
+
+
+func advance_sea() -> Dictionary:
+	if phase != "sea" or sea_done >= sea_total:
+		return {}
+	var player: Dictionary = players[sea_seat]
+	var index: int = wall.size() - Rules.BASE_RESERVE - 1
+	if index < 0:
+		_finish_sea_draw()
+		return {}
+	var tile: int = _take_wall(index, sea_seat, "sea", "tail", _wall_takes)
+	sea_done += 1
+	sea_drawn = tile
+	sea_flower = Rules.is_flower(tile, gold)
+	if not sea_flower:
+		player.hand.append(tile)
+		current = sea_seat
+		drawn = tile
+		can_self_win = true
+		var kind := ""
+		if not player.gold_gap.is_empty():
+			if Rules.is_gold(tile, gold):
+				kind = "goldGap"
+		else:
+			kind = win_kind(sea_seat)
+		if not kind.is_empty():
+			finish_win(sea_seat, -1, kind, tile)
+			result.sea = true
+			return {"seat": sea_seat, "tile": tile, "won": true}
+	note("sea", sea_seat, tile)
+	latest.flower = sea_flower
+	if sea_done >= sea_total:
+		_finish_sea_draw()
+		return {"seat": sea_seat, "tile": tile, "won": false, "ended": true}
+	sea_seat = (sea_seat + 1) % 4
+	current = sea_seat
+	return {"seat": sea_seat, "tile": tile, "won": false}
+
+
+func _finish_sea_draw() -> void:
+	finish({"kind": "seaDraw", "winner": -1, "from": -1, "deltas": [0, 0, 0, 0], "sea": true})
 
 
 func finish_win(winner: int, source: int, kind: String, winning_tile := -1) -> void:
@@ -822,7 +926,10 @@ func view(seat: int) -> Dictionary:
 		"seat": seat, "dealer": dealer, "round": round_number, "hand_id": hand_id, "gold": gold, "indicator": indicator,
 		"first_cycle": first_cycle,
 		"round_limit": round_limit, "table_finished": is_table_finished(),
-		"scores": scores.duplicate(), "current": current, "phase": phase, "remaining": maxi(0, wall.size() - Rules.RESERVE),
+		"scores": scores.duplicate(), "current": current, "phase": phase,
+		"remaining": maxi(0, wall.size() - reserve()), "reserve": reserve(),
+		"sea": {} if phase != "sea" else {"total": sea_total, "done": sea_done,
+			"seat": sea_seat, "tile": sea_drawn, "flower": sea_flower},
 		"discard_count": discard_count, "draw_count": draw_count,
 		"wall": _wall_view(),
 		"opening": pending.get("kind", "") if sees_claim else "",

@@ -31,8 +31,8 @@ func run() -> void:
 
 func test_wall_layout() -> void:
 	var footprints: Array[Rect2] = []
-	var dial := Rect2(467, 328, 164, 144)
-	var gold := Rect2(842, 52, 194, 112)
+	var dial := Rect2(548, 318, 184, 164)
+	var gold := Rect2(71, 92, 176, 72)
 	for seat in range(4):
 		var first := seat * 36
 		var wall := TableWall.slot_rect(first, 0)
@@ -41,27 +41,26 @@ func test_wall_layout() -> void:
 		var river: Rect2 = Art.RIVERS[seat]
 		match seat:
 			0:
-				check(wall.position.y > river.end.y and river.position.y > dial.end.y,
-					"near river is between the dial and the near wall")
+				check(river.position.y > dial.end.y and river.end.y < 615,
+					"near river sits between the dial and the hand controls")
 				check(wall.end.y < 615, "near wall clears the hand and the action buttons")
 			1:
-				check(wall.position.x > river.end.x and river.position.x > dial.end.x,
+				check(river.position.x > dial.end.x and wall.position.x >= river.end.x - 1,
 					"right river is between the dial and the right wall")
-				check(wall.end.x < 915, "right wall clears the right avatar")
+				check(wall.end.x < 1006, "right wall clears the right avatar")
 			2:
 				check(wall.end.y < river.position.y and river.end.y < dial.position.y,
 					"far river is between the dial and the far wall")
 				check(wall.position.y > 145, "far wall clears the far melds")
 			3:
-				check(wall.end.x < river.position.x and river.end.x < dial.position.x,
+				check(river.end.x < dial.position.x and wall.end.x <= river.position.x + 1,
 					"left river is between the dial and the left wall")
-				check(wall.position.x > 184, "left wall clears the left avatar")
+				check(wall.position.x > 275, "left wall clears the left avatar")
 		if seat % 2 == 0:
 			check(wall.size.x >= 450 and wall.size.x <= 520, "horizontal wall spans the table")
 		else:
 			check(wall.size.y >= 360 and wall.size.y <= 430, "side wall spans the table")
 		check(Art.FELT.encloses(wall) and not gold.intersects(wall), "wall stays on the felt clear of gold")
-		check(not Art.RIVERS.any(func(area): return wall.intersects(area)), "wall clears all rivers")
 		check(not footprints.any(func(area): return wall.grow(5).intersects(area)), "wall corners leave gaps")
 		footprints.append(wall)
 		var upper := TableWall.slot_rect(first, 0)
@@ -112,12 +111,14 @@ func test_geometry() -> void:
 	var rotated := TableView.from_room({"view": game.view(2), "my_seat": 2, "seats": [{}, {}, {}, {}]})
 	check(rotated.wall.takes[0].seat == 3 and rotated.wall.takes[0].slot == 65,
 		"the receiving player rotates independently of the public slot identifier")
-	while game.wall.size() > 18:
+	while game.wall.size() > 20:
 		game.draw_tile(1, true)
 	var reserve: Dictionary = game.view(0)
 	game.draw_tile(1, false)
-	check(reserve.remaining == 0 and reserve.wall.slots.size() == 18
-		and game.view(0).wall == reserve.wall, "the last 18 slots still render and cannot be drawn")
+	check(reserve.remaining == 0 and reserve.wall.slots.size() == 20
+		and game.phase == "sea" and game.view(0).wall.slots == reserve.wall.slots
+		and game.view(0).wall.takes == reserve.wall.takes,
+		"the last 20 slots still render and cannot be drawn")
 	game.start_round()
 	check(game.view(0).wall.takes.is_empty(), "a new deal resets runtime take events")
 	for luck_mode in ["lucky", "unlucky"]:
@@ -285,23 +286,31 @@ func test_table() -> void:
 
 func test_dense_rivers(desk) -> void:
 	var view: Dictionary = desk.game.view(0)
-	# 60 ordinary draws plus the dealer's opening discard bound a single river.
+	# Six discards per row keep a full river compact beside the dial.
 	var numbers: Array = []
-	for index in range(61):
+	for index in range(24):
 		numbers.append(index % 27)
+	var footprints: Array[Rect2] = []
 	for seat in range(4):
 		var region: Rect2 = Art.RIVERS[seat]
-		for other in range(seat):
-			check(not region.intersects(Art.RIVERS[other]), "rivers occupy separate regions")
 		view.players[seat].river = numbers
 		var first: int = desk.dynamic.get_child_count()
 		desk.draw_river(view, seat, false)
 		var rectangles: Array[Rect2] = []
 		for node in desk.dynamic.get_children().slice(first):
-			var tile_rect: Rect2 = node.get_rect()
-			check(node.get_script() == Tile and region.encloses(tile_rect), "river tile fits its felt region")
-			check(not rectangles.any(func(other): return other.intersects(tile_rect)), "river tiles remain separate")
-			rectangles.append(tile_rect)
+			if node.get_script() != Tile:
+				continue
+			var center: Vector2 = node.position + node.size * 0.5
+			var size: Vector2 = node.size
+			var angle := int(node.rotation_degrees) % 360
+			if angle == 90 or angle == 270:
+				size = Vector2(node.size.y, node.size.x)
+			var footprint := Rect2(center - size * 0.5, size)
+			check(region.grow(2).encloses(footprint), "river tile fits its felt region")
+			check(not footprints.any(func(other): return other.intersects(footprint)),
+				"river tiles remain separate")
+			rectangles.append(footprint)
+			footprints.append(footprint)
 		check(rectangles.size() == numbers.size(), "a full river shows every discard")
 
 

@@ -64,14 +64,15 @@ func _initialize() -> void:
 	check(not game.actions(0).any(func(move): return move.type == "win"), "discarded gold blocks ron")
 
 	game = fixture()
-	game.wall.resize(19)
+	game.wall.resize(21)
 	game.wall[0] = 34
 	game.players[0].hand = [8]
 	play(game, 0, "discard", 8)
-	check(game.result.get("kind") == "draw" and game.wall.size() == 18, "last live flower draws round")
+	check(game.phase == "sea" and game.wall.size() == 20, "the last live flower starts the sea stage")
 
 	game = fixture()
 	game.players[0].hand = [3, 3, 3, 3, 8]
+	game.wall.append(7)
 	game.wall.append(6)
 	play(game, 0, "concealedKong", 3)
 	check(game.players[0].hand == [8, 6], "kong draws from tail")
@@ -141,7 +142,7 @@ func fixture():
 		p.merge({"hand": [], "melds": [], "flowers": [], "river": [], "discarded_gold": false}, true)
 	game.gold = 26
 	game.indicator = 26
-	game.wall.resize(20)
+	game.wall.resize(22)
 	game.wall.fill(2)
 	game.phase = "turn"
 	game.current = 0

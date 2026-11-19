@@ -1,12 +1,12 @@
 extends Control
 
 const DiceRoll = preload("res://scripts/dice_roll.gd")
-const FRAME := Rect2(28, 16, 1042, 768)
-const FELT := Rect2(41, 29, 1016, 742)
-const CENTER := Vector2(549, 400)
+const FRAME := Rect2(28, 16, 1224, 768)
+const FELT := Rect2(41, 29, 1198, 742)
+const CENTER := Vector2(640, 400)
 const RIVERS := [
-	Rect2(307, 482, 484, 72), Rect2(641, 319, 174, 162),
-	Rect2(307, 205, 484, 113), Rect2(283, 319, 174, 162),
+	Rect2(360, 486, 560, 126), Rect2(742, 250, 173, 300),
+	Rect2(360, 205, 560, 109), Rect2(365, 250, 173, 300),
 ]
 const BRASS := Color("#c49a61")
 const DICE_RING_RADIUS := 62.0
@@ -98,11 +98,11 @@ func _draw() -> void:
 	draw_style_box(box(Color("#5b3829"), Color("#3e271e"), 17, 2), FRAME.grow(-8))
 	draw_style_box(box(Color("#23523f"), Color("#112c22"), 15, 2), FELT)
 	if table_texture:
-		var area := FELT.grow(-7)
 		var image_size := table_texture.get_size()
-		var scale := maxf(area.size.x / image_size.x, area.size.y / image_size.y)
-		var crop_size := area.size / scale
-		draw_texture_rect_region(table_texture, area, Rect2((image_size - crop_size) * 0.5, crop_size), Color(0.83, 0.83, 0.83))
+		var scale := maxf(FELT.size.x / image_size.x, FELT.size.y / image_size.y)
+		var crop_size := FELT.size / scale
+		draw_texture_rect_region(table_texture, FELT, Rect2((image_size - crop_size) * 0.5, crop_size),
+			Color(0.83, 0.83, 0.83))
 	else:
 		for ring in range(9, 0, -1):
 			var scale := ring / 9.0
@@ -111,16 +111,16 @@ func _draw() -> void:
 			draw_line(point, point + Vector2(2, -1), Color(0.81, 0.86, 0.68, 0.08), 1.0)
 	if ambience_enabled:
 		for index in range(16):
-			var seed_x := float((index * 137) % 916)
-			var seed_y := float((index * 223) % 660)
+			var seed_x := float((index * 137) % 1180)
+			var seed_y := float((index * 223) % 700)
 			var drift := sin(_ambience_time * 0.32 + index * 1.7)
 			var point := FELT.position + Vector2(50 + seed_x,
-				40 + fmod(seed_y + _ambience_time * (4.0 + index % 3), 650.0))
+				40 + fmod(seed_y + _ambience_time * (4.0 + index % 3), 700.0))
 			point.x += drift * 9.0
 			draw_circle(point, 1.2 + float(index % 3) * 0.5,
 				Color(0.84, 0.92, 0.78, 0.035 + 0.025 * (0.5 + 0.5 * drift)))
 	draw_style_box(box(Color.TRANSPARENT, Color("#638064"), 11), FELT.grow(-6))
-	for corner in [Vector2(57, 45), Vector2(1041, 45), Vector2(57, 755), Vector2(1041, 755)]:
+	for corner in [Vector2(57, 45), Vector2(1223, 45), Vector2(57, 755), Vector2(1223, 755)]:
 		var horizontal := -1.0 if corner.x > 500 else 1.0
 		var vertical := -1.0 if corner.y > 400 else 1.0
 		var points := PackedVector2Array()
@@ -138,10 +138,6 @@ func _draw() -> void:
 		var length := 6 if index % 8 == 0 else 2
 		draw_line(center + vector * (DICE_RING_RADIUS - 3 - length),
 			center + vector * (DICE_RING_RADIUS - 3), Color("#82906c"), 1.0, true)
-	draw_style_box(box(Color("#102c23"), Color("#496451"), 10), Rect2(53, 690, 992, 90))
-	draw_line(Vector2(62, 694), Vector2(1036, 694), Color("#314e3c"), 1.0)
-	for panel in [Rect2(1083, 72, 169, 272), Rect2(1083, 360, 169, 188), Rect2(1083, 564, 169, 220)]:
-		draw_style_box(box(Color("#1d3329"), Color("#4b624e"), 11), panel)
 
 
 func gradient(rect: Rect2, top: Color, bottom: Color) -> void:

@@ -144,7 +144,7 @@ func test_flower_draw_events() -> void:
 	game.players[0].hand = []
 	game.players[0].flowers = []
 	game.wall = []
-	for index in range(18):
+	for index in range(20):
 		game.wall.append(10)
 	game.wall.append(10)
 	game.wall.append(28)

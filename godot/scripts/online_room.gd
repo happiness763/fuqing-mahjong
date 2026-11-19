@@ -10,7 +10,7 @@ const Opponent = preload("res://scripts/opponent.gd")
 const Rules = preload("res://scripts/rules.gd")
 const Interactions = preload("res://scripts/table_interaction.gd")
 const OpeningIntro = preload("res://scripts/opening_intro.gd")
-const VERSION := "1.3.0"
+const VERSION := "1.3.1"
 const SERVER := 1
 const DEFAULT_PORT := 36712
 const CONNECT_MS := 8000
@@ -53,6 +53,9 @@ var _stage := 0
 var _redeal_due_ms := -1
 var _deadline_ms := -1
 var _ai_due_ms := -1
+var _sea_due_ms := -1
+var _result_votes: Array = [false, false, false, false]
+var _vote_hand_id := -1
 var _local_deadline_ms := -1
 var _connect_until_ms := -1
 var _resume_until_ms := -1
@@ -431,10 +434,31 @@ func _wire_depart() -> void:
 
 
 func _human_seat(nick: String, peer_id: int) -> Dictionary:
-	var seat := {"name": nick, "kind": "human", "difficulty": "normal", "peer": peer_id,
+	var seat := {"name": nick, "kind": "human", "difficulty": "normal", "peer": peer_id, "ready": false,
 		"token": Crypto.new().generate_random_bytes(24).hex_encode(), "expires_at": -1, "seat_id": _next_seat_id}
 	_next_seat_id += 1
 	return seat
+
+
+func _seat_ready(player: Dictionary) -> bool:
+	if player.is_empty():
+		return false
+	if player.get("kind") == "ai" or player.get("managed", false):
+		return true
+	return player.get("peer", 0) != 0 and bool(player.get("ready", false))
+
+
+func _all_ready() -> bool:
+	for player in _seats:
+		if not _seat_ready(player):
+			return false
+	return true
+
+
+func _reset_ready(seats: Array = []) -> void:
+	for seat in range(_seats.size()):
+		if (seats.is_empty() or seat in seats) and _seats[seat].get("kind", "") == "human":
+			_seats[seat]["ready"] = false
 
 
 func _seat_for_peer(peer_id: int) -> int:
@@ -562,6 +586,13 @@ func _apply_request(seat: int, op: String, data: Dictionary, received_at: int) -
 		return "本桌已开局，结算后可修改昵称。" if _game != null else _rename(seat, data)
 	if op == "move_seat":
 		return "本桌进行中，结算后可调整房间。" if _game != null else _move_seat(seat, data)
+	if op == "ready":
+		if _game != null or _rolling:
+			return "当前不能准备。"
+		_seats[seat]["ready"] = not bool(_seats[seat].get("ready", false))
+		return ""
+	if op in ["next", "lobby"]:
+		return _after_result(seat, op, data)
 	if _seats[seat].seat_id != _owner_id:
 		return "只有房主可以执行这项操作。"
 	var target: Variant = data.get("seat", -1)
@@ -573,8 +604,6 @@ func _apply_request(seat: int, op: String, data: Dictionary, received_at: int) -
 			return "请选择另一位在线真人接任房主。"
 		_owner_id = _seats[target].seat_id
 		return ""
-	if op in ["next", "lobby"]:
-		return _after_result(op, data)
 	if _game != null:
 		return "本桌进行中，结算后可调整房间。"
 	match op:
@@ -589,10 +618,13 @@ func _apply_request(seat: int, op: String, data: Dictionary, received_at: int) -
 				return "出牌时间须为 15 秒、30 秒、60 秒或不限时。"
 			_rounds = rounds
 			_turn_seconds = seconds
+			_reset_ready()
 		"start":
 			for player in _seats:
 				if player.is_empty() or (player.kind == "human" and player.peer == 0):
 					return "请等真人到齐或用 AI 补满四个座位。"
+			if not _all_ready():
+				return "请等四家全部准备。"
 			_start_rolling()
 		"add_ai", "update_ai":
 			if not has_target:
@@ -629,6 +661,7 @@ func _move_seat(source: int, data: Dictionary) -> String:
 		return "座位已变化，请确认后再操作。"
 	_seats[target] = _seats[source]
 	_seats[source] = {}
+	_reset_ready([target])
 	return ""
 
 
@@ -642,6 +675,7 @@ func _arrange_seats(data: Dictionary) -> String:
 	var occupant := _seats[source]
 	_seats[source] = _seats[target]
 	_seats[target] = occupant
+	_reset_ready([source, target])
 	return ""
 
 
@@ -670,7 +704,7 @@ func _set_ai(seat: int, update: bool, data: Dictionary) -> String:
 	var seat_id: int = player.seat_id if update else _next_seat_id
 	if not update:
 		_next_seat_id += 1
-	_seats[seat] = {"name": nick, "kind": "ai", "difficulty": difficulty, "seat_id": seat_id}
+	_seats[seat] = {"name": nick, "kind": "ai", "difficulty": difficulty, "seat_id": seat_id, "ready": true}
 	return ""
 
 
@@ -747,23 +781,72 @@ func _play(seat: int, data: Dictionary, received_at: int) -> String:
 	return ""
 
 
-func _after_result(op: String, data: Dictionary) -> String:
+func _after_result(seat: int, op: String, data: Dictionary) -> String:
 	if _game == null or _game.phase != "result" or typeof(data.get("stage")) != TYPE_INT or data.stage != _stage:
 		return "请等待当前结算。"
-	if op == "next":
-		if not _game.next_round():
-			return "本桌已打完。"
-		_begin_stage(_opening_grace_ms())
-		return ""
-	if not _game.is_table_finished():
+	if op == "lobby" and not _game.is_table_finished():
 		return "整桌结束后可返回等候室。"
-	_game = null
-	_deadline_ms = -1
-	_ai_due_ms = -1
-	for seat in range(_seats.size()):
-		if _seats[seat].get("managed", false):
-			_seats[seat] = {}
+	_ensure_votes()
+	_result_votes[seat] = true
+	_publish()
+	_maybe_advance_result()
 	return ""
+
+
+func _ensure_votes() -> void:
+	if _game == null or _game.phase != "result":
+		return
+	if _vote_hand_id == _game.hand_id:
+		return
+	_vote_hand_id = _game.hand_id
+	_result_votes = [false, false, false, false]
+	for seat in range(_seats.size()):
+		var player: Dictionary = _seats[seat]
+		if player.is_empty() or player.get("kind") == "ai" or player.get("peer", 0) == 0:
+			_result_votes[seat] = true
+
+
+func _vote_for(seat: int) -> bool:
+	_ensure_votes()
+	if bool(_result_votes[seat]):
+		return true
+	var player: Dictionary = _seats[seat]
+	return player.is_empty() or player.get("kind") == "ai" or player.get("peer", 0) == 0
+
+
+func _all_voted() -> bool:
+	for seat in range(_seats.size()):
+		if not _vote_for(seat):
+			return false
+	return true
+
+
+func _result_votes_view() -> Array:
+	return [0, 1, 2, 3].map(func(seat): return _vote_for(seat))
+
+
+func _maybe_advance_result() -> void:
+	if _game == null or _game.phase != "result" or not _all_voted():
+		return
+	if _game.is_table_finished():
+		_game = null
+		_deadline_ms = -1
+		_ai_due_ms = -1
+		_sea_due_ms = -1
+		for seat in range(_seats.size()):
+			if _seats[seat].get("managed", false):
+				_seats[seat] = {}
+		_reset_ready()
+		_vote_hand_id = -1
+		_result_votes = [false, false, false, false]
+		_stage = 0
+		_publish()
+		return
+	if _game.next_round():
+		_vote_hand_id = -1
+		_result_votes = [false, false, false, false]
+		_begin_stage(_opening_grace_ms())
+		_publish()
 
 
 func _start_rolling() -> void:
@@ -855,10 +938,23 @@ func _begin_stage(intro_ms := 0) -> void:
 	_redeal_due_ms = now + Game.REDEAL_DELAY_MS if _game.phase == "redeal" else -1
 	_deadline_ms = now + intro_ms + _turn_seconds * 1000 if actor >= 0 and _turn_seconds > 0 else -1
 	_ai_due_ms = now + intro_ms + AI_DELAY_MS if actor >= 0 and _seats[actor].kind == "ai" else -1
+	_sea_due_ms = now + intro_ms + 720 if _game.phase == "sea" else -1
+	if _game.phase == "result":
+		_ensure_votes()
 
 
 func _process_stage(now: int) -> void:
 	if _game == null:
+		return
+	if _game.phase == "result":
+		if _all_voted():
+			_maybe_advance_result()
+		return
+	if _game.phase == "sea":
+		if _sea_due_ms >= 0 and now >= _sea_due_ms:
+			_game.advance_sea()
+			_begin_stage(0)
+			_publish()
 		return
 	if _game.phase == "redeal":
 		if now >= _redeal_due_ms and _game.restart_after_draw():
@@ -889,7 +985,8 @@ func _snapshot(seat: int) -> Dictionary:
 			public_seats.append({})
 		else:
 			public_seats.append({"name": player.name, "kind": player.kind, "difficulty": player.difficulty, "seat_id": player.seat_id,
-				"connected": player.kind == "ai" or player.get("peer", 0) != 0, "managed": player.get("managed", false)})
+				"connected": player.kind == "ai" or player.get("peer", 0) != 0, "managed": player.get("managed", false),
+				"ready": _seat_ready(player)})
 	var snapshot := {"phase": "rolling" if _rolling else ("lobby" if _game == null else "playing"),
 		"my_seat": seat, "owner": owner, "host_seat": _seat_for_peer(SERVER), "seats": public_seats, "rounds": _rounds,
 		"turn_seconds": _turn_seconds, "port": _port}
@@ -910,6 +1007,7 @@ func _snapshot(seat: int) -> Dictionary:
 		snapshot.remaining_ms = -1 if _deadline_ms < 0 else maxi(0, _deadline_ms - Time.get_ticks_msec())
 		if _game.phase == "result":
 			snapshot.standings = _game.standings()
+			snapshot.result_votes = _result_votes_view()
 	return snapshot
 
 

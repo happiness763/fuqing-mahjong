@@ -2,6 +2,7 @@ extends SceneTree
 
 const Desk = preload("res://table.tscn")
 const Game = preload("res://scripts/game.gd")
+const Art = preload("res://scripts/table_art.gd")
 
 var failures := 0
 var capture_dir := ""
@@ -75,14 +76,23 @@ func run() -> void:
 	check(desk.center_dial.active_seat == 1 and desk.countdown_label.text == "11",
 		"shared clock accompanies the public north turn")
 	var dealer_wind := desk.dynamic.get_node_or_null("SeatWind3") as Label
-	var dealer_score_wind := desk.dynamic.get_node_or_null("ScoreWind3") as Label
-	check(is_instance_valid(dealer_wind) and dealer_wind.text.begins_with("南 · 庄")
-		and is_instance_valid(dealer_score_wind) and dealer_score_wind.text.begins_with("南 · 庄"),
-		"both dealer indicators live on the fixed wind line")
+	var seat_record := desk.dynamic.get_node_or_null("SeatRecord3") as Label
+	check(is_instance_valid(dealer_wind) and dealer_wind.text.begins_with("庄")
+		and not dealer_wind.text.contains("南")
+		and is_instance_valid(seat_record) and seat_record.text.begins_with("胡 ")
+		and desk.center_dial._score_labels[0].text == "0",
+		"seat plates drop the wind and show win/deal-in counts")
+	check(desk.center_dial.format_score(10) == "+10" and desk.center_dial.format_score(-10) == "-10"
+		and desk.center_dial.format_score(0) == "0", "counter scores use natural digits")
+	desk.center_dial.set_scores([10, -10, 0, 0])
+	check(desk.center_dial._score_labels[0].text == "+10"
+		and desk.center_dial._score_labels[1].text == "-10"
+		and desk.center_dial._score_labels[2].text == "0", "dial scores show signs without padding")
+	desk.center_dial.set_scores([0, 0, 0, 0])
 	desk.queue_action_banner("海棠", "碰")
 	var banner_rect: Rect2 = desk.action_banner.get_rect()
-	check(banner_rect.end.x < 310 and banner_rect.end.y < 205,
-		"the action banner leaves the far wall exposed")
+	check(not banner_rect.intersects(Art.RIVERS[2]),
+		"the action banner leaves the far river exposed")
 	desk.clear_action_banner()
 	await capture("online-countdown")
 

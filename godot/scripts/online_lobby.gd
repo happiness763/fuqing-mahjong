@@ -43,6 +43,8 @@ var turn_menu: OptionButton
 var save_button: Button
 var guest_settings: Label
 var start_button: Button
+var ready_button: Button
+var ready_status: Label
 var confirm: ConfirmationDialog
 var pending_confirmation: Dictionary
 var previous_rounds := -1
@@ -209,6 +211,8 @@ func _build_room() -> void:
 	guest_settings = desk.label(guest_controls, "", Rect2(776, 237, 405, 136), 20, INK)
 	desk.label(guest_controls, "等待房主开局", Rect2(776, 402, 405, 28), 17, MUTED)
 	start_button = desk.button(room_screen, "开始游戏", Rect2(1026, 682, 178, 48), _start, "primary")
+	ready_button = desk.button(room_screen, "准备", Rect2(776, 604, 180, 40), _toggle_ready, "primary")
+	ready_status = desk.label(room_screen, "", Rect2(966, 604, 238, 40), 17, MUTED)
 
 
 func _build_seat(seat: int) -> void:
@@ -278,23 +282,34 @@ func refresh() -> void:
 			_clear_arrangement()
 			_set_notice("选中的座位已变化，请重新选座。")
 	var occupied := 0
-	var ready := 0
+	var ready_count := 0
+	var connected := 0
 	for seat in range(4):
 		var occupant: Dictionary = state.seats[seat]
 		_refresh_seat(seat, occupant, state, owner)
 		if not occupant.is_empty():
 			occupied += 1
-			if occupant.kind == "ai" or occupant.get("connected", true):
-				ready += 1
-	seat_summary.text = "已入座 %d / 4" % occupied
-	if ready < occupied:
+			var online: bool = occupant.kind == "ai" or occupant.get("connected", true)
+			if online:
+				connected += 1
+			if occupant.kind == "ai" or (online and bool(occupant.get("ready", false))):
+				ready_count += 1
+	seat_summary.text = "已入座 %d / 4 · 已准备 %d / 4" % [occupied, ready_count]
+	if connected < occupied:
 		seat_summary.text += "   ·   等待断线玩家"
 	if arranging_seat >= 0:
 		seat_summary.text = "正在调整%s座 · 选择目标座位" % WINDS[arranging_seat]
-	can_start = owner and not reconnecting and ready == 4
+	can_start = owner and not reconnecting and occupied == 4 and ready_count == 4
 	host_controls.visible = owner
 	guest_controls.visible = not owner
 	start_button.visible = owner
+	var my_seat: int = int(state.get("my_seat", -1))
+	var mine: Dictionary = state.seats[my_seat] if my_seat >= 0 and my_seat < state.seats.size() else {}
+	ready_button.visible = my_seat >= 0 and mine.get("kind", "") == "human"
+	ready_button.disabled = reconnecting or arranging_seat >= 0
+	ready_button.text = "取消准备" if bool(mine.get("ready", false)) else "准备"
+	ready_status.visible = ready_button.visible
+	ready_status.text = "已准备 %d / 4" % ready_count
 	_refresh_addresses(state)
 	_refresh_settings(state)
 	if not joining_nickname.is_empty() and state.seats[state.my_seat].name == joining_nickname:
@@ -341,13 +356,14 @@ func _refresh_seat(seat: int, occupant: Dictionary, state: Dictionary, owner: bo
 		action.disabled = not can_edit
 	var detail := ""
 	if ai:
-		detail = "AI · " + DIFFICULTY_NAMES[difficulty]
+		detail = "AI · " + DIFFICULTY_NAMES[difficulty] + " · 已准备"
 	elif not empty:
-		detail = "真人" if occupant.get("connected", true) else "真人 · 断线保留"
+		detail = ("真人" if occupant.get("connected", true) else "真人 · 断线保留")
 		if own:
 			detail += " · 你"
 		if seat == state.owner:
 			detail += " · 房主"
+		detail += " · 已准备" if bool(occupant.get("ready", false)) else " · 未准备"
 	row.detail.text = detail
 	row.previous = occupant.duplicate()
 
@@ -391,7 +407,7 @@ func _refresh_settings_actions() -> void:
 	if changed:
 		start_button.tooltip_text = "请先保存本桌设置"
 	elif not can_start:
-		start_button.tooltip_text = "四个座位就绪后可以开始"
+		start_button.tooltip_text = "四个座位都准备后可以开始"
 	else:
 		start_button.tooltip_text = ""
 
@@ -607,6 +623,12 @@ func _save_settings() -> void:
 func _start() -> void:
 	if not start_button.disabled:
 		_request("start")
+
+
+func _toggle_ready() -> void:
+	if room.state.get("reconnecting", false):
+		return
+	_request("ready")
 
 
 func _request(operation: String, data := {}) -> void:

@@ -23,6 +23,7 @@ const SLIDE_DURATION := 0.23
 const SLIDE_FADE := 0.16
 const UI_FONT = preload("res://assets/fonts/NotoSansSC.woff2")
 const ACTION_FONT = preload("res://assets/fonts/MaShanZheng-Regular.ttf")
+const DIAL_FONT = preload("res://assets/fonts/ZCOOLQingKeHuangYou-Regular.ttf")
 const DESIGN_SIZE := Vector2(1280, 800)
 const NAMES := ["你", "阿岚", "阿榕", "阿屿"]
 const MARKS := ["你", "岚", "榕", "屿"]
@@ -34,8 +35,8 @@ const GOLD := Color("#edc780")
 const REDEAL_NOTICE := "首巡四家同牌 · 流局"
 const BUTTON := Color("#294638")
 const FONT_DARK := Color("#202e25")
-const GOLD_AREA := Rect2(842, 52, 194, 112)
-const SEAT_POSITIONS := [Vector2(63, 640), Vector2(915, 290), Vector2(472, 40), Vector2(58, 290)]
+const GOLD_AREA := Rect2(71, 92, 176, 64)
+const SEAT_POSITIONS := [Vector2(154, 640), Vector2(1006, 290), Vector2(563, 40), Vector2(149, 290)]
 
 var game
 var action_font: FontVariation
@@ -61,7 +62,11 @@ var header: Control
 var menu_button: Button
 var menu_panel: Panel
 var menu_backdrop: Control
-var status_label: Label
+var delegate_button: Button
+var ai_delegate := false
+var result_action_button: Button
+var result_vote_label: Label
+var sea_timer: Timer
 var room
 var online_lobby: Control
 var online_view := {}
@@ -83,6 +88,7 @@ var preferences_root := "user://"
 var preferences: Preferences
 var stats
 var stats_table_id := ""
+var table_seat_records: Array = []
 var stats_round_hand_id := -1
 var stats_round_started_ms := 0
 var stats_round_started_at := 0
@@ -167,7 +173,7 @@ func _ready() -> void:
 	board_art = Art.new()
 	add_child(board_art)
 	center_dial = CenterDial.new()
-	center_dial.setup(session_font)
+	center_dial.setup(ACTION_FONT, UI_FONT)
 	center_dial.position = Art.CENTER - CenterDial.MIDPOINT
 	center_dial.hide()
 	board_art.add_child(center_dial)
@@ -202,6 +208,10 @@ func _ready() -> void:
 	fx_hold_timer.one_shot = true
 	add_child(fx_hold_timer)
 	fx_hold_timer.timeout.connect(_finish_fx_hold)
+	sea_timer = Timer.new()
+	sea_timer.one_shot = true
+	add_child(sea_timer)
+	sea_timer.timeout.connect(_advance_sea)
 	flower_fx = Control.new()
 	flower_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	flower_fx.z_index = 15
@@ -361,24 +371,51 @@ func build_header() -> void:
 	header = Control.new()
 	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(header)
-	menu_button = button(header, "菜单", Rect2(1083, 16, 169, 44), toggle_menu)
+	menu_button = button(header, "菜单", Rect2(1148, 34, 90, 36), toggle_menu)
 	menu_button.z_index = 20
-	menu_panel = panel(header, Rect2(1083, 64, 169, 272), Color("#203a2e"), Color("#ab8852"), 12)
+	menu_panel = panel(header, Rect2(1088, 80, 150, 314), Color("#203a2e"), Color("#ab8852"), 12)
 	menu_panel.visible = false
 	menu_panel.z_index = 21
 	sound_button = menu_row(menu_panel, 0, "声音  开", _menu_sound)
 	menu_row(menu_panel, 1, "玩法规则", _menu_rules)
 	menu_row(menu_panel, 2, "数据统计", _menu_stats)
-	transfer_button = menu_row(menu_panel, 3, "移交房主", _menu_transfer)
+	delegate_button = menu_row(menu_panel, 3, "AI 托管  关", _menu_delegate)
+	transfer_button = menu_row(menu_panel, 4, "移交房主", _menu_transfer)
 	transfer_button.hide()
-	menu_row(menu_panel, 4, "设置", show_settings)
-	leave_button = menu_row(menu_panel, 5, "返回首页", _menu_leave)
+	menu_row(menu_panel, 5, "设置", show_settings)
+	leave_button = menu_row(menu_panel, 6, "返回首页", _menu_leave)
 
 
 func menu_row(parent: Control, index: int, copy: String, handler: Callable) -> Button:
-	var node := button(parent, copy, Rect2(10, 10 + index * 42, 149, 36), handler)
+	var node := button(parent, copy, Rect2(10, 10 + index * 42, 130, 36), handler)
 	node.z_index = 22
 	return node
+
+
+func _menu_delegate() -> void:
+	set_delegate(not ai_delegate)
+
+
+func set_delegate(enabled: bool) -> void:
+	ai_delegate = enabled
+	if is_instance_valid(delegate_button):
+		delegate_button.text = "AI 托管  " + ("开" if enabled else "关")
+	ai_timer.stop()
+	close_menu()
+	if enabled:
+		if is_instance_valid(modal) and not is_instance_valid(settings_panel):
+			close_modal(false)
+		clear_selection()
+		if is_instance_valid(dealer_roll_panel):
+			_schedule_dealer_roll()
+	refresh()
+
+
+func _advance_sea() -> void:
+	if game == null or game.phase != "sea":
+		return
+	game.advance_sea()
+	refresh()
 
 
 func toggle_menu() -> void:
@@ -611,6 +648,12 @@ func show_lobby() -> void:
 	clear_selection()
 	clear_board()
 	clear_action_banner()
+	ai_delegate = false
+	ai_timer.stop()
+	if is_instance_valid(delegate_button):
+		delegate_button.text = "AI 托管  关"
+	if is_instance_valid(sea_timer):
+		sea_timer.stop()
 	if is_instance_valid(fx):
 		fx_result_hand = -1
 		fx_hold_active = false
@@ -637,7 +680,6 @@ func clear_board() -> void:
 	center_dial.hide()
 	redeal_notice = null
 	room_notice_label = null
-	status_label = null
 
 
 func show_online() -> void:
@@ -692,6 +734,10 @@ func room_state_changed() -> void:
 		stats_table_id = ""
 		stats_round_hand_id = -1
 		stats_recorded_hand_id = -1
+		ai_delegate = false
+		ai_timer.stop()
+		if is_instance_valid(delegate_button):
+			delegate_button.text = "AI 托管  关"
 		var was_rolling := online_rolling
 		online_rolling = false
 		close_online_dealer_roll()
@@ -739,7 +785,8 @@ func room_state_changed() -> void:
 	var owner_changed := owner != online_owner
 	var resync := reconnecting or online_reconnecting or (not entering and stage > online_stage + 1)
 	if not (hand_changed or stage_changed or owner_changed or reconnecting != online_reconnecting
-		or next_view.seat_info != online_view.seat_info):
+		or next_view.seat_info != online_view.seat_info
+		or next_view.get("result_votes", []) != online_view.get("result_votes", [])):
 		return
 	if stage_changed or reconnecting:
 		if modal_tracks_stage:
@@ -1039,14 +1086,27 @@ func _update_dealer_roll_panel() -> void:
 
 
 func _schedule_dealer_roll() -> void:
-	if dealer_roll_online or not is_instance_valid(dealer_roll_panel):
+	if not is_instance_valid(dealer_roll_panel):
+		return
+	var current := Rules.dealer_roll_current(dealer_roll_state)
+	if dealer_roll_online:
+		if ai_delegate and current == 0 and dealer_roll_online_ready and not dealer_roll_animating:
+			dealer_roll_auto_roll = true
+			dealer_roll_timer.start(0.6)
+		else:
+			dealer_roll_auto_roll = false
+			dealer_roll_timer.stop()
 		return
 	if dealer_roll_state.get("finished", false):
 		dealer_roll_auto_roll = false
 		_update_dealer_roll_panel()
 		dealer_roll_timer.start(1.8)
 		return
-	var current := Rules.dealer_roll_current(dealer_roll_state)
+	if current == 0 and ai_delegate:
+		dealer_roll_auto_roll = true
+		_update_dealer_roll_panel()
+		dealer_roll_timer.start(0.6)
+		return
 	if current <= 0:
 		dealer_roll_auto_roll = false
 		dealer_roll_timer.stop()
@@ -1063,6 +1123,8 @@ func _dealer_roll_tick() -> void:
 	if dealer_roll_state.get("finished", false):
 		finish_dealer_roll()
 	elif dealer_roll_auto_roll:
+		if dealer_roll_online:
+			dealer_roll_auto_roll = false
 		_dealer_roll_press()
 
 
@@ -1128,6 +1190,7 @@ func show_online_dealer_roll(snapshot: Dictionary) -> void:
 			board_art.set_dice(Vector2i(int(pair[0]), int(pair[1])))
 			dealer_roll_dice_label.text = "%d + %d = %d" % [int(pair[0]), int(pair[1]), int(roll.sums[last_rolled])]
 		_update_dealer_roll_panel()
+		_schedule_dealer_roll()
 		return
 	online_roll_names = names
 	dealer_roll_online_ready = bool(snapshot.get("roll_ready", true))
@@ -1137,9 +1200,12 @@ func show_online_dealer_roll(snapshot: Dictionary) -> void:
 	if advanced and last_rolled >= 0 and roll.dice[last_rolled].size() == 2:
 		var pair: Array = roll.dice[last_rolled]
 		var total := int(roll.sums[last_rolled])
-		_animate_roll_dice(pair, total, func(): _update_dealer_roll_panel())
+		_animate_roll_dice(pair, total, func():
+			_update_dealer_roll_panel()
+			_schedule_dealer_roll())
 	elif not dealer_roll_animating:
 		_update_dealer_roll_panel()
+		_schedule_dealer_roll()
 
 
 func close_online_dealer_roll() -> void:
@@ -1304,6 +1370,7 @@ func _refresh_wall(view: Dictionary, animate: bool) -> void:
 	var wall: Dictionary = view.get("wall", {})
 	if wall.is_empty():
 		wall_art.set_slots([], 0)
+		wall_art.set_sea_slots([])
 		return
 	var values: Array = wall.slots.duplicate()
 	var events: Array = wall.takes
@@ -1324,6 +1391,7 @@ func _refresh_wall(view: Dictionary, animate: bool) -> void:
 		values.sort()
 	var previous := wall_art.slots
 	wall_art.set_slots(values, int(view.dealer))
+	wall_art.set_sea_slots(wall.get("sea_slots", []) if not intro_active() and not flower_active else [])
 	var same_hand := wall_hand == hand_key(view)
 	wall_hand = hand_key(view)
 	if not same_hand or not (animate or intro_active() or flower_active):
@@ -1563,6 +1631,13 @@ func perform(seat: int, move: Dictionary) -> void:
 func run_ai() -> void:
 	if is_instance_valid(modal) and not is_instance_valid(settings_panel):
 		return
+	if ai_delegate:
+		var moves: Array = local_moves()
+		if not moves.is_empty():
+			perform(0, Opponent.choose(board_view(), moves, "normal"))
+			return
+	if not online_view.is_empty() or game == null:
+		return
 	for seat in range(1, 4):
 		var moves: Array = game.actions(seat)
 		if not moves.is_empty():
@@ -1573,10 +1648,22 @@ func run_ai() -> void:
 func next_round() -> void:
 	if not online_view.is_empty():
 		room.request("next", {"stage": online_stage})
+		_mark_vote_sent()
 		return
 	if not game.next_round():
 		return
 	start_intro()
+
+
+func _mark_vote_sent() -> void:
+	if is_instance_valid(result_action_button):
+		result_action_button.disabled = true
+		result_action_button.text = "已确认 · 等待…"
+	for key in ["next", "home"]:
+		var bottom = controls.get(key)
+		if is_instance_valid(bottom):
+			bottom.disabled = true
+			bottom.text = "已确认"
 
 
 func cancel_hand_animations(view: Dictionary) -> void:
@@ -1659,16 +1746,25 @@ func refresh(animate := false) -> void:
 	if fresh:
 		record(view)
 	render_board(render_view, moves, deal, animate and fresh)
-	render_sidebar(view)
 	render_controls(view, moves)
 	if is_instance_valid(modal):
 		suspend_focus(dynamic)
 	if redealing:
 		return
 	if view.phase == "result":
+		_update_result_vote_ui()
+	if view.phase == "sea":
+		sea_timer.stop()
+		if online_view.is_empty() and not is_instance_valid(modal):
+			sea_timer.start(0.72)
+		return
+	sea_timer.stop()
+	if view.phase == "result":
 		if shown_round != view.round and not is_instance_valid(modal) and not flower_active and not intro_running:
 			if not _begin_result_hold(view):
 				show_result()
+	elif ai_delegate and not local_moves().is_empty() and (not is_instance_valid(modal) or is_instance_valid(settings_panel)) and not intro_running and not draw_flower_active and not flower_active:
+		ai_timer.start(0.55)
 	elif online_view.is_empty() and (not is_instance_valid(modal) or is_instance_valid(settings_panel)) and not intro_running and not draw_flower_active and not flower_active:
 		for seat in range(1, 4):
 			if not game.actions(seat).is_empty():
@@ -1726,7 +1822,7 @@ func show_action_banner() -> void:
 	var message: Dictionary = action_messages.pop_front()
 	var accent := Color("#ffe298") if message.win else Color("#cff7b9")
 	var fill := Color("#633023") if message.win else Color("#184734")
-	var banner := panel(self, Rect2(65, 103, 188, 54), fill, accent, 10)
+	var banner := panel(self, Rect2(770, 40, 188, 54), fill, accent, 10)
 	var style := banner.get_theme_stylebox("panel") as StyleBoxFlat
 	style.shadow_color = Color(0.02, 0.10, 0.07, 0.55)
 	style.shadow_size = 4
@@ -1827,13 +1923,22 @@ func _flip_wall_gold(card: Control, gold_display: Control) -> void:
 func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: bool) -> void:
 	winning_tile_rect = Rect2()
 	label(dynamic, "第 %02d / %02d 局" % [view.round, view.round_limit], Rect2(71, 40, 170, 27), 17, GOLD)
-	var playable: int = view.remaining
-	if intro_active() or flower_active:
-		playable = maxi(0, wall_art.slots.size() - Rules.RESERVE)
-	label(dynamic, "可摸 %d 张" % playable, Rect2(71, 67, 135, 25), 14, MUTED)
+	var sea: Dictionary = view.get("sea", {})
+	if view.phase == "sea":
+		label(dynamic, "海底 %d/%d" % [int(sea.get("done", 0)), int(sea.get("total", Rules.SEA_COUNT))],
+			Rect2(71, 67, 135, 25), 14, GOLD)
+	else:
+		var playable: int = view.remaining
+		if intro_active() or flower_active:
+			playable = maxi(0, wall_art.slots.size() - int(view.get("reserve", Rules.RESERVE)))
+		label(dynamic, "可摸 %d 张" % playable, Rect2(71, 67, 135, 25), 14, MUTED)
 	center_dial.visible = not intro_active() and view.phase != "redeal"
 	var public_turn: bool = view.phase == "turn" and not online_reconnecting
 	center_dial.set_seats(view.get("winds", WINDS), int(view.current) if public_turn else -1)
+	center_dial.set_dealer(int(view.get("dealer", -1)))
+	center_dial.set_scores(view.get("scores", [0, 0, 0, 0]))
+	center_dial.set_round("第 %d 局" % view.round)
+	center_dial.set_remaining("--")
 	if is_instance_valid(fx):
 		fx.set_active(int(view.current) if public_turn else -1)
 	if not online_view.is_empty():
@@ -1841,38 +1946,57 @@ func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: b
 		room_notice_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		update_online_clock()
 	else:
-		countdown_label.text = ""
+		center_dial.set_countdown("")
 	if intro_gold:
-		var gold_display := panel(dynamic, GOLD_AREA, Color("#1d4938"), Color("#668064"), 9)
+		var gold_display := Control.new()
 		gold_display.name = "GoldDisplay"
-		label(gold_display, "本局金牌", Rect2(0, 4, 194, 22), 14, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+		gold_display.position = GOLD_AREA.position
+		gold_display.size = GOLD_AREA.size
+		gold_display.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		dynamic.add_child(gold_display)
+		var gold_char := label(gold_display, "金", Rect2(0, 0, 56, 64), 46, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+		gold_char.name = "GoldMark"
+		gold_char.add_theme_font_override("font", action_font)
+		gold_char.add_theme_color_override("font_outline_color", Color("#5e421c"))
+		gold_char.add_theme_constant_override("outline_size", 6)
 		var golds: Array = Rules.gold_tiles(view.gold)
-		var gold_width := 44 if golds.size() == 1 else 35
-		var gold_step := gold_width + 5
-		var gold_left := (194.0 - (golds.size() * gold_step - 5)) * 0.5
-		for index in range(golds.size()):
-			var card := tile(gold_display, golds[index], Rect2(gold_left + index * gold_step, 27, gold_width, 59),
-				view.gold, Callable(), false, golds.size() > 1 and golds[index] == view.gold)
-			if golds[index] == view.indicator and wall_gold_from.is_finite():
+		if golds.size() == 1:
+			var card := tile(gold_display, golds[0], Rect2(58, 4, 34, 47), view.gold, Callable(), false, false)
+			if golds[0] == view.indicator and wall_gold_from.is_finite():
 				_flip_wall_gold(card, gold_display)
-		var gold_name := Rules.tile_name(view.gold)
-		if golds.size() > 1:
-			gold_name = "花金 · 翻 " + gold_name
-		elif view.gold >= Rules.NUMBERED:
-			gold_name += " · 花金"
-		label(gold_display, gold_name + (" · 已抢" if view.indicator < 0 else ""),
-			Rect2(0, 87, 194, 22), 15, INK, HORIZONTAL_ALIGNMENT_CENTER)
+		else:
+			for index in range(golds.size()):
+				var card := tile(gold_display, golds[index], Rect2(58 + index * 28, 4, 26, 36),
+					view.gold, Callable(), false, golds[index] == view.gold)
+				if golds[index] == view.indicator and wall_gold_from.is_finite():
+					_flip_wall_gold(card, gold_display)
 	var rob_tile: int = view.get("rob_tile", -1)
 	if view.phase == "robKong" and rob_tile >= 0 and moves.any(func(move): return move.type == "win"):
-		var offer := panel(dynamic, Rect2(604, 623, 130, 55), Color("#1a3d31"), GOLD, 10)
+		var offer := panel(dynamic, Rect2(695, 623, 130, 55), Color("#1a3d31"), GOLD, 10)
 		offer.name = "RobKongOffer"
 		label(offer, "可抢的补杠牌", Rect2(45, 0, 80, 55), 12, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 		tile(offer, rob_tile, Rect2(8, 5, 32, 44), view.gold, Callable(), false, true)
 
+	table_seat_records = []
+	if stats != null and not stats_table_id.is_empty():
+		table_seat_records = stats.table_summary(stats_table_id).get("seats", [])
 	for seat in range(4):
 		draw_seat(view, seat, SEAT_POSITIONS[seat])
 		draw_river(view, seat, animate_discard)
 	draw_hand(view, moves, deal)
+	if view.phase == "sea":
+		var event: Dictionary = view.get("latest", {})
+		var sea_notice := panel(dynamic, Rect2(480, 588, 320, 62), Color("#1a3d31"), GOLD, 12)
+		sea_notice.name = "SeaNotice"
+		if event.get("type", "") == "sea" and int(event.get("tile", -1)) >= 0:
+			var sea_tile := int(event.tile)
+			var who := player_name(int(event.seat))
+			label(sea_notice, "海底 · " + who, Rect2(12, 6, 190, 20), 14, GOLD)
+			tile(sea_notice, sea_tile, Rect2(206, 10, 28, 38), view.gold)
+			label(sea_notice, "花牌 · 不计花" if bool(event.get("flower", false)) else Rules.tile_name(sea_tile),
+				Rect2(242, 18, 70, 22), 13, INK)
+		else:
+			label(sea_notice, "海底 · 等待摸牌", Rect2(0, 0, 320, 62), 16, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	if view.phase == "redeal":
 		var bounds := Rect2(Art.CENTER - Vector2(90, 23), Vector2(180, 46))
 		redeal_notice = panel(dynamic, bounds, Color("#21392e"), GOLD, 12)
@@ -1903,11 +2027,27 @@ func draw_seat(view: Dictionary, seat: int, origin: Vector2) -> void:
 		dynamic.add_child(hitbox)
 	set_player_font(label(dynamic, player_mark(seat), Rect2(origin + Vector2(5, 5), Vector2(29, 29)),
 		17, FONT_DARK, HORIZONTAL_ALIGNMENT_CENTER, true))
-	var wind := seat_wind(seat) + (" · 庄" if seat == view.dealer else "")
+	var record: Dictionary = table_seat_records[seat] if seat < table_seat_records.size() else {}
+	var record_text := "胡 %d · 点 %d" % [int(record.get("wins", 0)), int(record.get("deal_ins", 0))]
+	var record_label: Label
+	if seat == 2:
+		record_label = label(dynamic, record_text, Rect2(origin + Vector2(width + 8, 8), Vector2(110, 20)),
+			12, MUTED)
+	else:
+		record_label = label(dynamic, record_text, Rect2(origin + Vector2(0, -20), Vector2(width, 18)),
+			12, MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	record_label.name = "SeatRecord%d" % seat
+	set_player_font(record_label)
 	set_player_font(label(dynamic, player_name(seat),
 		Rect2(origin + Vector2(41, 2), Vector2(width - 42, 18)), 14, GOLD if active else INK))
 	var flower_count: int = player.flowers.size() if intro_flowers else 0
-	var seat_caption := label(dynamic, "%s · %d 花" % [wind, flower_count],
+	var tags := PackedStringArray()
+	if seat == view.dealer:
+		tags.append("庄")
+	tags.append("%d 花" % flower_count)
+	if seat == 0 and ai_delegate:
+		tags.append("托管")
+	var seat_caption := label(dynamic, " · ".join(tags),
 		Rect2(origin + Vector2(41, 20), Vector2(width - 42, 16)), 12, GOLD if seat == view.dealer else MUTED)
 	seat_caption.name = "SeatWind%d" % seat
 	var gold_gap: Array = player.get("gold_gap", [])
@@ -1931,12 +2071,12 @@ func draw_seat(view: Dictionary, seat: int, origin: Vector2) -> void:
 	if not player.melds.is_empty():
 		var anchor := origin + Vector2(width * 0.5, 61 if wide else 112)
 		if seat == 0:
-			anchor = Vector2(228, 615 if player.melds.size() > 3 else 648)
+			anchor = Vector2(319, 615 if player.melds.size() > 3 else 648)
 		elif not wide and gold_gap.size() == 2 and player.has("hand"):
 			anchor.y += 17
 		draw_melds(player.melds, view.gold, anchor, seat)
 	if gold_gap.size() == 2:
-		var gap_origins := [Vector2(66, 594), Vector2(916, 359), Vector2(644, 40), Vector2(59, 359)]
+		var gap_origins := [Vector2(157, 594), Vector2(1007, 359), Vector2(735, 40), Vector2(150, 359)]
 		var gap_origin: Vector2 = gap_origins[seat]
 		if not wide and player.has("hand"):
 			gap_origin.y += 14
@@ -1991,34 +2131,54 @@ func draw_meld(meld: Dictionary, gold: int, origin: Vector2, seat: int) -> void:
 			x += 25
 
 
-func river_slots(seat: int, count: int) -> Array[Rect2]:
-	var region: Rect2 = Art.RIVERS[seat].grow(-6)
-	var side := seat in [1, 3]
-	var columns := 5 if side else 14
-	var rows := 3 if side else 2
-	var spacing := Vector2(29, 38)
-	if count > columns * rows:
-		var best_scale := 0.0
-		for candidate_columns in range(1, count + 1):
-			var candidate_rows := ceili(float(count) / candidate_columns)
-			var fit := minf(region.size.x / (candidate_columns * spacing.x), region.size.y / (candidate_rows * spacing.y))
-			if fit > best_scale:
-				best_scale = fit
-				columns = candidate_columns
-				rows = candidate_rows
-	var grid_size := Vector2(columns, rows) * spacing
-	var scale := minf(1.0, minf(region.size.x / grid_size.x, region.size.y / grid_size.y))
-	var step := spacing * scale
-	var dimensions := Vector2(25, 34) * scale
-	var grid_origin := region.get_center() - (grid_size * scale - step + dimensions) * 0.5
+func river_common_width(size_rows: int) -> float:
+	var gap := 3.0
+	var best := 9999.0
+	for seat in range(4):
+		var region: Rect2 = Art.RIVERS[seat].grow(-4)
+		var side := seat in [1, 3]
+		var fit: float
+		if side:
+			fit = minf((region.size.y - gap * 5.0) / 6.0,
+				(region.size.x - gap * (size_rows - 1)) / size_rows / 1.36)
+		else:
+			fit = minf((region.size.x - gap * 5.0) / 6.0,
+				(region.size.y - gap * (size_rows - 1)) / size_rows / 1.36)
+		best = minf(best, fit)
+	return maxf(8.0, best)
+
+
+func river_slots(seat: int, count: int, max_count := -1) -> Array[Rect2]:
 	var slots: Array[Rect2] = []
+	if count <= 0:
+		return slots
+	var region: Rect2 = Art.RIVERS[seat].grow(-4)
+	var side := seat in [1, 3]
+	var gap := 3.0
+	var size_rows := ceili(float(maxi(count, max_count)) / 6.0)
+	var width := river_common_width(size_rows)
+	var height := width * 1.36
+	var along := width + gap
+	var depth := height + gap
 	for index in range(count):
-		var column := floori(float(index) / rows) if side else index % columns
-		var row := index % rows if side else floori(float(index) / columns)
-		if seat == 1:
-			column = columns - 1 - column
-		var pos := grid_origin + Vector2(column, row) * step
-		slots.append(Rect2(pos, dimensions))
+		var line := floori(float(index) / 6.0)
+		var place := index % 6
+		var center: Vector2
+		if side:
+			var block_y := 6.0 * width + 5.0 * gap
+			var top := region.get_center().y - block_y * 0.5
+			var y := top + (place if seat == 1 else 5 - place) * along + width * 0.5
+			var near := region.position.x if seat == 1 else region.end.x
+			var x := near + (line * depth + height * 0.5) * (1.0 if seat == 1 else -1.0)
+			center = Vector2(x, y)
+		else:
+			var block_x := 6.0 * width + 5.0 * gap
+			var left := region.get_center().x - block_x * 0.5
+			var x := left + (place if seat == 0 else 5 - place) * along + width * 0.5
+			var near := region.position.y if seat == 0 else region.end.y
+			var y := near + (line * depth + height * 0.5) * (1.0 if seat == 0 else -1.0)
+			center = Vector2(x, y)
+		slots.append(Rect2(center - Vector2(width, height) * 0.5, Vector2(width, height)))
 	return slots
 
 
@@ -2027,11 +2187,19 @@ func draw_river(view: Dictionary, seat: int, animate: bool) -> void:
 	var river: Array = view.players[seat].river
 	if river.is_empty():
 		return
-	var slots := river_slots(seat, river.size())
+	var max_count := 0
+	for player in view.players:
+		max_count = maxi(max_count, player.river.size())
+	var slots := river_slots(seat, river.size(), max_count)
 	for index in range(river.size()):
 		var last: bool = view.last_discard.get("seat", -1) == seat and index == river.size() - 1
 		var bounds := slots[index]
 		var node := tile(dynamic, river[index], bounds, view.gold, Callable(), false, last)
+		node.name = "RiverTile%d_%d" % [seat, index]
+		var angle: int = [0, 270, 180, 90][seat]
+		if angle != 0:
+			node.pivot_offset = node.size * 0.5
+			node.rotation_degrees = angle
 		if last:
 			var arrow := Polygon2D.new()
 			arrow.polygon = PackedVector2Array([Vector2(-5, -3), Vector2(5, -3), Vector2(0, 4)])
@@ -2071,7 +2239,7 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool) -> void:
 	var has_draw := separate >= 0
 	var reserve_draw_slot: bool = flower_hold_drawn and view.drawn >= 0
 	var slot_count := hand.size() + int(reserve_draw_slot)
-	var cursor := 549.0 - (slot_count * 59 - 3 + (10 if has_draw or reserve_draw_slot else 0)) * 0.5
+	var cursor := 640.0 - (slot_count * 59 - 3 + (10 if has_draw or reserve_draw_slot else 0)) * 0.5
 	for index in range(hand.size()):
 		var number: int = hand[index]
 		var chosen := selected_index == index
@@ -2092,39 +2260,6 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool) -> void:
 		elif drawn and wall_draw_from.is_finite():
 			slide(node, wall_draw_from - node.get_rect().get_center())
 		cursor += 59
-
-
-func render_sidebar(view: Dictionary) -> void:
-	label(dynamic, "本桌积分", Rect2(1094, 80, 100, 31), 21, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
-	label(dynamic, "累计", Rect2(1200, 85, 40, 22), 12, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
-	for seat in range(4):
-		var y := 120 + seat * 55
-		panel(dynamic, Rect2(1093, y, 149, 46), Color("#213c30"), Color("#395543"))
-		panel(dynamic, Rect2(1099, y + 9, 27, 28), PORTRAITS[seat], PORTRAITS[seat])
-		set_player_font(label(dynamic, player_mark(seat), Rect2(1099, y + 9, 27, 28), 16, FONT_DARK, HORIZONTAL_ALIGNMENT_CENTER, true))
-		set_player_font(label(dynamic, player_name(seat), Rect2(1133, y + 4, 63, 21), 13))
-		var status := ""
-		if not online_view.is_empty():
-			var entry: Dictionary = view.seat_info[seat]
-			if entry.get("managed", false):
-				status = "AI 托管"
-			elif not entry.get("connected", true) and entry.kind == "human":
-				status = "断线"
-			elif posmod(seat + room.state.my_seat, 4) == online_owner:
-				status = "房主"
-			elif entry.kind == "ai":
-				status = "AI"
-		var direction := seat_wind(seat) + (" · 庄" if seat == view.dealer else "")
-		var score_caption := label(dynamic, direction if status.is_empty() else direction + " · " + status,
-			Rect2(1133, y + 24, 76, 17), 11, GOLD if seat == view.dealer else MUTED)
-		score_caption.name = "ScoreWind%d" % seat
-		label(dynamic, points(view.scores[seat]), Rect2(1190, y + 7, 45, 32), 16,
-			score_color(view.scores[seat]), HORIZONTAL_ALIGNMENT_RIGHT)
-	label(dynamic, "行牌动态", Rect2(1094, 368, 146, 28), 21, INK, HORIZONTAL_ALIGNMENT_LEFT, true)
-	for index in range(log_lines.size()):
-		var shade := GOLD if index == 0 else MUTED
-		var line := label(dynamic, log_lines[index], Rect2(1096, 400 + index * 27, 143, 23), 13, shade)
-		set_player_font(line)
 
 
 func points(value: int) -> String:
@@ -2164,11 +2299,13 @@ func result_caption(result: Dictionary) -> String:
 
 func result_title(result: Dictionary) -> String:
 	if result.winner < 0:
-		return "本局流局"
+		return "海底流局" if str(result.get("kind", "")) == "seaDraw" else "本局流局"
 	var title := player_name(result.winner) + result_caption(result)
 	if result.from >= 0:
 		title += " · " + player_name(result.from)
 		title += "被抢杠" if result.get("method", result.kind) == "rob" else "点炮"
+	if result.get("sea", false):
+		title = "海底 · " + title
 	return title
 
 
@@ -2194,9 +2331,7 @@ func render_controls(view: Dictionary, moves: Array) -> void:
 			options.append(["跳过演出", _finish_fx_hold, "normal", "skip"])
 		else:
 			options.append(["结算明细", show_result, "normal", "result"])
-			if not online_view.is_empty() and not is_room_owner():
-				detail += " · 等待房主"
-			elif view.table_finished:
+			if view.table_finished:
 				options.append([end_table_text(), end_table, "primary", "home"])
 			else:
 				options.append(["下一局", next_round, "primary", "next"])
@@ -2231,36 +2366,10 @@ func render_controls(view: Dictionary, moves: Array) -> void:
 		if discards:
 			options.append(["出牌", confirm_discard, "primary", "discard"])
 
-	if stats != null and not stats_table_id.is_empty():
-		var table_stats: Dictionary = stats.table_summary(stats_table_id)
-		if int(table_stats.get("rounds", 0)) > 0:
-			var table_seats: Array = table_stats.get("seats", [])
-			var my_table: Dictionary = table_seats[0] if not table_seats.is_empty() else {}
-			label(dynamic, "本桌统计", Rect2(1094, 518, 149, 16), 11, MUTED)
-			label(dynamic, "你 胡%d 点%d · %d 局" % [
-				int(my_table.get("wins", 0)), int(my_table.get("deal_ins", 0)),
-				int(table_stats.get("rounds", 0))], Rect2(1094, 535, 149, 18), 12, INK)
-	label(dynamic, "牌桌状态", Rect2(1094, 570, 149, 22), 16, MUTED)
-	status_label = label(dynamic, detail, Rect2(1093, 596, 149, 56), 15,
-		GOLD if not moves.is_empty() else INK)
-	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	set_player_font(status_label)
-	var cursor := 654.0
-	for index in range(options.size()):
-		var entry: Array = options[index]
-		var node := button(dynamic, entry[0], Rect2(1093, cursor, 149, 36), entry[1], entry[2])
-		controls[entry[3]] = node
-		if entry[3] == "discard":
-			node.disabled = not moves.any(func(move): return move.type == "discard" and move.tile == selected_tile)
-		elif entry[3] == "gold_gap" and selected_declarations.is_empty():
-			node.disabled = true
-			node.tooltip_text = "所选牌无法报听。取消选择后可查看报听弃牌。"
-		cursor += 40.0
-	render_floating(moves)
+	render_actions(options, moves)
 
 
-func render_floating(moves: Array) -> void:
+func render_actions(options: Array, moves: Array) -> void:
 	var entries := []
 	for entry in [
 		["过", "pass", ["pass"], "pass"],
@@ -2277,13 +2386,22 @@ func render_floating(moves: Array) -> void:
 			caption = win_caption(group[0])
 		var handler := confirm_discard if group.any(is_swap) else choose_action.bind(entry[1], group)
 		entries.append([caption, entry[1], entry[3], handler, group.any(is_swap)])
-	var right := 1037.0
+	for option in options:
+		entries.append([option[0], option[3], "normal" if option[2] == "normal" else "primary", option[1], false])
+	var right := 1128.0
 	for index in range(entries.size() - 1, -1, -1):
 		var entry: Array = entries[index]
 		var width := maxf(77.0, 24.0 * entry[0].length() + 30.0)
 		right -= width
 		var node := floating_button(entry[0], Rect2(right, 615, width, 64), entry[3], entry[4], entry[2])
 		controls[entry[1]] = node
+		if entry[1] == "discard":
+			node.disabled = not moves.any(func(move): return move.type == "discard" and move.tile == selected_tile)
+		elif entry[1] == "gold_gap":
+			var selected_declarations := moves.filter(func(move): return move.type == "declareGoldGap" and (selected_tile < 0 or move.tile == selected_tile))
+			if selected_declarations.is_empty():
+				node.disabled = true
+				node.tooltip_text = "所选牌无法报听。取消选择后可查看报听弃牌。"
 		right -= 9
 
 
@@ -2291,7 +2409,9 @@ func floating_button(caption: String, rect: Rect2, handler: Callable, needs_sele
 	var node := button(dynamic, caption, rect, handler)
 	var colors: Array = {
 		"pass": [Color("#4b514e"), Color("#bfc5ba"), Color("#f2f0e8")],
+		"normal": [Color("#3f5a4b"), Color("#aabda6"), Color("#f2f0e8")],
 		"meld": [Color("#28694c"), Color("#95c492"), Color("#edffe5")],
+		"primary": [Color("#9a6a2e"), Color("#e0b86d"), Color("#fff2cf")],
 		"win": [Color("#a93d30"), Color("#efa073"), Color("#ffe0a3")],
 	}[style]
 	var base: Color = colors[0]
@@ -2488,8 +2608,7 @@ func update_online_clock() -> void:
 	var timed: bool = limit > 0 and remaining >= 0 and not online_reconnecting and online_view.phase not in ["result", "redeal"]
 	var seconds := mini(limit, remaining)
 	var digits := "%02d" % seconds if timed and center_dial.visible else ""
-	if countdown_label.text != digits:
-		countdown_label.text = digits
+	center_dial.set_countdown(digits)
 	var urgent := timed and seconds <= 5
 	if is_instance_valid(fx):
 		fx.set_urgent(urgent)
@@ -2560,7 +2679,10 @@ func _play_result_effects(view: Dictionary) -> void:
 	var from := int(result.get("from", -1))
 	if from in range(4) and result.get("method", result.get("kind")) == "discard" and result.has("tile"):
 		# The engine has already transferred the winning discard out of the river.
-		source = river_slots(from, view.players[from].river.size() + 1).back()
+		var max_count := 0
+		for player in view.players:
+			max_count = maxi(max_count, player.river.size())
+		source = river_slots(from, view.players[from].river.size() + 1, max_count + 1).back()
 	fx.play_win(view, source, winning_tile_rect)
 	for seat in range(4):
 		var delta := int(result.get("deltas", [0, 0, 0, 0])[seat])
@@ -2684,12 +2806,43 @@ func show_result() -> void:
 				17, score_color(view.scores[seat]), HORIZONTAL_ALIGNMENT_RIGHT)
 	button(dialog, "本局统计", Rect2(24, 410, 106, 35), show_stats.bind("round"))
 	button(dialog, "查看牌桌", Rect2(372, 410, 106, 35), close_modal)
-	if not online_view.is_empty() and not is_room_owner():
-		label(dialog, "等待房主", Rect2(488, 410, 114, 35), 15, MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	elif finished:
-		button(dialog, end_table_text(), Rect2(488, 410, 114, 35), end_table, "primary")
-	else:
-		button(dialog, "下一局", Rect2(488, 410, 114, 35), next_round, "primary")
+	result_vote_label = null
+	if not online_view.is_empty():
+		result_vote_label = label(dialog, "", Rect2(24, 391, 452, 16), 11, MUTED)
+	result_action_button = button(dialog, end_table_text() if finished else "下一局",
+		Rect2(488, 410, 114, 35), end_table if finished else next_round, "primary")
+	_update_result_vote_ui()
+
+
+func _update_result_vote_ui() -> void:
+	var finished := bool(board_view().get("table_finished", false))
+	var caption := end_table_text() if finished else "下一局"
+	if online_view.is_empty():
+		if is_instance_valid(result_action_button):
+			result_action_button.text = caption
+			result_action_button.disabled = false
+		return
+	var votes: Array = online_view.get("result_votes", [])
+	if votes.size() < 4:
+		return
+	var count := votes.count(true)
+	if is_instance_valid(result_action_button):
+		if bool(votes[0]):
+			result_action_button.text = "已确认 · 等待 %d/4" % count
+			result_action_button.disabled = true
+		else:
+			result_action_button.text = caption
+			result_action_button.disabled = false
+	if is_instance_valid(result_vote_label):
+		var parts := PackedStringArray()
+		for seat in range(4):
+			parts.append(("你" if seat == 0 else player_name(seat)) + (" ✓" if votes[seat] else " ·"))
+		result_vote_label.text = "　".join(parts)
+	for key in ["next", "home"]:
+		var bottom = controls.get(key)
+		if is_instance_valid(bottom):
+			bottom.disabled = bool(votes[0])
+			bottom.text = "已确认 %d/4" % count if bool(votes[0]) else caption
 
 
 func end_table_text() -> String:
@@ -2701,6 +2854,7 @@ func end_table() -> void:
 		show_lobby()
 	else:
 		room.request("lobby", {"stage": online_stage})
+		_mark_vote_sent()
 
 
 func _unhandled_input(event: InputEvent) -> void:

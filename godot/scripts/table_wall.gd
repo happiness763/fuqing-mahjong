@@ -5,13 +5,14 @@ const STACKS_PER_SIDE := 18
 const SLOTS_PER_SIDE := STACKS_PER_SIDE * 2
 
 # Near, right, far, left. The step follows the original physical draw order.
-const WALL_CENTERS := [Vector2(549, 590), Vector2(850, 400), Vector2(549, 180), Vector2(248, 400)]
+const WALL_CENTERS := [Vector2(640, 590), Vector2(941, 400), Vector2(640, 180), Vector2(339, 400)]
 const STACK_STEPS := [Vector2(27.3, 0), Vector2(0, -21.6), Vector2(-26.5, 0), Vector2(0, 21.6)]
 const TILE_SIZES := [Vector2(26, 42), Vector2(34, 20.3), Vector2(25, 41), Vector2(34, 20.3)]
 const BODY_EDGES := [Vector2(0, 7), Vector2(7, 0), Vector2(0, 7), Vector2(-7, 0)]
 const STACK_OFFSETS := [Vector2(0, -9), Vector2(-9, 0), Vector2(0, -9), Vector2(9, 0)]
 
 var slots: Array = []
+var sea_slots: Array = []
 var dealer := 0
 var _bodies := [Art.box(Color("#e8d9bb"), Color("#766a4b"), 3),
 	Art.box(Color("#c8b891"), Color("#655840"), 3)]
@@ -24,6 +25,13 @@ func set_slots(values: Array, dealer_seat: int) -> void:
 		return
 	slots = values
 	dealer = dealer_seat
+	queue_redraw()
+
+
+func set_sea_slots(values: Array) -> void:
+	if sea_slots == values:
+		return
+	sea_slots = values
 	queue_redraw()
 
 
@@ -75,3 +83,9 @@ func _draw() -> void:
 			draw_style_box(_backs[layer], back)
 			draw_line(back.position + Vector2(3, 2), Vector2(back.end.x - 3, back.position.y + 2),
 				Color(0.82, 0.91, 0.71, 0.34), 1.0, true)
+	if not sea_slots.is_empty():
+		for slot in sea_slots:
+			if not slots.has(slot):
+				continue
+			var rect := slot_rect(int(slot), dealer)
+			draw_style_box(Art.box(Color.TRANSPARENT, Color("#efd793"), 4, 2), rect.grow(2))

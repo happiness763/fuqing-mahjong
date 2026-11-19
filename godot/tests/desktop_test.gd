@@ -56,7 +56,7 @@ func run() -> void:
 	var desk = Desk.instantiate()
 	desk.preferences_root = OS.get_temp_dir().path_join("fuqing-desktop-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	root.add_child(desk)
-	check(ProjectSettings.get_setting("application/config/version") == "1.3.0", "project version")
+	check(ProjectSettings.get_setting("application/config/version") == "1.3.1", "project version")
 	check(is_instance_valid(desk.action_font) and desk.action_font.has_char("胡".unicode_at(0)),
 		"action captions use the bundled display font")
 	check(is_instance_valid(desk.fx) and desk.effects in ["full", "simple", "off"],
@@ -72,9 +72,9 @@ func run() -> void:
 	desk.apply_saved_appearance()
 	check(desk.fx.mode == "full", "effects can be restored")
 	check(desk.game == null and desk.lobby.round_field.text == "25", "lobby defaults to 25 rounds")
-	check(Art.FRAME == Rect2(28, 16, 1042, 768), "table frame fills the window")
-	check(Art.FELT == Rect2(41, 29, 1016, 742), "felt follows the frame")
-	check(Art.CENTER == Vector2(549, 400), "table center is recentered")
+	check(Art.FRAME == Rect2(28, 16, 1224, 768) and Art.FELT == Rect2(41, 29, 1198, 742), "the wooden frame returns around the full tabletop")
+	
+	check(Art.CENTER == Vector2(640, 400), "table center is recentered")
 	check(Art.RIVERS[0].position.y > Art.CENTER.y + 72 and Art.RIVERS[0].end.y < 615,
 		"bottom river fits between the dial and the hand controls")
 	check(is_instance_valid(desk.menu_button) and desk.menu_button.text == "菜单", "one menu button replaces the header row")
@@ -135,9 +135,9 @@ func run() -> void:
 	await create_timer(0.68).timeout
 	check(desk.human_buttons.size() == 17, "17 starting tiles visible")
 	check(desk.human_buttons[0].size == Vector2(56, 76), "hand grows to 56x76")
-	check(desk.human_buttons.back().position.x + 56 <= 1070, "17 tiles fit the frame width")
-	check(is_instance_valid(desk.status_label) and desk.status_label.text.contains("轮到你出牌"),
-		"turn status moves to the side panel")
+	check(desk.human_buttons.back().position.x + 56 <= 1280, "17 tiles fit the window width")
+	check(not desk.dynamic.find_children("*", "Label", true, false).any(func(node): return node.text in ["牌桌状态", "行牌动态", "本桌积分"]),
+		"the right sidebar is removed")
 	check(not desk.dynamic.find_children("*", "Label", true, false).any(func(node): return node.text == "出牌操作"),
 		"operation hints are removed")
 	check(not desk.dynamic.get_children().any(func(node): return node.get_script() == Tile and node.number == -1),
@@ -165,12 +165,14 @@ func run() -> void:
 	check(menu_labels.has("声音  开") and menu_labels.has("玩法规则") and menu_labels.has("返回首页"),
 		"menu has sound, rules and leave")
 	check(menu_labels.has("数据统计"), "menu has data statistics")
+	check(menu_labels.has("AI 托管  关"), "menu has the AI delegation switch")
 	check(not menu_labels.has("操作说明"), "the old operation hints are gone")
 	click(by_text(desk.menu_panel, "玩法规则"))
 	check(is_instance_valid(desk.modal), "rules opens")
 	click(by_text(desk.modal, "×"))
 	check(not is_instance_valid(desk.modal) and not desk.menu_open(), "rules closes")
 	click(desk.menu_button)
+	await capture("menu-ai.png")
 	var stats_menu := by_text(desk.menu_panel, "数据统计")
 	check(is_instance_valid(stats_menu), "statistics menu entry")
 	click(stats_menu)
@@ -264,6 +266,8 @@ func run() -> void:
 	await test_multiple_chow(desk)
 	test_concealed_kong_prompt(desk)
 	test_draw_after_pass(desk)
+	test_delegate(desk)
+	await test_sea_presentation(desk)
 	await test_flower_gold(desk)
 	await test_gold_gap_declaration(desk)
 	test_waiting_presentation(desk)
@@ -318,7 +322,7 @@ func run() -> void:
 	desk.game.indicator = desk.game.gold
 	desk.start_intro()
 	check(desk.intro_active() and desk.local_moves().is_empty(), "intro blocks moves")
-	check(desk.status_label.text.begins_with("发牌"), "intro status is visible")
+	check(desk.intro.status_text().begins_with("发牌"), "intro status is visible")
 	check(not desk.dynamic.has_node("GoldDisplay"), "gold stays hidden while dealing")
 	for index in range(4):
 		desk.intro.advance()
@@ -433,21 +437,17 @@ func test_fullscreen(desk) -> void:
 
 
 func test_gold_display(desk) -> void:
-	var gold_display: Panel = desk.dynamic.get_node_or_null("GoldDisplay")
-	check(is_instance_valid(gold_display), "gold display exists in the upper right")
+	var gold_display: Control = desk.dynamic.get_node_or_null("GoldDisplay")
+	check(is_instance_valid(gold_display), "gold display exists under the round counter")
 	if not is_instance_valid(gold_display):
 		return
-	check(Rect2(842, 52, 194, 112).encloses(gold_display.get_rect()), "gold display fits reference area")
-	var number: int = desk.game.gold
-	var tile: Button = gold_display.find_children("*", "Button", false, false)[0]
-	check(tile.number == number and tile.golden, "gold display uses actual gold tile")
-	var indicator: int = desk.game.indicator
-	desk.game.indicator = -1
-	desk.refresh()
-	var names: Array = desk.dynamic.get_node("GoldDisplay").find_children("*", "Label", false, false)
-	check(names.any(func(node): return node.text.ends_with("已抢")), "robbed gold stays marked in its display")
-	desk.game.indicator = indicator
-	desk.refresh()
+	check(desk.GOLD_AREA.encloses(gold_display.get_rect()), "gold display sits under the round counter")
+	var mark := gold_display.get_node_or_null("GoldMark") as Label
+	var cards: Array = gold_display.find_children("*", "Button", false, false)
+	var labels: Array = gold_display.find_children("*", "Label", false, false)
+	check(is_instance_valid(mark) and mark.text == "金" and cards.size() == 1
+		and cards[0].number == desk.game.gold and labels.size() == 1,
+		"the gold display shows the gold mark and tile without naming it")
 
 
 func test_flower_gold(desk) -> void:
@@ -456,10 +456,15 @@ func test_flower_gold(desk) -> void:
 	desk.game.players[0].hand = [1, 35]
 	desk.game.drawn = -1
 	desk.refresh()
-	var display: Panel = desk.dynamic.get_node("GoldDisplay")
+	var display: Control = desk.dynamic.get_node("GoldDisplay")
+	var mark := display.get_node_or_null("GoldMark") as Label
 	var cards: Array = display.find_children("*", "Button", false, false)
-	check(cards.size() == 4 and cards.all(func(card): return card.golden), "spring indicator displays four flower golds")
-	check(cards.any(func(card): return card.number == 37 and card.texture != null), "flower gold has a readable face")
+	var labels: Array = display.find_children("*", "Label", false, false)
+	check(is_instance_valid(mark) and mark.text == "金" and labels.size() == 1,
+		"flower gold keeps the gold mark without naming the tile")
+	check(cards.size() == 4 and cards.all(func(card): return card.golden)
+		and cards.any(func(card): return card.number == 37 and card.texture != null),
+		"spring gold shows four readable gold tiles")
 	check(not desk.human_buttons[0].golden and desk.human_buttons[1].golden,
 		"summer is gold and numbered tiles are ordinary with a spring indicator")
 	await capture("flower-gold.png")
@@ -517,10 +522,11 @@ func test_waiting_presentation(desk) -> void:
 	desk.dynamic = Control.new()
 	desk.add_child(desk.dynamic)
 	desk.render_controls(view, [])
-	desk.draw_seat(view, 2, Vector2(472, 115))
+	desk.draw_seat(view, 2, desk.SEAT_POSITIONS[2])
 	var labels: Array = desk.dynamic.find_children("*", "Label", false, false)
-	check(labels.any(func(node): return node.text.contains("阿屿打出 五万") and node.text.ends_with("等待中")),
-		"claim waiting shows the discarded tile and a generic message")
+	check(not labels.any(func(node): return node.text.contains("等待中") or node.text.contains("打出")),
+		"claim waiting no longer uses a status line")
+	check(desk.controls.is_empty(), "waiting on a claim has no action buttons")
 	var seat_panel := desk.dynamic.get_children().filter(func(node): return node is Panel)[0] as Panel
 	var style := seat_panel.get_theme_stylebox("panel") as StyleBoxFlat
 	check(style.border_color == Color("#678367"), "claim waiting does not highlight the responder")
@@ -531,7 +537,8 @@ func test_waiting_presentation(desk) -> void:
 	desk.add_child(desk.dynamic)
 	desk.render_controls(view, [])
 	labels = desk.dynamic.find_children("*", "Label", false, false)
-	check(labels.any(func(node): return node.text == "等待中"), "opening subtype is hidden while waiting")
+	check(not labels.any(func(node): return node.text.contains("等待中")),
+		"opening subtype is hidden while waiting")
 
 	view.phase = "robKong"
 	view.rob_tile = 4
@@ -760,7 +767,7 @@ func test_draw_after_pass(desk) -> void:
 	game.phase = "turn"
 	game.current = 3
 	game.gold = 26
-	game.wall.resize(20)
+	game.wall.resize(21)
 	game.wall.fill(18)
 	for player in game.players:
 		player.hand.clear()
@@ -773,6 +780,55 @@ func test_draw_after_pass(desk) -> void:
 	desk.perform(0, game.actions(0).back())
 	check(game.current == 0 and game.drawn == 18, "pass advances to player's draw")
 	check(desk.human_buttons.back().modulate.a < 1.0, "draw after passed claim starts a tween")
+
+
+func test_delegate(desk) -> void:
+	desk.close_modal(false)
+	desk.game = Game.new(43)
+	var game = desk.game
+	game.phase = "turn"
+	game.current = 0
+	game.gold = 26
+	game.wall.resize(30)
+	game.wall.fill(8)
+	for player in game.players:
+		player.hand = []
+		player.melds = []
+	game.players[0].hand = [2, 5, 7]
+	desk.clear_selection()
+	desk.refresh()
+	check(not desk.ai_delegate, "delegation starts off")
+	desk.set_delegate(true)
+	check(desk.ai_delegate and desk.delegate_button.text.contains("开"),
+		"the menu toggles AI delegation")
+	desk.ai_timer.stop()
+	desk.run_ai()
+	check(game.players[0].river.size() == 1, "delegation discards for the local seat")
+	desk.set_delegate(false)
+	check(not desk.ai_delegate and desk.delegate_button.text.contains("关"),
+		"delegation can be switched off again")
+
+
+func test_sea_presentation(desk) -> void:
+	desk.close_modal(false)
+	desk.game = Game.new(43)
+	var game = desk.game
+	game.phase = "sea"
+	game.current = 0
+	game.sea_total = 4
+	game.sea_done = 1
+	game.sea_seat = 1
+	game.sea_drawn = 10
+	game.wall.resize(20)
+	game.wall.fill(10)
+	game.latest = {"type": "sea", "seat": 0, "tile": 10, "flower": false, "revision": game.revision + 1}
+	desk.last_revision = -1
+	desk.refresh()
+	desk.sea_timer.stop()
+	check(desk.dynamic.has_node("SeaNotice"), "the sea stage shows its draw notice")
+	var labels: Array = desk.dynamic.find_children("*", "Label", true, false).map(func(node): return node.text)
+	check(labels.has("海底 1/4"), "the round counter switches to the sea count")
+	await capture("sea-stage.png")
 
 
 func test_dense_board(desk) -> void:
@@ -799,5 +855,12 @@ func test_dense_board(desk) -> void:
 		func(node): return node.get_script() == Tile)
 	for seat in range(4):
 		var region: Rect2 = Art.RIVERS[seat]
-		var shown: Array = tiles.filter(func(node): return region.encloses(node.get_rect()))
+		var prefix := "RiverTile%d_" % seat
+		var shown: Array = tiles.filter(func(node): return node.name.begins_with(prefix)).filter(func(node):
+			var center: Vector2 = node.position + node.size * 0.5
+			var footprint_size: Vector2 = node.size
+			var angle := int(node.rotation_degrees) % 360
+			if angle == 90 or angle == 270:
+				footprint_size = Vector2(node.size.y, node.size.x)
+			return region.grow(2).encloses(Rect2(center - footprint_size * 0.5, footprint_size)))
 		check(shown.size() == game.players[seat].river.size(), "long river fits region %d" % seat)

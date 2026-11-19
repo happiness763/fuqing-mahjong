@@ -51,6 +51,20 @@ func drive_rolls(host, client, other = null) -> bool:
 	return await wait_for(func(): return client.state.get("phase") == "playing", "mixed table starts for both peers")
 
 
+func ready_all(rooms: Array) -> bool:
+	for room in rooms:
+		var seat := int(room.state.get("my_seat", -1))
+		if seat < 0 or seat >= room.state.seats.size():
+			continue
+		var info: Dictionary = room.state.seats[seat]
+		if info.get("kind") == "human" and not bool(info.get("ready", false)):
+			room.request("ready")
+			await process_frame
+	return await wait_for(func(): return rooms[0].state.seats.all(
+		func(info): return info.is_empty() or info.get("kind") == "ai" or bool(info.get("ready", false))),
+		"all humans are ready")
+
+
 func set_dealer_turn(host, dealer: int) -> void:
 	for seed in range(100):
 		var game := Game.new(seed, 1, "normal", true)
@@ -300,6 +314,12 @@ func test_lobby_seating() -> void:
 	var locked_swap := {"from": guest_seat, "seat": vacant, "from_id": host.state.seats[guest_seat].seat_id,
 		"seat_id": host.state.seats[vacant].seat_id}
 	host.request("start")
+	check(host.state.phase == "lobby", "start waits for every human to ready")
+	if not await ready_all([host, guest, visitor]):
+		return
+	check(host.state.seats.all(func(info): return info.get("kind") == "ai" or bool(info.get("ready", false))),
+		"all humans show ready in the room snapshot")
+	host.request("start")
 	check(host.state.phase == "rolling", "four moved seats are ready to roll")
 	host.request("arrange_seats", locked_swap)
 	check(host.state.my_seat == guest_seat, "seat placement is locked as soon as dealer rolls start")
@@ -321,7 +341,15 @@ func test_lobby_seating() -> void:
 	host._game.finish({"winner": -1, "deltas": [0, 0, 0, 0]})
 	host._begin_stage()
 	host._publish()
+	if not await wait_for(func(): return visitor.state.stage == host.state.stage, "visitor sees the result stage"):
+		return
 	host.request("lobby", {"stage": host.state.stage})
+	await create_timer(0.1).timeout
+	check(host.state.phase == "playing" and host.state.get("result_votes", [])[3],
+		"one confirmation does not advance the table")
+	visitor.request("lobby", {"stage": visitor.state.stage})
+	if not await wait_for(func(): return host.state.phase == "lobby", "both humans confirm the lobby return"):
+		return
 	check(host.state.phase == "lobby" and host.state.seats[0].is_empty(), "returning to the lobby clears managed East")
 	host.request("arrange_seats", {"from": vacant, "seat": 0, "from_id": host.state.seats[vacant].seat_id, "seat_id": -1})
 	check(host.state.seats[0].get("name") == "小竹", "seat placement unlocks after returning to the lobby")
@@ -386,6 +414,9 @@ func run() -> void:
 	check(host.state.seats[1].is_empty(), "kick vacates the seat")
 	check(client.join("访客", "127.0.0.1", port) == "", "same endpoint can be used to join the vacated seat")
 	if not await wait_for(func(): return client.state.get("my_seat") == 1, "client joins the vacated seat"):
+		quit(failures)
+		return
+	if not await ready_all([host, client]):
 		quit(failures)
 		return
 	host.request("start")
@@ -476,6 +507,9 @@ func run() -> void:
 	check(client.join("访客", "127.0.0.1", port) == "", "client reconnects to the new lobby")
 	await wait_for(func(): return client.state.get("phase") == "lobby", "lobby accepts new clients after settlement")
 	host.request("settings", {"rounds": 1, "turn_seconds": 0})
+	if not await ready_all([host, client]):
+		quit(failures)
+		return
 	host.request("start")
 	if not await drive_rolls(host, client):
 		quit(failures)

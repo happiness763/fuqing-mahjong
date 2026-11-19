@@ -40,6 +40,9 @@ static func from_room(state: Dictionary) -> Dictionary:
 	view.players = rotate_seats(view.players, viewer)
 	view.scores = rotate_seats(view.scores, viewer)
 	view.seat_info = rotate_seats(state.seats, viewer)
+	view.result_votes = rotate_seats(Array(state.get("result_votes", [false, false, false, false])), viewer)
+	if not view.get("sea", {}).is_empty():
+		view.sea.seat = local_seat(view.sea.seat, viewer)
 	for key in ["deal_flowers", "deal_draws", "last_flowers"]:
 		for event in view.get(key, []):
 			event.seat = local_seat(event.seat, viewer)

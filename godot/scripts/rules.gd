@@ -1,7 +1,9 @@
 extends RefCounted
 
 const NUMBERED := 27
-const RESERVE := 18
+const BASE_RESERVE := 16
+const SEA_COUNT := 4
+const RESERVE := BASE_RESERVE + SEA_COUNT
 const RANKS := ["一", "二", "三", "四", "五", "六", "七", "八", "九"]
 const SUITS := ["万", "筒", "条"]
 const FLOWERS := "东南西北中发白春夏秋冬梅兰竹菊"
@@ -33,6 +35,10 @@ static func tile_name(tile: int) -> String:
 		return FLOWERS[tile - NUMBERED]
 	@warning_ignore("integer_division")
 	return RANKS[tile % 9] + SUITS[tile / 9]
+
+
+static func reserve(open_kongs: int, concealed_kongs: int) -> int:
+	return RESERVE + open_kongs + 2 * concealed_kongs
 
 
 static func make_wall(rng: RandomNumberGenerator) -> Array:
