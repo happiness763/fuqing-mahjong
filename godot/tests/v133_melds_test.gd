@@ -50,8 +50,8 @@ func run() -> void:
 				melds.append(make_meld(kinds[code % kinds.size()], 0, index % 3 + 1))
 				code = floori(float(code) / kinds.size())
 			var layout: Dictionary = desk.local_group_layout(17 - 3 * count, melds, true)
-			check(layout.bounds.position.x >= 130 and layout.bounds.end.x <= 1150,
-				"reachable local group stays inside felt")
+			check(layout.bounds.position.x >= 178 and layout.bounds.end.x <= 1246,
+				"reachable local group fits between the player badge and the right rail")
 			if count > 0:
 				check(layout.meld_origin.x >= layout.hand_origin.x + layout.hand_width + 16,
 					"melds stay to the right of the whole hand")
@@ -69,10 +69,10 @@ func run() -> void:
 	check(desk.human_buttons.size() == 17, "opening hand displays all seventeen cards")
 	var drawn = desk.human_buttons.back()
 	var previous = desk.human_buttons[-2]
-	check(drawn.size == Vector2(56, 76) and drawn.position.x - previous.position.x == 69,
+	check(drawn.size == Vector2(56, 82) and drawn.position.x - previous.position.x == 69,
 		"full hand preserves touch target and drawn-tile gap")
 	check(drawn.mouse_filter == Control.MOUSE_FILTER_STOP, "drawn tile remains interactive")
-	check(desk.human_buttons[0].position.x >= 130 and drawn.get_rect().end.x <= 1150,
+	check(desk.human_buttons[0].position.x >= 178 and drawn.get_rect().end.x <= 1246,
 		"seventeen tile opening remains within felt")
 	desk.dynamic.free()
 	desk.human_buttons.clear()
@@ -97,7 +97,7 @@ func run() -> void:
 			check(is_equal_approx(band.rotation_degrees, float([0, 270, 180, 90][seat])), "melds face their owner")
 			var anchor: Vector2 = desk.local_group_layout(2, game.players[seat].melds, false).meld_origin if seat == 0 else Vector2.ZERO
 			var bounds: Rect2 = desk.meld_strip_layout(game.players[seat].melds, anchor, seat).bounds
-			check(Rect2(65, 75, 1150, 690).encloses(bounds), "all exposed melds remain on felt")
+			check(Rect2(65, 75, 1181, 700).encloses(bounds), "all exposed melds remain on felt")
 	# Claimed tiles are horizontal relative to their owner; an added kong
 	# places a fourth tile directly above the original claimed tile.
 	for seat in range(4):

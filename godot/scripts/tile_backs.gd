@@ -15,10 +15,11 @@ static func texture_for(index: int) -> Texture2D:
 	return _textures[posmod(index, NAMES.size())]
 
 
-static func draw_on(canvas: CanvasItem, area: Rect2, index: int, angle := 0.0) -> void:
+static func draw_on(canvas: CanvasItem, area: Rect2, index: int, angle := 0.0,
+		tint := Color.WHITE) -> void:
 	var side := minf(area.size.x, area.size.y) * 0.83
 	if side < 4.0:
 		return
 	canvas.draw_set_transform(area.get_center(), angle)
-	canvas.draw_texture_rect(texture_for(index), Rect2(Vector2.ONE * -side * 0.5, Vector2.ONE * side), false)
+	canvas.draw_texture_rect(texture_for(index), Rect2(Vector2.ONE * -side * 0.5, Vector2.ONE * side), false, tint)
 	canvas.draw_set_transform(Vector2.ZERO)

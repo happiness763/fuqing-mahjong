@@ -13,6 +13,7 @@ var texture: Texture2D
 var face_font: Font
 var hot := false
 var guobiao_face := false
+var upright := false
 
 
 func setup(tile: int, dimensions: Vector2, face: Texture2D, font: Font, is_gold: bool,
@@ -41,11 +42,17 @@ func setup(tile: int, dimensions: Vector2, face: Texture2D, font: Font, is_gold:
 
 
 func _draw() -> void:
-	var depth := maxf(2.0, size.y * 0.09)
-	var surface := Rect2(Vector2.ZERO, size - Vector2(0, depth))
+	var depth := maxf(3.0, minf(size.x, size.y) * (0.11 if upright else 0.19))
+	var down := Vector2.DOWN.rotated(-get_global_transform().get_rotation()).snapped(Vector2.ONE)
+	# The exposed edge points toward the viewer even on a rotated table tile.
+	var edge_offset := down * depth
+	var surface := Rect2(-edge_offset.min(Vector2.ZERO), size - edge_offset.abs())
+	if upright:
+		surface.position.y += 3.0
+		surface.size.y -= 3.0
 	var traditional_face := guobiao_face and number >= 0 and not golden
-	var edge := Color("#ae9673")
-	var ivory := Color("#fff7e6")
+	var edge := Color("#beaa81")
+	var ivory := Color("#ffefd0")
 	if number < 0:
 		edge = Color("#3c6250")
 		ivory = Color("#7a9d77")
@@ -53,19 +60,22 @@ func _draw() -> void:
 		edge = Color("#b08039")
 		ivory = Color("#ffe7a6")
 	elif traditional_face:
-		edge = Color("#d2cdb9")
-		ivory = Color("#f4f1e5")
-	var face_border := Color("#d0cbbb") if traditional_face else ivory.darkened(0.15)
-	var bevel := Color("#e6dfcc") if traditional_face else ivory.darkened(0.10)
+		edge = Color("#bca77e")
+		ivory = Color("#fbebca")
+	var face_border := ivory.darkened(0.16)
+	var bevel := ivory.darkened(0.10)
 	var active := hot or chosen or marked or has_focus()
 	var rim := Color("#edc67a") if active else edge
 	var radius := 5 if size.x >= 30 else 3
-	draw_style_box(Art.box(Color(0.02, 0.08, 0.04, 0.45), Color.TRANSPARENT, radius, 0), Rect2(Vector2(1, 3), size))
-	draw_style_box(Art.box(edge, rim, radius), Rect2(Vector2.ZERO, size))
+	draw_style_box(Art.box(Color(0.01, 0.055, 0.03, 0.54), Color.TRANSPARENT, radius, 0), Rect2(down * 3, size))
+	draw_style_box(Art.box(Color("#527741"), Color("#294630"), radius), Rect2(Vector2.ZERO, size))
+	var body := surface.merge(Rect2(surface.position + edge_offset * 0.73, surface.size))
+	draw_style_box(Art.box(edge, rim, radius), body)
 	draw_style_box(Art.box(ivory, rim if active else face_border, radius, 2 if active else 1), surface)
-	draw_line(Vector2(3, surface.end.y - 1), Vector2(size.x - 3, surface.end.y - 1), bevel, 1.0)
-	if traditional_face and size.x >= 26:
-		draw_line(Vector2(radius + 1, 1.5), Vector2(size.x - radius - 1, 1.5), Color("#fffdf6"), 1.0)
+	draw_line(Vector2(surface.position.x + 4, surface.end.y - 1), Vector2(surface.end.x - 4, surface.end.y - 1), bevel, 1.0)
+	if size.x >= 24:
+		var top := surface.position + Vector2(radius + 1, 1.5)
+		draw_line(top, Vector2(surface.end.x - radius - 1, top.y), Color("#fff9e6"), 1.0)
 	if number < 0:
 		if size.x >= 12:
 			draw_style_box(Art.box(Color("#678a67"), Color("#a3b591"), 2), surface.grow(-2))
@@ -84,7 +94,7 @@ func _draw() -> void:
 			face_rect.size *= ratio
 		draw_texture_rect(texture, face_rect, false)
 	if badge > 0.0:
-		var badge_rect := Rect2(size.x - badge - 1, 1, badge, badge)
+		var badge_rect := Rect2(surface.end.x - badge - 1, surface.position.y + 1, badge, badge)
 		draw_style_box(Art.box(Color("#8f5724"), Color("#d4a65f"), 3), badge_rect)
 		draw_string(face_font, badge_rect.position + Vector2(1, badge - 2), "金", HORIZONTAL_ALIGNMENT_CENTER,
 			badge - 2, int(badge - 2), Color("#fff0c0"))
