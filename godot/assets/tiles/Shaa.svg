@@ -1,25 +1,6 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
-
-<svg
-   xmlns:osb="http://www.openswatchbook.org/uri/2009/osb"
-   xmlns:dc="http://purl.org/dc/elements/1.1/"
-   xmlns:cc="http://creativecommons.org/ns#"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-   xmlns:svg="http://www.w3.org/2000/svg"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="300"
-   height="400"
-   viewBox="0 0 300 400"
-   id="svg2"
-   version="1.1"
-   inkscape:version="0.91 r13725"
-   sodipodi:docname="Shaa.svg"
-   inkscape:export-filename="C:\Users\Fluffy\Documents\Projects\ExtraRiichi\Shaa.png"
-   inkscape:export-xdpi="180"
-   inkscape:export-ydpi="180">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(5.49670 7.27536) scale(0.964427)">
   <defs
      id="defs4">
     <inkscape:path-effect
@@ -244,5 +225,6 @@
          d="m 189.6572,785.11604 -13.32425,0 -25.12742,191.8783 12.92012,0 z"
          style="fill:#19328c;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
     </g>
+  </g>
   </g>
 </svg>

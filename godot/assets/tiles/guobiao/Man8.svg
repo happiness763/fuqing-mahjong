@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(-38.22641 -22.15094) scale(2.188679)">
   <title>八萬</title>
   <path d="M68 35 Q73 31 79 38 Q80 45 69 61 Q58 76 50 76 Q45 76 50 70 Q65 51 66 39 Q66 36 68 35Z M87 22 Q94 23 98 34 Q111 57 123 64 Q129 68 122 71 Q109 75 101 60 Q90 44 84 30 Q81 22 87 22Z" fill="#181b1d"/>
   <path d="M52 100 Q76 100 105 92 Q115 90 119 96 Q121 101 113 102 Q80 102 59 109 Q51 111 47 105 Q44 101 52 100Z" fill="#a81e25"/>
@@ -7,4 +9,5 @@
   <path d="M70 131 Q85 130 104 125 M81 119 Q85 130 84 160" fill="none" stroke="#a81e25" stroke-width="6.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M52 149 Q57 146 62 149 Q85 148 108 142 Q119 140 124 148 Q121 154 119 169 Q117 181 109 181 Q105 173 99 170 Q97 167 103 168 L111 170 Q114 160 114 149 Q88 152 62 156 L63 173 Q64 180 59 180 Q53 181 52 175 L49 156 Q47 151 52 149Z" fill="#a81e25"/>
   <path d="M70 159 Q84 162 100 155 L104 162 Q91 165 76 170 Q70 171 67 165 Q65 161 70 159Z M96 153 Q103 151 108 159 Q111 165 106 167 Q102 168 100 163 L94 157 Q92 154 96 153Z" fill="#a81e25"/>
+  </g>
 </svg>

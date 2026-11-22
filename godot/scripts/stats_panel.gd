@@ -515,7 +515,7 @@ func _round() -> void:
 		hand_sorted.sort()
 		var hand_x := 0.0
 		for number in hand_sorted:
-			desk.tile(body, int(number), Rect2(hand_x, y, 23, 32), gold)
+			desk.tile(body, int(number), desk.Metrics.at(Vector2(hand_x, y), 23), gold)
 			hand_x += 25.0
 		y += 38
 		var melds: Array = entry.get("winner_melds", [])

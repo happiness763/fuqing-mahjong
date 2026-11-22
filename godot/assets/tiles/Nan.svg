@@ -1,25 +1,6 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
-
-<svg
-   xmlns:osb="http://www.openswatchbook.org/uri/2009/osb"
-   xmlns:dc="http://purl.org/dc/elements/1.1/"
-   xmlns:cc="http://creativecommons.org/ns#"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-   xmlns:svg="http://www.w3.org/2000/svg"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="300"
-   height="400"
-   viewBox="0 0 300 400"
-   id="svg2"
-   version="1.1"
-   inkscape:version="0.91 r13725"
-   sodipodi:docname="Nan.svg"
-   inkscape:export-filename="C:\Users\Fluffy\Documents\Projects\ExtraRiichi\Nan.png"
-   inkscape:export-xdpi="180"
-   inkscape:export-ydpi="180">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(16.03329 21.27861) scale(0.892120)">
   <defs
      id="defs4">
     <inkscape:path-effect
@@ -266,5 +247,6 @@
            sodipodi:nodetypes="ccccc" />
       </g>
     </g>
+  </g>
   </g>
 </svg>

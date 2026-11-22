@@ -144,9 +144,8 @@ func refresh_preview() -> void:
 		var faces := Skins.faces(preview_skin)
 		for index in range(SAMPLE_TILES.size()):
 			var number: int = SAMPLE_TILES[index]
-			var tile = desk.tile(preview_tiles, number, Rect2(index * 66, 0, 52, 71), -1)
+			var tile = desk.tile(preview_tiles, number, desk.Metrics.at(Vector2(index * 66, 0), 52), -1)
 			tile.texture = faces[number]
-			tile.guobiao_face = preview_skin == "guobiao"
 			tile.queue_redraw()
 	var id: String = table_ids[table_menu.selected]
 	preview_table.texture = ImageTexture.create_from_image(pending_image) if id == ":import" else desk.preferences.table_texture(id)

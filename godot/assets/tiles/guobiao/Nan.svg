@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(-75.43478 -49.74640) scale(2.652174)">
   <title>南</title>
   <g transform="translate(26 35) scale(1.17)">
     <path d="M16 24 Q49 19 85 20" fill="none" stroke="#181b1d" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -10,5 +12,6 @@
     <path d="M32 58 L68 54" fill="none" stroke="#181b1d" stroke-width="7.4" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M33 70 L69 66" fill="none" stroke="#181b1d" stroke-width="7.4" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M51 58 L50 85" fill="none" stroke="#181b1d" stroke-width="7.4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
   </g>
 </svg>

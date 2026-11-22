@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(-7.69148 30.30319) scale(1.946808)">
   <title>蘭</title>
   <g transform="translate(15 25) scale(0.37)">
     <path d="M14 20 L87 18 M34 12 L37 24 M67 11 L62 24 M20 32 L20 89 M22 32 L43 30 L42 49 L22 51 M23 42 L41 40 M58 30 L82 28 L81 88 L73 89 M59 30 L58 48 L80 46 M59 39 L80 37 M32 58 L70 56 M34 67 L68 64 M36 74 L66 72 M50 56 L49 86 M46 73 L32 85 M54 73 L69 82" fill="none" stroke="#181b1d" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -28,4 +30,5 @@
   <circle cx="93.22" cy="58.63" r="3.3" fill="none" stroke="#22463a" stroke-width="2.1"/>
   <circle cx="94.37" cy="50.22" r="3.3" fill="none" stroke="#22463a" stroke-width="2.1"/>
   <circle cx="98" cy="55" r="2.6" fill="#22463a"/>
+  </g>
 </svg>

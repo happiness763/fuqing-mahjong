@@ -1,25 +1,6 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
-
-<svg
-   xmlns:osb="http://www.openswatchbook.org/uri/2009/osb"
-   xmlns:dc="http://purl.org/dc/elements/1.1/"
-   xmlns:cc="http://creativecommons.org/ns#"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-   xmlns:svg="http://www.w3.org/2000/svg"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="300"
-   height="400"
-   viewBox="0 0 300 400"
-   id="svg2"
-   version="1.1"
-   inkscape:version="0.91 r13725"
-   sodipodi:docname="Pei.svg"
-   inkscape:export-filename="C:\Users\Fluffy\Documents\Projects\ExtraRiichi\Pei.png"
-   inkscape:export-xdpi="180"
-   inkscape:export-ydpi="180">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(19.61610 34.77963) scale(0.867299)">
   <defs
      id="defs4">
     <inkscape:path-effect
@@ -232,5 +213,6 @@
          d="m 185.33231,661.72592 c -11.04102,2e-5 -32.46283,30.3394 -32.52388,36.72052 0.11709,8.1973 20.7411,15.69941 20.32596,27.9071 -0.39117,69.66027 -18.68319,181.14057 -4.68375,199.36122 20.54014,24.53708 118.85312,1.86586 124.94486,-3.14748 9.69372,-7.94512 13.91122,-15.91222 10.49157,-23.95576 -3.66499,-8.85428 -76.70142,11.15833 -108.85778,-0.69943 -13.49873,-4.95729 -3.98491,-100.61173 -3.75176,-156.79993 0.6848,-12.78519 25.76648,-27.26784 25.87921,-32.87359 0.39967,-10.88258 -18.36945,-45.20268 -31.82443,-46.51265 z"
          style="fill:#142896;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
     </g>
+  </g>
   </g>
 </svg>

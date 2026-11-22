@@ -1,5 +1,6 @@
-<?xml version='1.0' encoding='utf-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(11.29538 23.21353) scale(0.928826)">
   <g id="layer1" transform="translate(0,-652.36216)">
     <g id="g6031" transform="translate(1034.3429,648.88567)">
       <path style="fill:#b93c3c;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" d="m -973.89996,230.33452 c 101.51009,10.77646 95.08642,-15.76217 180.06105,-18.57669 18.88461,-2.74566 17.63524,-17.45957 -0.44879,-16.01707 -90.36841,2.24313 -58.77943,34.93937 -177.69318,16.09165 -28.99732,-5.17596 -24.26375,14.56756 -1.91908,18.50211 z" id="path6014" />
@@ -15,5 +16,6 @@
       <path style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" d="m 122.12365,655.71644 c -9.04375,-1.38864 -18.45494,18.7911 -19.0105,23.98575 1.47894,11.46445 10.50381,15.44155 11.95913,20.17827 6.50446,25.75105 8.4039,67.28056 10.49584,75.3199 2.20074,8.02132 55.9263,13.84495 59.72476,11.7353 11.84665,-8.00981 17.24866,-31.32164 6.85982,-29.21397 -21.90078,3.13098 -39.53972,3.41801 -44.17005,0.63215 -3.97158,-2.69778 -12.89187,-48.4919 -10.86615,-52.66272 2.48997,-5.51509 11.95588,-12.68542 10.81645,-17.48596 -1.03414,-5.10364 -15.0153,-30.79118 -25.8093,-32.48872 z" id="path13514" />
       <path style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" d="M 71.063411,776.82976 C 59.009706,777.70468 60.345873,760.83508 70.622258,758.0431 209.49254,737.5656 108.95092,704.0102 237.90225,682.07575 c 5.62581,-1.10813 4.97456,27.02373 -0.70918,27.69935 -129.99354,18.71741 -22.68823,40.7935 -166.129659,67.05466 z" id="path13516" />
     </g>
+  </g>
   </g>
 </svg>

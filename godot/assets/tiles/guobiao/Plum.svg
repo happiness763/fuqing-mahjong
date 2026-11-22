@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(-6.18681 23.70329) scale(2.010989)">
   <title>梅</title>
   <g transform="translate(15 25) scale(0.37)">
     <path d="M12 35 L43 31 M27 14 L26 89 M26 36 Q19 59 10 67 M28 46 L42 57 M60 14 L47 32 M53 25 L87 22 M51 42 L81 38 L76 82 L68 88 M51 42 L46 79 L86 77 M42 62 L89 56 M62 45 L68 51 M59 66 L65 72" fill="none" stroke="#181b1d" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -31,4 +33,5 @@
   <circle cx="92" cy="55.13" r="3.3" fill="none" stroke="#a81e25" stroke-width="2.1"/>
   <circle cx="96.02" cy="49.34" r="3.3" fill="none" stroke="#a81e25" stroke-width="2.1"/>
   <circle cx="98" cy="55" r="2.6" fill="#a81e25"/>
+  </g>
 </svg>

@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(-23.19347 25.14441) scale(1.994550)">
   <title>秋</title>
   <g transform="translate(114 25) scale(0.37)">
     <path d="M44 14 L17 23 M12 39 L45 34 M30 20 L28 90 M27 38 Q19 59 10 67 M32 47 L45 58 M64 16 Q64 63 43 88 M52 35 L49 53 M80 34 L69 48 M63 61 Q69 79 87 90" fill="none" stroke="#a81e25" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -28,4 +30,5 @@
   <circle cx="93.22" cy="58.63" r="3.3" fill="none" stroke="#22463a" stroke-width="2.1"/>
   <circle cx="94.37" cy="50.22" r="3.3" fill="none" stroke="#22463a" stroke-width="2.1"/>
   <circle cx="98" cy="55" r="2.6" fill="#22463a"/>
+  </g>
 </svg>

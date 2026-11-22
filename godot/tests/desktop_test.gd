@@ -56,7 +56,7 @@ func run() -> void:
 	var desk = Desk.instantiate()
 	desk.preferences_root = OS.get_temp_dir().path_join("fuqing-desktop-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	root.add_child(desk)
-	check(ProjectSettings.get_setting("application/config/version") == "1.3.3a", "project version")
+	check(ProjectSettings.get_setting("application/config/version") == "1.3.3b", "project version")
 	check(is_instance_valid(desk.action_font) and desk.action_font.has_char("胡".unicode_at(0)),
 		"action captions use the bundled display font")
 	check(is_instance_valid(desk.fx) and desk.effects in ["full", "simple", "off"],
@@ -134,7 +134,7 @@ func run() -> void:
 	desk.refresh(true)
 	await create_timer(0.68).timeout
 	check(desk.human_buttons.size() == 17, "17 starting tiles visible")
-	check(desk.human_buttons[0].size == Vector2(56, 85), "the upright hand keeps a large click target")
+	check(desk.human_buttons[0].size.is_equal_approx(Vector2(56, 56 / 0.75)), "the upright hand keeps the common proportion and a large click target")
 	check(desk.human_buttons.back().position.x + 56 <= 1280, "17 tiles fit the window width")
 	check(not desk.dynamic.find_children("*", "Label", true, false).any(func(node): return node.text in ["牌桌状态", "行牌动态", "本桌积分"]),
 		"the right sidebar is removed")
@@ -148,7 +148,7 @@ func run() -> void:
 	for index in range(desk.faces.size()):
 		var face = desk.faces[index]
 		check(face != null and face.get_image().get_used_rect().has_area(), "tile has visible artwork %d" % index)
-	var honor: Button = desk.tile(desk, 27, Rect2(0, 0, 56, 76), 26)
+	var honor: Button = desk.tile(desk, 27, Rect2(Vector2.ZERO, desk.HAND_SIZE), 26)
 	check(not honor.find_children("*", "Label", false, false).size(), "honor tiles do not fall back to text")
 	honor.queue_free()
 	test_gold_display(desk)

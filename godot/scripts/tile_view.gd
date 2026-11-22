@@ -3,6 +3,7 @@ extends Button
 const Art = preload("res://scripts/table_art.gd")
 const Backs = preload("res://scripts/tile_backs.gd")
 const Rules = preload("res://scripts/rules.gd")
+const Metrics = preload("res://scripts/tile_metrics.gd")
 const SHELL = preload("res://assets/effects/mahjong_shell.gdshader")
 
 var number := -1
@@ -13,21 +14,19 @@ var chosen := false
 var texture: Texture2D
 var face_font: Font
 var hot := false
-var guobiao_face := false
 var upright := false
 var shell_layer: ColorRect
 var shell_material: ShaderMaterial
 
 
 func setup(tile: int, dimensions: Vector2, face: Texture2D, font: Font, is_gold: bool,
-		interactive: bool, selected: bool, highlighted: bool, guobiao: bool = false) -> void:
+		interactive: bool, selected: bool, highlighted: bool) -> void:
 	number = tile
 	texture = face
 	face_font = font
 	golden = is_gold
 	chosen = selected
 	marked = highlighted
-	guobiao_face = guobiao
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	custom_minimum_size = dimensions
 	size = dimensions
@@ -65,34 +64,26 @@ func _draw() -> void:
 	shell_material.set_shader_parameter("face", Vector4(surface.position.x, surface.position.y, surface.size.x, surface.size.y))
 	shell_material.set_shader_parameter("extrusion", extrusion)
 	shell_material.set_shader_parameter("shadow_offset", Vector2(1.3, 3.3).rotated(-angle))
-	shell_material.set_shader_parameter("ivory", Color("#ffe6ad") if golden else Color("#fff0d2"))
-	shell_material.set_shader_parameter("resin", Color("#698b50"))
+	var small_gold := golden and size.x < 20.0
+	shell_material.set_shader_parameter("ivory", Color("#ffcc6d") if small_gold else (Color("#ffe7b9") if golden else Color("#fff0d2")))
+	shell_material.set_shader_parameter("resin", Color("#b3762a") if golden else Color("#698b50"))
 	shell_material.set_shader_parameter("face_down", number < 0)
 	shell_material.set_shader_parameter("highlighted", hot or chosen or marked or has_focus())
 	if number < 0:
 		Backs.draw_on(self, surface.grow(-2), back_index)
 		return
-	var badge := 0.0
-	if golden and size.x >= 26:
-		badge = 14.0 if size.x >= 40 else 11.0
-	if texture:
-		var maximum := surface.size * (Vector2(0.94, 0.93) if upright else Vector2(0.91, 0.91))
-		var original := texture.get_size()
-		var art := original * minf(maximum.x / original.x, maximum.y / original.y)
-		# Shallow far-side faces use mild foreshortening so their symbols
-		# are still legible at small window sizes.
-		if surface.size.x > surface.size.y:
-			art.x = minf(maximum.x, art.x * 1.23)
-		var face_rect := Rect2(surface.get_center() - art * 0.5, art)
-		if guobiao_face and badge > 0.0 and face_rect.size.y > badge:
-			# The unprinted top margin of the artwork shares space with the gold badge.
-			var inset := maxf(0.0, badge - (4.0 if size.x >= 40 else 1.0) - (face_rect.position.y - surface.position.y))
-			var ratio := (face_rect.size.y - inset) / face_rect.size.y
-			face_rect.position += Vector2(face_rect.size.x * (1.0 - ratio) * 0.5, inset)
-			face_rect.size *= ratio
-		draw_texture_rect(texture, face_rect, false)
+	var badge := clampf(size.x * 0.20, 8.0, 16.0) if golden and not small_gold else 0.0
+	var print_area := surface.grow(-maxf(0.8, minf(surface.size.x, surface.size.y) * 0.04))
+	var badge_rect := Rect2()
 	if badge > 0.0:
-		var badge_rect := Rect2(surface.end.x - badge - 1, surface.position.y + 1, badge, badge)
-		draw_style_box(Art.box(Color("#8f5724"), Color("#d4a65f"), 3), badge_rect)
+		# The dedicated top band is kept clear of SVG ink on either skin.
+		badge_rect = Rect2(print_area.end.x - badge, print_area.position.y, badge, badge)
+		var band := badge + 0.8
+		print_area.position.y += band
+		print_area.size.y -= band
+	if texture:
+		draw_texture_rect(texture, Metrics.fit_art(texture.get_size(), print_area), false)
+	if badge > 0.0:
+		draw_style_box(Art.box(Color("#7f4c22"), Color("#d4a65f"), 2), badge_rect)
 		draw_string(face_font, badge_rect.position + Vector2(1, badge - 2), "金", HORIZONTAL_ALIGNMENT_CENTER,
 			badge - 2, int(badge - 2), Color("#fff0c0"))

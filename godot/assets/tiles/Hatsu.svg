@@ -1,25 +1,6 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
-
-<svg
-   xmlns:osb="http://www.openswatchbook.org/uri/2009/osb"
-   xmlns:dc="http://purl.org/dc/elements/1.1/"
-   xmlns:cc="http://creativecommons.org/ns#"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-   xmlns:svg="http://www.w3.org/2000/svg"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="300"
-   height="400"
-   viewBox="0 0 300 400"
-   id="svg2"
-   version="1.1"
-   inkscape:version="0.91 r13725"
-   sodipodi:docname="Hatsu.svg"
-   inkscape:export-filename="C:\Users\Fluffy\Documents\Projects\ExtraRiichi\Hatsu.png"
-   inkscape:export-xdpi="180"
-   inkscape:export-ydpi="180">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(26.35136 41.31757) scale(0.824324)">
   <defs
      id="defs4">
     <inkscape:path-effect
@@ -305,5 +286,6 @@
          d="m 467.46975,707.99594 c 16.45636,11.80939 23.18013,23.60264 27.44222,47.64951 0.48027,2.70969 -0.53953,7.36472 7.27341,8.72373 28.71731,4.99955 57.74678,-8.73379 60.29802,-22.09624 1.59916,-27.28194 -51.93367,-50.90188 -89.27628,-47.74791 -7.69401,1.28961 -9.12776,11.01879 -5.73737,13.47091 z"
          style="fill:#004900;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
     </g>
+  </g>
   </g>
 </svg>

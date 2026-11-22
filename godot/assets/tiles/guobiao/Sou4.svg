@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(-93.13953 -66.02325) scale(2.860465)">
   <title>四條</title>
   <rect x="45" y="39.5" width="20" height="39" rx="7" fill="#22463a"/>
   <rect x="42" y="56" width="26" height="6" rx="2.8" fill="#22463a"/>
@@ -12,4 +14,5 @@
   <rect x="105" y="107.5" width="20" height="39" rx="7" fill="#22463a"/>
   <rect x="102" y="124" width="26" height="6" rx="2.8" fill="#22463a"/>
   <path d="M113 113.5V140.5" fill="none" stroke="#f4f1e5" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>

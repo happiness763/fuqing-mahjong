@@ -1,25 +1,6 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
-
-<svg
-   xmlns:osb="http://www.openswatchbook.org/uri/2009/osb"
-   xmlns:dc="http://purl.org/dc/elements/1.1/"
-   xmlns:cc="http://creativecommons.org/ns#"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-   xmlns:svg="http://www.w3.org/2000/svg"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="300"
-   height="400"
-   viewBox="0 0 300 400"
-   id="svg2"
-   version="1.1"
-   inkscape:version="0.91 r13725"
-   sodipodi:docname="Chun.svg"
-   inkscape:export-filename="C:\Users\Fluffy\Documents\Projects\ExtraRiichi\Chun.png"
-   inkscape:export-xdpi="180"
-   inkscape:export-ydpi="180">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(27.68661 39.63058) scale(0.801179)">
   <defs
      id="defs4">
     <inkscape:path-effect
@@ -228,5 +209,6 @@
          d="m 367.90999,395.10475 c 0.37549,4.16112 -0.17568,12.40731 6.29079,14.78577 5.6162,0.58559 19.75278,11.44606 16.95438,28.57096 0.0928,187.92712 3.32312,200.16425 0.3131,345.45795 -5.62614,52.57681 6.73403,80.47048 10.82199,86.96513 2.93545,6.59024 6.12648,5.51697 7.60418,1.43859 12.97863,-35.82036 18.66091,-12.55418 14.70196,-102.90205 -0.58086,-150.13908 -2.88642,-315.64694 19.06631,-327.81061 8.67123,-6.96222 20.05495,-28.68846 17.34799,-33.72755 3.10315,-4.97486 -50.62215,-54.03954 -55.12546,-49.49693 -7.36818,8.03967 -36.64575,21.9603 -37.97524,36.71874 z"
          style="fill:#b93c3c;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
     </g>
+  </g>
   </g>
 </svg>
