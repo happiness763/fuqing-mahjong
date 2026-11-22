@@ -289,7 +289,7 @@ func test_dense_rivers(desk) -> void:
 	var view: Dictionary = desk.game.view(0)
 	# A full river of six-per-row tiles keeps the reference size.
 	var numbers: Array = []
-	for index in range(18):
+	for index in range(36):
 		numbers.append(index % 27)
 	check(desk.river_slots(0, 6)[0].size == desk.river_slots(0, 24)[0].size,
 		"discard tiles keep one size regardless of the river length")

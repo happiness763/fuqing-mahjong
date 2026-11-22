@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="福清麻将 · 融城茶馆"
-config/version="1.3.3"
+config/version="1.3.3a"
 run/main_scene="res://table.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 boot_splash/bg_color=Color(0.077, 0.118, 0.101, 1)

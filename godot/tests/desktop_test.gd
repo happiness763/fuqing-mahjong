@@ -56,7 +56,7 @@ func run() -> void:
 	var desk = Desk.instantiate()
 	desk.preferences_root = OS.get_temp_dir().path_join("fuqing-desktop-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	root.add_child(desk)
-	check(ProjectSettings.get_setting("application/config/version") == "1.3.3", "project version")
+	check(ProjectSettings.get_setting("application/config/version") == "1.3.3a", "project version")
 	check(is_instance_valid(desk.action_font) and desk.action_font.has_char("胡".unicode_at(0)),
 		"action captions use the bundled display font")
 	check(is_instance_valid(desk.fx) and desk.effects in ["full", "simple", "off"],
@@ -134,7 +134,7 @@ func run() -> void:
 	desk.refresh(true)
 	await create_timer(0.68).timeout
 	check(desk.human_buttons.size() == 17, "17 starting tiles visible")
-	check(desk.human_buttons[0].size == Vector2(56, 82), "the upright hand keeps a large click target")
+	check(desk.human_buttons[0].size == Vector2(56, 85), "the upright hand keeps a large click target")
 	check(desk.human_buttons.back().position.x + 56 <= 1280, "17 tiles fit the window width")
 	check(not desk.dynamic.find_children("*", "Label", true, false).any(func(node): return node.text in ["牌桌状态", "行牌动态", "本桌积分"]),
 		"the right sidebar is removed")

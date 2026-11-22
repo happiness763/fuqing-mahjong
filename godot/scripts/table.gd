@@ -37,8 +37,14 @@ const BUTTON := Color("#294638")
 const FONT_DARK := Color("#202e25")
 const GOLD_AREA := Rect2(156, 24, 151, 52)
 const SEAT_POSITIONS := [Vector2(10, 679), Vector2(1170, 234), Vector2(521, 12), Vector2(12, 234)]
-const HAND_Y := 685.0
-const LOCAL_MELD_SCALE := 1.60
+const HAND_Y := 683.0
+const HAND_SIZE := Vector2(56, 85)
+const HAND_STEP := 59.0
+const DRAW_GAP := 10.0
+const LOCAL_GROUP_WIDTH := 1066.0
+const LOCAL_GROUP_CENTER := 712.0
+const LOCAL_MELD_GAP := 22.0
+const LOCAL_MELD_SCALE := 1.83
 const PORTRAIT_ATLAS = preload("res://assets/portraits/tea_house.png")
 const SEAT_IDLE_EDGE := Color("#b38b4b")
 
@@ -2156,30 +2162,44 @@ func melds_width(melds: Array) -> float:
 
 
 func local_group_layout(slot_count: int, melds: Array, separated: bool) -> Dictionary:
-	var hand_width := maxf(0.0, slot_count * 59.0 - 3.0) + (10.0 if separated and slot_count > 0 else 0.0)
-	var exposed_width := melds_width(melds) * LOCAL_MELD_SCALE
-	var gap := 22.0 if slot_count > 0 and not melds.is_empty() else 0.0
+	var hand_width := maxf(0.0, (slot_count - 1) * HAND_STEP + HAND_SIZE.x)
+	if separated and slot_count > 0:
+		hand_width += DRAW_GAP
+	var meld_scale := local_meld_scale(melds)
+	var exposed_width := melds_width(melds) * meld_scale
+	var gap := LOCAL_MELD_GAP if slot_count > 0 and not melds.is_empty() else 0.0
 	var span := hand_width + gap + exposed_width
-	var left := 711.0 - span * 0.5
+	var left := LOCAL_GROUP_CENTER - span * 0.5
 	return {"hand_origin": Vector2(left, HAND_Y), "hand_width": hand_width,
-		"meld_origin": Vector2(left + hand_width + gap, 715),
-		"bounds": Rect2(left, HAND_Y - 9, span, 91)}
+		"meld_origin": Vector2(left + hand_width + gap, HAND_Y + HAND_SIZE.y - 33.0 * meld_scale),
+		"bounds": Rect2(left, HAND_Y - 9, span, HAND_SIZE.y + 9)}
+
+
+func local_meld_scale(melds: Array) -> float:
+	# Reserve the complete hand and draw gap so exposing or selecting a
+	# drawn tile never resizes a meld that is already on the table.
+	var max_slots := maxi(1, 17 - 3 * melds.size())
+	var hand_space := (max_slots - 1) * HAND_STEP + HAND_SIZE.x + DRAW_GAP
+	var available := LOCAL_GROUP_WIDTH - hand_space - LOCAL_MELD_GAP
+	if melds.is_empty():
+		return LOCAL_MELD_SCALE
+	return minf(LOCAL_MELD_SCALE, available / melds_width(melds))
 
 
 func meld_strip_layout(melds: Array, origin: Vector2, seat: int) -> Dictionary:
 	var span := melds_width(melds)
-	var factor := LOCAL_MELD_SCALE if seat == 0 else 1.12
+	var factor := Vector2.ONE * local_meld_scale(melds) if seat == 0 else Vector2(1.27, 1.09)
 	if seat in [1, 3]:
-		factor = minf(1.36, 381.0 / maxf(1.0, span))
+		factor = Vector2.ONE * minf(1.49, 375.0 / maxf(1.0, span))
 	var anchor := origin
 	if seat == 1:
-		anchor = Vector2(1010, 324 + span * factor * 0.5)
+		anchor = Vector2(1010, 333 + span * factor.x * 0.5)
 	elif seat == 2:
-		anchor = Vector2(640 + span * factor * 0.5, 175)
+		anchor = Vector2(640 + span * factor.x * 0.5, 175)
 	elif seat == 3:
-		anchor = Vector2(270, 324 - span * factor * 0.5)
+		anchor = Vector2(270, 333 - span * factor.x * 0.5)
 	var angle := float([0, 270, 180, 90][seat])
-	var transform := Transform2D(deg_to_rad(angle), Vector2.ONE * factor, 0.0, anchor)
+	var transform := Transform2D(deg_to_rad(angle), factor, 0.0, anchor)
 	return {"origin": anchor, "scale": factor, "angle": angle,
 		"bounds": transform * Rect2(0, 0, span, 33)}
 
@@ -2199,7 +2219,7 @@ func draw_melds(melds: Array, gold: int, origin: Vector2, seat: int) -> void:
 	strip.name = "MeldsSeat%d" % seat
 	strip.position = layout.origin
 	strip.rotation_degrees = layout.angle
-	strip.scale = Vector2.ONE * float(layout.scale)
+	strip.scale = layout.scale
 	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dynamic.add_child(strip)
 	var cursor := 0.0
@@ -2242,27 +2262,29 @@ func draw_meld(meld: Dictionary, gold: int, origin: Vector2, seat: int, parent: 
 func river_slots(seat: int, count: int) -> Array[Rect2]:
 	var slots: Array[Rect2] = []
 	var region: Rect2 = Art.RIVERS[seat]
-	var dimensions: Vector2 = [Vector2(41, 43), Vector2(26, 39), Vector2(34, 25), Vector2(26, 39)][seat]
+	var dimensions: Vector2 = [Vector2(43, 43), Vector2(29, 34), Vector2(36, 34), Vector2(29, 34)][seat]
 	for index in range(count):
 		var row := floori(float(index) / 6.0)
 		var column := index % 6
 		var center: Vector2
 		if seat in [1, 3]:
-			var step := 40.0
+			var step := dimensions.y + 2.0
 			var x := region.position.x + step * (0.5 + row) if seat == 1 else region.end.x - step * (0.5 + row)
-			var y := region.position.y + 14.0 + (column if seat == 1 else 5 - column) * 29.0
+			var y := region.position.y + 16.0 + (column if seat == 1 else 5 - column) * (dimensions.x + 2.0)
 			center = Vector2(x, y)
 		else:
-			# Extra rows go into either wing, keeping the central three (or
-			# two on the far side) in their original positions.
+			# The near wings begin below the side rivers so dense rivers
+			# never collide. The initial rows keep their positions.
 			var rows := 3 if seat == 0 else 2
-			var wing := floori(float(row) / rows)
-			var wing_offset := 1 if wing == 1 else (-1 if wing == 2 else 0)
 			var step_x := dimensions.x + 2.0
 			var step_y := dimensions.y + 2.0
+			var extra_row := row - rows
+			var wing_offset := 0 if extra_row < 0 else (1 if extra_row < 2 else -1)
 			var x := 640.0 + (float(column if seat == 0 else 5 - column) - 2.5) * step_x + wing_offset * (step_x * 6 + 6)
-			var offset := float(row % rows) * step_y + dimensions.y * 0.5 + 1
-			var y := region.position.y + offset if seat == 0 or wing > 0 else region.end.y - offset
+			var offset := float(row if extra_row < 0 else extra_row % 2) * step_y + dimensions.y * 0.5 + 1
+			var y := region.end.y - offset
+			if seat == 0:
+				y = region.position.y + offset if extra_row < 0 else region.end.y - offset
 			center = Vector2(x, y)
 		slots.append(Rect2(center - dimensions * 0.5, dimensions))
 	return slots
@@ -2331,9 +2353,9 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool) -> void:
 		var chosen := selected_index == index
 		var drawn := has_draw and index == hand.size() - 1
 		if drawn:
-			cursor += 10
+			cursor += DRAW_GAP
 		var handler := choose_tile.bind(index, number) if playable.has(number) else Callable()
-		var node := tile(dynamic, number, Rect2(cursor, HAND_Y - (9 if chosen else 0), 56, 82),
+		var node := tile(dynamic, number, Rect2(Vector2(cursor, HAND_Y - (9 if chosen else 0)), HAND_SIZE),
 			view.gold, handler, chosen, drawn)
 		node.upright = true
 		node.name = "HandTile%d" % index
@@ -2346,7 +2368,7 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool) -> void:
 			slide(node, Vector2(0, 18), index * 0.017)
 		elif drawn and wall_draw_from.is_finite():
 			slide(node, wall_draw_from - node.get_rect().get_center())
-		cursor += 59
+		cursor += HAND_STEP
 
 
 func points(value: int) -> String:

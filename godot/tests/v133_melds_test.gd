@@ -69,7 +69,7 @@ func run() -> void:
 	check(desk.human_buttons.size() == 17, "opening hand displays all seventeen cards")
 	var drawn = desk.human_buttons.back()
 	var previous = desk.human_buttons[-2]
-	check(drawn.size == Vector2(56, 82) and drawn.position.x - previous.position.x == 69,
+	check(drawn.size == Vector2(56, 85) and drawn.position.x - previous.position.x == 69,
 		"full hand preserves touch target and drawn-tile gap")
 	check(drawn.mouse_filter == Control.MOUSE_FILTER_STOP, "drawn tile remains interactive")
 	check(desk.human_buttons[0].position.x >= 178 and drawn.get_rect().end.x <= 1246,
