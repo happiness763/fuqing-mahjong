@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <g fill="#fff3d7" stroke="#172c24" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Outward little ears and a soft, round body echo the supplied pig. -->
+    <path d="M 31,28 Q 21,25 18,19 Q 13,39 24,43 C 7,59 9,91 25,102
+             Q 29,105 32,105 L 37,115 L 43,108 L 49,114 L 54,106
+             Q 64,108 74,106 L 79,114 L 85,108 L 91,115 L 96,105
+             C 119,96 122,61 104,43 Q 115,37 111,19 Q 103,27 94,25
+             Q 85,23 82,29 Q 58,19 31,28 Z"/>
+    <ellipse cx="64" cy="70" rx="20" ry="14"/>
+    <g fill="#172c24" stroke="none">
+      <ellipse cx="43" cy="49" rx="4" ry="5.5"/>
+      <ellipse cx="85" cy="49" rx="4" ry="5.5"/>
+      <ellipse cx="57" cy="70" rx="3.2" ry="4.3"/>
+      <ellipse cx="71" cy="70" rx="3.2" ry="4.3"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <g fill="#fff3d7" stroke="#172c24" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Round ears create the bear's broad, compact silhouette. -->
+    <circle cx="30" cy="30" r="17"/>
+    <circle cx="98" cy="30" r="17"/>
+    <path d="M 27,43 C 31,24 97,24 101,43 C 123,62 116,111 64,111
+             C 12,111 5,62 27,43 Z"/>
+    <ellipse cx="64" cy="80" rx="20" ry="16" stroke-width="4"/>
+    <g fill="#172c24" stroke="none">
+      <ellipse cx="44" cy="59" rx="4" ry="5"/>
+      <ellipse cx="84" cy="59" rx="4" ry="5"/>
+      <path d="M 56,75 Q 64,70 72,75 Q 71,82 64,83 Q 57,82 56,75 Z"/>
+    </g>
+    <path d="M 64,83 L 64,89" fill="none" stroke-width="4"/>
+  </g>
+</svg>
