@@ -1,6 +1,7 @@
 extends Control
 
 const DiceRoll = preload("res://scripts/dice_roll.gd")
+const WALNUT_TABLE = preload("res://assets/table/walnut_table.png")
 const FRAME := Rect2(3, 3, 1274, 794)
 const FELT := Rect2(14, 20, 1252, 760)
 const CENTER := Vector2(640, 325)
@@ -18,9 +19,9 @@ var background_area := Rect2(0, 0, 1280, 800)
 var ambience_enabled := true
 var _ambience_time := 0.0
 var _ambience_accum := 0.0
-static var _cloth: ImageTexture
 var _dice_roll: DiceRoll
 var _dice_rolling := false
+static var _capsules: Dictionary = {}
 
 
 static func box(fill: Color, border: Color, radius := 8, width := 1) -> StyleBoxFlat:
@@ -33,6 +34,40 @@ static func box(fill: Color, border: Color, radius := 8, width := 1) -> StyleBox
 	return style
 
 
+static func capsule(dimensions: Vector2, fill: Color, metal: Color) -> StyleBoxTexture:
+	var key := [dimensions, fill, metal]
+	if _capsules.has(key):
+		return _capsules[key]
+	var padding := Vector2.ONE * 7.0
+	var pixel_size := Vector2i(dimensions + padding * 2.0)
+	var image := Image.create_empty(pixel_size.x, pixel_size.y, false, Image.FORMAT_RGBA8)
+	var radius := dimensions.y * 0.5
+	var straight := (dimensions.x - dimensions.y) * 0.5
+	for y in range(pixel_size.y):
+		for x in range(pixel_size.x):
+			var point := Vector2(x + 0.5, y + 0.5) - Vector2(pixel_size) * 0.5
+			var cross := Vector2(maxf(absf(point.x) - straight, 0), point.y)
+			var distance := cross.length() - radius
+			var t := clampf(0.5 + point.y / dimensions.y, 0, 1)
+			var shade := 0.13 * exp(-pow((t - 0.19) * 5.2, 2.0))
+			var surface := fill.darkened(t * 0.23).lightened(shade)
+			var foil := metal.darkened(0.45 * t).lightened(0.20 * (1.0 - t))
+			var rim := 1.0 - smoothstep(2.0, 2.9, -distance)
+			var lip := exp(-pow((distance + 3.3) * 1.2, 2.0)) * lerpf(0.28, 0.05, t)
+			var alpha := 1.0 - smoothstep(-0.5, 0.6, distance)
+			var shadow_distance := (cross - Vector2(0, 3.6)).length() - radius
+			var shadow := 0.61 * (1.0 - smoothstep(-1.0, 5.3, shadow_distance))
+			var ink := Color(0.017, 0.036, 0.023, shadow)
+			var color := surface.lightened(lip).lerp(foil, rim)
+			image.set_pixel(x, y, ink.blend(Color(color, alpha)))
+	var style := StyleBoxTexture.new()
+	style.texture = ImageTexture.create_from_image(image)
+	for side in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM]:
+		style.set_expand_margin(side, 7.0)
+	_capsules[key] = style
+	return style
+
+
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_dice_roll = DiceRoll.new()
@@ -40,15 +75,6 @@ func _ready() -> void:
 	add_child(_dice_roll)
 	_dice_roll.set_faces(dice)
 	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-	if _cloth == null:
-		var grain := RandomNumberGenerator.new()
-		grain.seed = 811
-		var weave := Image.create_empty(256, 256, false, Image.FORMAT_L8)
-		for y in range(weave.get_height()):
-			for x in range(weave.get_width()):
-				var value := 0.87 + grain.randf_range(-0.10, 0.10) + 0.025 * float((x + y) % 2)
-				weave.set_pixel(x, y, Color(value, value, value))
-		_cloth = ImageTexture.create_from_image(weave)
 
 
 func set_dice(faces: Vector2i) -> void:
@@ -100,9 +126,7 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	gradient(background_area, Color("#253a30"), Color("#10231d"))
 	if not table_texture:
-		draw_polygon(table_polygon(FELT),
-			PackedColorArray([Color("#305b42"), Color("#2b573e"), Color("#163e2e"), Color("#24513c")]),
-			PackedVector2Array([Vector2.ZERO, Vector2(6, 0), Vector2(6, 4), Vector2(0, 4)]), _cloth)
+		draw_texture_rect(WALNUT_TABLE, Rect2(0, 0, 1280, 800), false)
 	if table_texture:
 		var image_size := table_texture.get_size()
 		var scale := maxf(FELT.size.x / image_size.x, FELT.size.y / image_size.y)
@@ -123,9 +147,6 @@ func _draw() -> void:
 				texture_uv.append(uv_start + point * uv_size)
 			draw_polygon(points, PackedColorArray([Color(0.83, 0.83, 0.83)]),
 				texture_uv, table_texture)
-	else:
-		for ring in range(12, 0, -1):
-			draw_circle(CENTER, 295.0 * ring / 12.0, Color(0.19, 0.57, 0.37, 0.017), true, -1.0, true)
 	if ambience_enabled:
 		for index in range(16):
 			var seed_x := float((index * 137) % 1180)
@@ -136,7 +157,8 @@ func _draw() -> void:
 			point.x += drift * 9.0
 			draw_circle(point, 1.2 + float(index % 3) * 0.5,
 				Color(0.84, 0.92, 0.78, 0.035 + 0.025 * (0.5 + 0.5 * drift)))
-	draw_frame()
+	if table_texture:
+		draw_frame()
 
 	var center := CENTER
 	draw_circle(center, DICE_RING_RADIUS, Color("#1d4938"), true, -1.0, true)
@@ -164,21 +186,6 @@ static func table_polygon(rect: Rect2) -> PackedVector2Array:
 static func surface_point(uv: Vector2) -> Vector2:
 	var inset := FAR_EDGE_INSET * (1.0 - uv.y)
 	return FELT.position + Vector2(inset + uv.x * (FELT.size.x - inset * 2.0), uv.y * FELT.size.y)
-
-
-static func closed_polygon(points: PackedVector2Array) -> PackedVector2Array:
-	var closed := points.duplicate()
-	closed.append(points[0])
-	return closed
-
-
-static func bevel_polygon(quad: PackedVector2Array, cut: float) -> PackedVector2Array:
-	var result := PackedVector2Array()
-	for index in range(quad.size()):
-		var point := quad[index]
-		result.append(point.move_toward(quad[posmod(index - 1, quad.size())], cut))
-		result.append(point.move_toward(quad[(index + 1) % quad.size()], cut))
-	return result
 
 
 func draw_frame() -> void:

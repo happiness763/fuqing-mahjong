@@ -2505,13 +2505,11 @@ func floating_button(caption: String, rect: Rect2, handler: Callable, needs_sele
 	}[style]
 	var base: Color = colors[0]
 	var border: Color = colors[1]
-	for state in ["normal", "hover", "pressed"]:
-		var fill := base if state == "normal" else (base.lightened(0.14) if state == "hover" else base.darkened(0.14))
-		var shape := Art.box(fill, border, floori(rect.size.y / 2.0), 3)
-		shape.shadow_color = Color(0.03, 0.08, 0.05, 0.8)
-		shape.shadow_size = 5
-		shape.shadow_offset = Vector2(0, 4)
-		node.add_theme_stylebox_override(state, shape)
+	node.add_theme_stylebox_override("normal", Art.capsule(rect.size, base, border))
+	node.add_theme_stylebox_override("hover", Art.capsule(rect.size, base.lightened(0.12), border.lightened(0.10)))
+	node.add_theme_stylebox_override("pressed", Art.capsule(rect.size, base.darkened(0.19), border.darkened(0.16)))
+	node.add_theme_stylebox_override("disabled", Art.capsule(rect.size, base.darkened(0.47), border.darkened(0.57)))
+	node.add_theme_stylebox_override("focus", Art.box(Color.TRANSPARENT, GOLD, floori(rect.size.y * 0.5), 2))
 	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		node.add_theme_color_override(state, colors[2])
 	node.add_theme_color_override("font_outline_color", base.darkened(0.55))

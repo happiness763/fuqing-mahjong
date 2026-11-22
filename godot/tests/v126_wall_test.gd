@@ -60,7 +60,7 @@ func test_wall_layout() -> void:
 		if seat % 2 == 0:
 			check(wall.size.x >= 730 and wall.size.x <= 970, "horizontal wall spans the table")
 		else:
-			check(wall.size.y >= 360 and wall.size.y <= 430, "side wall spans the table")
+			check(wall.size.y >= 360 and wall.size.y <= 440, "side wall spans the table including both thick layers")
 		check(Art.FELT.encloses(wall) and not gold.intersects(wall), "wall stays on the felt clear of gold")
 		for slot in range(first, first + 36, 2):
 			var face := TableWall.face_quad(slot, 0)

@@ -1,5 +1,6 @@
 extends Control
 
+const DIAL_SURFACE = preload("res://assets/effects/compass_dial.gdshader")
 const FRAME_SIZE := Vector2(174, 152)
 const MIDPOINT := FRAME_SIZE * 0.5
 const TAB_CENTERS := [Vector2(87, 123), Vector2(146, 71), Vector2(87, 25), Vector2(28, 71)]
@@ -9,7 +10,6 @@ const SCORE_CENTERS := [Vector2(87, 108), Vector2(147, 91), Vector2(87, 43), Vec
 const INK := Color("#e9c47a")
 const ACTIVE_INK := Color("#fff0c9")
 const CYAN := Color("#72f4ed")
-const GOLD := Color("#daad68")
 
 var winds: Array = []
 var active_seat := -1
@@ -23,6 +23,7 @@ var _score_labels: Array[Label] = []
 var _time := 0.0
 var wind_font: Font
 var number_font: FontVariation
+var surface_material: ShaderMaterial
 
 
 func setup(font: Font, score_font: Font = null) -> void:
@@ -31,6 +32,15 @@ func setup(font: Font, score_font: Font = null) -> void:
 	size = FRAME_SIZE
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_process(true)
+	var surface := ColorRect.new()
+	surface.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	surface.show_behind_parent = true
+	surface.size = Vector2(192, 174)
+	surface.position = MIDPOINT - surface.size * 0.5
+	surface_material = ShaderMaterial.new()
+	surface_material.shader = DIAL_SURFACE
+	surface.material = surface_material
+	add_child(surface)
 	number_font = FontVariation.new()
 	number_font.base_font = score_font if score_font != null else font
 	number_font.variation_embolden = 0.8
@@ -91,6 +101,9 @@ func set_seats(directions: Array, active: int) -> void:
 		return
 	winds = directions
 	active_seat = active
+	var directions_on_screen := [Vector2.DOWN, Vector2.RIGHT, Vector2.UP, Vector2.LEFT]
+	surface_material.set_shader_parameter("active_direction",
+		directions_on_screen[active] if active in range(4) else Vector2.ZERO)
 	for seat in range(_labels.size()):
 		_labels[seat].text = winds[seat]
 	_refresh_colors()
@@ -135,7 +148,7 @@ func _process(delta: float) -> void:
 	if active_seat < 0:
 		return
 	_time += delta
-	queue_redraw()
+	surface_material.set_shader_parameter("light_phase", 0.86 + 0.14 * sin(_time * 4.2))
 
 
 func _label(font: Font, rect: Rect2, point_size: int, color: Color) -> Label:
@@ -155,23 +168,6 @@ func _label(font: Font, rect: Rect2, point_size: int, color: Color) -> Label:
 
 
 func _draw() -> void:
-	ellipse(MIDPOINT + Vector2(0, 6), Vector2(88, 75), Color(0.015, 0.05, 0.03, 0.68))
-	ellipse(MIDPOINT, Vector2(86, 74), Color("#19281f"))
-	ellipse(MIDPOINT, Vector2(84, 72), GOLD)
-	ellipse(MIDPOINT + Vector2(0, -1), Vector2(82, 69), Color("#6f5229"))
-	ellipse(MIDPOINT, Vector2(79, 66), Color("#143c33"))
-	ellipse(MIDPOINT + Vector2(0, -1), Vector2(75, 63), Color("#1c463b"))
-	ellipse(MIDPOINT, Vector2(37, 31), Color("#57806a"))
-	ellipse(MIDPOINT, Vector2(35, 29), Color("#0d2925"))
-	if active_seat >= 0:
-		_draw_lamp(active_seat)
-	for index in range(4):
-		var angle := PI / 4 + index * PI / 2
-		var point := MIDPOINT + Vector2.from_angle(angle) * Vector2(57, 51)
-		draw_set_transform(point, angle)
-		draw_colored_polygon(PackedVector2Array([Vector2(-8, 0), Vector2(0, -3), Vector2(8, 0), Vector2(0, 3)]),
-			Color("#729382"))
-		draw_set_transform(Vector2.ZERO)
 	for seat in range(_score_labels.size()):
 		var label := _score_labels[seat]
 		_draw_number(label.text, SCORE_CENTERS[seat], 0, 11,
@@ -186,22 +182,6 @@ func _draw() -> void:
 		var at: Vector2 = TAB_CENTERS[seat] + Vector2(-dimensions.x * 0.5,
 			wind_font.get_ascent(23) - wind_font.get_height(23) * 0.5)
 		draw_string(wind_font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 23, ink)
-
-
-func ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
-	draw_set_transform(center, 0, Vector2(1, radius.y / radius.x))
-	draw_circle(Vector2.ZERO, radius.x, color, true, -1, true)
-	draw_set_transform(Vector2.ZERO)
-
-
-func _draw_lamp(seat: int) -> void:
-	var angles := [PI / 2, 0.0, -PI / 2, PI]
-	var angle: float = angles[seat]
-	var pulse := 0.82 + 0.18 * sin(_time * 4.2)
-	draw_set_transform(MIDPOINT, 0, Vector2(1, 0.86))
-	draw_arc(Vector2.ZERO, 78, angle - 0.45, angle + 0.45, 28, Color(CYAN, 0.22 * pulse), 12, true)
-	draw_arc(Vector2.ZERO, 80, angle - 0.43, angle + 0.43, 26, Color(CYAN, pulse), 4, true)
-	draw_set_transform(Vector2.ZERO)
 
 
 func _draw_number(text: String, center: Vector2, angle: float, point_size: int, ink: Color) -> void:

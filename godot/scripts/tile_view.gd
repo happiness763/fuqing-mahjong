@@ -3,6 +3,7 @@ extends Button
 const Art = preload("res://scripts/table_art.gd")
 const Backs = preload("res://scripts/tile_backs.gd")
 const Rules = preload("res://scripts/rules.gd")
+const SHELL = preload("res://assets/effects/mahjong_shell.gdshader")
 
 var number := -1
 var back_index := 0
@@ -14,6 +15,8 @@ var face_font: Font
 var hot := false
 var guobiao_face := false
 var upright := false
+var shell_layer: ColorRect
+var shell_material: ShaderMaterial
 
 
 func setup(tile: int, dimensions: Vector2, face: Texture2D, font: Font, is_gold: bool,
@@ -34,6 +37,14 @@ func setup(tile: int, dimensions: Vector2, face: Texture2D, font: Font, is_gold:
 	tooltip_text = Rules.tile_name(tile) + (" · 金" if is_gold else "")
 	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
 		add_theme_stylebox_override(state, StyleBoxEmpty.new())
+	shell_layer = ColorRect.new()
+	shell_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shell_layer.show_behind_parent = true
+	shell_layer.position = Vector2(-7, -7)
+	shell_material = ShaderMaterial.new()
+	shell_material.shader = SHELL
+	shell_layer.material = shell_material
+	add_child(shell_layer)
 	if interactive:
 		mouse_entered.connect(func(): hot = true; queue_redraw())
 		mouse_exited.connect(func(): hot = false; queue_redraw())
@@ -42,53 +53,40 @@ func setup(tile: int, dimensions: Vector2, face: Texture2D, font: Font, is_gold:
 
 
 func _draw() -> void:
-	var depth := maxf(3.0, minf(size.x, size.y) * (0.11 if upright else 0.19))
-	var down := Vector2.DOWN.rotated(-get_global_transform().get_rotation()).snapped(Vector2.ONE)
-	# The exposed edge points toward the viewer even on a rotated table tile.
-	var edge_offset := down * depth
-	var surface := Rect2(-edge_offset.min(Vector2.ZERO), size - edge_offset.abs())
-	if upright:
-		surface.position.y += 3.0
-		surface.size.y -= 3.0
-	var traditional_face := guobiao_face and number >= 0 and not golden
-	var edge := Color("#beaa81")
-	var ivory := Color("#ffefd0")
+	if not is_instance_valid(shell_material):
+		return
+	var angle := get_global_transform().get_rotation()
+	var down := Vector2.DOWN.rotated(-angle).snapped(Vector2.ONE)
+	var depth := maxf(2.8, minf(size.x, size.y) * (0.145 if upright else 0.24))
+	var extrusion := Vector2(-1.4, -depth) if upright else down * depth
+	var surface := Rect2(-extrusion.min(Vector2.ZERO), size - extrusion.abs()).grow(-0.6)
+	shell_layer.size = size + Vector2(15, 16)
+	shell_material.set_shader_parameter("canvas_size", shell_layer.size)
+	shell_material.set_shader_parameter("face", Vector4(surface.position.x, surface.position.y, surface.size.x, surface.size.y))
+	shell_material.set_shader_parameter("extrusion", extrusion)
+	shell_material.set_shader_parameter("shadow_offset", Vector2(1.3, 3.3).rotated(-angle))
+	shell_material.set_shader_parameter("ivory", Color("#ffe6ad") if golden else Color("#fff0d2"))
+	shell_material.set_shader_parameter("resin", Color("#698b50"))
+	shell_material.set_shader_parameter("face_down", number < 0)
+	shell_material.set_shader_parameter("highlighted", hot or chosen or marked or has_focus())
 	if number < 0:
-		edge = Color("#3c6250")
-		ivory = Color("#7a9d77")
-	elif golden:
-		edge = Color("#b08039")
-		ivory = Color("#ffe7a6")
-	elif traditional_face:
-		edge = Color("#bca77e")
-		ivory = Color("#fbebca")
-	var face_border := ivory.darkened(0.16)
-	var bevel := ivory.darkened(0.10)
-	var active := hot or chosen or marked or has_focus()
-	var rim := Color("#edc67a") if active else edge
-	var radius := 5 if size.x >= 30 else 3
-	draw_style_box(Art.box(Color(0.01, 0.055, 0.03, 0.54), Color.TRANSPARENT, radius, 0), Rect2(down * 3, size))
-	draw_style_box(Art.box(Color("#527741"), Color("#294630"), radius), Rect2(Vector2.ZERO, size))
-	var body := surface.merge(Rect2(surface.position + edge_offset * 0.73, surface.size))
-	draw_style_box(Art.box(edge, rim, radius), body)
-	draw_style_box(Art.box(ivory, rim if active else face_border, radius, 2 if active else 1), surface)
-	draw_line(Vector2(surface.position.x + 4, surface.end.y - 1), Vector2(surface.end.x - 4, surface.end.y - 1), bevel, 1.0)
-	if size.x >= 24:
-		var top := surface.position + Vector2(radius + 1, 1.5)
-		draw_line(top, Vector2(surface.end.x - radius - 1, top.y), Color("#fff9e6"), 1.0)
-	if number < 0:
-		if size.x >= 12:
-			draw_style_box(Art.box(Color("#678a67"), Color("#a3b591"), 2), surface.grow(-2))
 		Backs.draw_on(self, surface.grow(-2), back_index)
 		return
 	var badge := 0.0
 	if golden and size.x >= 26:
 		badge = 14.0 if size.x >= 40 else 11.0
 	if texture:
-		var face_rect := surface.grow(-maxf(1.0, size.x * 0.045))
+		var maximum := surface.size * (Vector2(0.94, 0.93) if upright else Vector2(0.91, 0.91))
+		var original := texture.get_size()
+		var art := original * minf(maximum.x / original.x, maximum.y / original.y)
+		# Shallow far-side faces use mild foreshortening so their symbols
+		# are still legible at small window sizes.
+		if surface.size.x > surface.size.y:
+			art.x = minf(maximum.x, art.x * 1.23)
+		var face_rect := Rect2(surface.get_center() - art * 0.5, art)
 		if guobiao_face and badge > 0.0 and face_rect.size.y > badge:
 			# The unprinted top margin of the artwork shares space with the gold badge.
-			var inset := maxf(0.0, badge - (4.0 if size.x >= 40 else 1.0) - face_rect.position.y)
+			var inset := maxf(0.0, badge - (4.0 if size.x >= 40 else 1.0) - (face_rect.position.y - surface.position.y))
 			var ratio := (face_rect.size.y - inset) / face_rect.size.y
 			face_rect.position += Vector2(face_rect.size.x * (1.0 - ratio) * 0.5, inset)
 			face_rect.size *= ratio
