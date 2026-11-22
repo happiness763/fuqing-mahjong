@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <g fill="#fff3d7" stroke="#172c24" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- A little three-lobed comb and a broad beak distinguish the chick. -->
+    <path d="M 47,32 Q 38,20 47,17 Q 54,14 58,25
+             Q 56,8 65,9 Q 74,10 70,25 Q 80,12 85,20 Q 89,27 79,34
+             C 113,41 123,92 97,106 Q 64,121 31,106
+             C 5,92 15,42 47,32 Z"/>
+    <path d="M 44,112 L 40,119 M 84,112 L 88,119" fill="none"/>
+    <g fill="#172c24" stroke="none">
+      <ellipse cx="44" cy="62" rx="4" ry="5"/>
+      <ellipse cx="84" cy="62" rx="4" ry="5"/>
+    </g>
+    <path d="M 51,78 L 64,70 L 77,78 L 64,88 Z" stroke-width="4.5"/>
+    <path d="M 24,83 Q 27,92 35,94 M 104,83 Q 101,92 93,94" fill="none" stroke-width="4"/>
+  </g>
+</svg>

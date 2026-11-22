@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <g fill="#fff3d7" stroke="#172c24" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- One continuous silhouette keeps the long ears distinct. -->
+    <path d="M 32,59 C 26,37 25,10 36,10 C 47,10 48,36 50,48
+             Q 64,44 78,48 C 80,36 81,10 92,10 C 103,10 102,37 96,59
+             C 116,76 107,113 64,113 C 21,113 12,76 32,59 Z"/>
+    <path d="M 36,24 L 40,46 M 92,24 L 88,46" fill="none" stroke-width="4"/>
+    <g fill="#172c24" stroke="none">
+      <ellipse cx="46" cy="73" rx="4" ry="5"/>
+      <ellipse cx="82" cy="73" rx="4" ry="5"/>
+      <path d="M 58,84 Q 64,80 70,84 L 64,90 Z"/>
+    </g>
+    <path d="M 64,90 Q 58,98 53,92 M 64,90 Q 70,98 75,92" fill="none" stroke-width="4"/>
+  </g>
+</svg>

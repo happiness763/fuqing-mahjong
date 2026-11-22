@@ -1,9 +1,11 @@
 extends Button
 
 const Art = preload("res://scripts/table_art.gd")
+const Backs = preload("res://scripts/tile_backs.gd")
 const Rules = preload("res://scripts/rules.gd")
 
 var number := -1
+var back_index := 0
 var golden := false
 var marked := false
 var chosen := false
@@ -67,6 +69,7 @@ func _draw() -> void:
 	if number < 0:
 		if size.x >= 12:
 			draw_style_box(Art.box(Color("#678a67"), Color("#a3b591"), 2), surface.grow(-2))
+		Backs.draw_on(self, surface.grow(-2), back_index)
 		return
 	var badge := 0.0
 	if golden and size.x >= 26:

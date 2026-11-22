@@ -1,6 +1,7 @@
 extends Control
 
 const Art = preload("res://scripts/table_art.gd")
+const Backs = preload("res://scripts/tile_backs.gd")
 const STACKS_PER_SIDE := 18
 const SLOTS_PER_SIDE := STACKS_PER_SIDE * 2
 
@@ -14,6 +15,13 @@ const STACK_OFFSETS := [Vector2(0, -9), Vector2(-9, 0), Vector2(0, -9), Vector2(
 var slots: Array = []
 var sea_slots: Array = []
 var dealer := 0
+var back_index := 0
+
+
+func set_back(index: int) -> void:
+	if back_index != index:
+		back_index = index
+		queue_redraw()
 var _bodies := [Art.box(Color("#e8d9bb"), Color("#766a4b"), 3),
 	Art.box(Color("#c8b891"), Color("#655840"), 3)]
 var _backs := [Art.box(Color("#609267"), Color("#28593f"), 3),
@@ -81,6 +89,8 @@ func _draw() -> void:
 			var back := Rect2(rect.position - edge.min(Vector2.ZERO), rect.size - edge.abs())
 			draw_style_box(_bodies[layer], rect)
 			draw_style_box(_backs[layer], back)
+			var angle: float = [0.0, -PI / 2.0, PI, PI / 2.0][wall_side(int(slot), dealer)]
+			Backs.draw_on(self, back.grow(-1), back_index, angle)
 			draw_line(back.position + Vector2(3, 2), Vector2(back.end.x - 3, back.position.y + 2),
 				Color(0.82, 0.91, 0.71, 0.34), 1.0, true)
 	if not sea_slots.is_empty():

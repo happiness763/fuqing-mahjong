@@ -17,6 +17,7 @@ const OpeningIntro = preload("res://scripts/opening_intro.gd")
 const Stats = preload("res://scripts/stats.gd")
 const StatsPanel = preload("res://scripts/stats_panel.gd")
 const TableWall = preload("res://scripts/table_wall.gd")
+const TileBacks = preload("res://scripts/tile_backs.gd")
 const Interactions = preload("res://scripts/table_interaction.gd")
 const Effects = preload("res://scripts/table_effects.gd")
 const SLIDE_DURATION := 0.23
@@ -1365,6 +1366,7 @@ func _fly_wall_back(source: Vector2, seat: int, offset := Vector2.ZERO) -> void:
 
 
 func _refresh_wall(view: Dictionary, animate: bool) -> void:
+	wall_art.set_back(TileBacks.for_hand(hand_key(view)))
 	wall_draw_from = Vector2.INF
 	wall_gold_from = Vector2.INF
 	var wall: Dictionary = view.get("wall", {})
@@ -1860,6 +1862,7 @@ func clear_action_banner() -> void:
 func tile(parent: Node, number: int, rect: Rect2, gold: int, on_press := Callable(),
 		chosen := false, highlighted := false) -> Button:
 	var node := Tile.new()
+	node.back_index = TileBacks.for_hand(hand_key(board_view()))
 	node.position = rect.position
 	var face: Texture2D = faces[number] if number >= 0 and number < faces.size() else null
 	node.setup(number, rect.size, face, session_font, Rules.is_gold(number, gold),
