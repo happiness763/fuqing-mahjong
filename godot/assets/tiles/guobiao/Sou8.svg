@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(-53.66882 -37.21428) scale(2.396104)">
   <title>八條</title>
   <g>
     <path d="M39 48 L40 86 L62 72 L85 57 L108 73 L130 86 L131 48" fill="none" stroke="#22463a" stroke-width="10.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -7,5 +9,6 @@
   <g>
     <path d="M39 150 L40 112 L62 126 L85 141 L108 125 L130 112 L131 150" fill="none" stroke="#22463a" stroke-width="10.5" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M39 150 L40 112 L62 126 L85 141 L108 125 L130 112 L131 150" fill="none" stroke="#f4f1e5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
   </g>
 </svg>

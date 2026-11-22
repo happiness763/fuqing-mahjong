@@ -291,8 +291,14 @@ func test_dense_rivers(desk) -> void:
 	var numbers: Array = []
 	for index in range(36):
 		numbers.append(index % 27)
-	check(desk.river_slots(0, 6)[0].size == desk.river_slots(0, 24)[0].size,
-		"discard tiles keep one size regardless of the river length")
+	check(desk.river_slots(0, 6)[0] == desk.river_slots(0, 18)[0],
+		"the first three rows fill without shifting their existing positions")
+	check(desk.river_slots(0, 19)[0] == desk.river_slots(0, 24)[0]
+		and desk.river_slots(0, 31)[0] == desk.river_slots(0, 36)[0],
+		"compact positions stay fixed while each additional row fills")
+	check(desk.river_slots(0, 19)[0].get_center().x == desk.river_slots(0, 19)[18].get_center().x
+		and desk.river_slots(0, 19)[18].position.y > desk.river_slots(0, 19)[12].end.y,
+		"the nineteenth discard starts the next row rather than a disconnected wing")
 	var footprints: Array[Rect2] = []
 	for seat in range(4):
 		var region: Rect2 = Art.RIVERS[seat]

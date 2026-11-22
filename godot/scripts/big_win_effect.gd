@@ -1,6 +1,7 @@
 extends RefCounted
 
 const Rules = preload("res://scripts/rules.gd")
+const Metrics = preload("res://scripts/tile_metrics.gd")
 const DRAGON_ART = preload("res://assets/effects/chinese_dragon.svg")
 const KINDS := ["dragon", "heaven", "pure", "dandiao", "sparrow", "goldGap", "three", "grab", "pengpeng", "idle"]
 const DURATION := 2.0
@@ -255,4 +256,4 @@ func draw_tile(canvas: CanvasItem, faces: Array, number: int, bounds: Rect2, alp
 	canvas.draw_rect(bounds, Color(LIGHT if gilded else PAPER, alpha))
 	canvas.draw_rect(bounds, Color("#a4773a", alpha), false, 1.0)
 	if number >= 0 and number < faces.size() and faces[number] != null:
-		canvas.draw_texture_rect(faces[number], bounds.grow(-2), false, Color(1, 1, 1, alpha))
+		canvas.draw_texture_rect(faces[number], Metrics.fit_art(faces[number].get_size(), bounds.grow(-2)), false, Color(1, 1, 1, alpha))

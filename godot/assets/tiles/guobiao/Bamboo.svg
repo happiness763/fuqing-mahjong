@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(-5.94228 31.88976) scale(1.921260)">
   <title>竹</title>
   <g transform="translate(15 25) scale(0.37)">
     <path d="M31 14 Q25 32 12 43 M23 31 L49 28 M36 31 L35 76 M68 13 Q61 32 50 42 M59 29 L87 26 M74 30 L73 79 Q72 89 62 83" fill="none" stroke="#181b1d" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -9,4 +11,5 @@
   <path d="M43 145 Q65 128 91 110 Q107 99 118 86" fill="none" stroke="#22463a" stroke-width="4.05" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M62 130L42 110 M83 115L67 92 M103 100L85 82 M103 100L129 78" fill="none" stroke="#22463a" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M51 119Q46 113 33 107Q37 119 51 119Z M78 108Q71 97 61 94Q66 108 78 108Z M94 91Q91 83 80 77Q80 88 94 91Z M116 89Q128 87 137 76Q125 76 116 89Z" fill="#22463a"/>
+  </g>
 </svg>

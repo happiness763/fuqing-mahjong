@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(-56.61954 -35.37375) scale(2.464646)">
   <title>發</title>
   <g transform="translate(26 34) scale(1.17)">
     <path d="M19 17 L42 15 Q34 36 12 48" fill="none" stroke="#22463a" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -10,5 +12,6 @@
     <path d="M57 51 L76 49 L71 60 L57 63" fill="none" stroke="#22463a" stroke-width="7.4" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M54 68 L79 65 Q73 82 51 92" fill="none" stroke="#22463a" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M57 72 Q69 85 86 92" fill="none" stroke="#22463a" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
   </g>
 </svg>

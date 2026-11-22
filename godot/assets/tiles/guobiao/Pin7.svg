@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(-19.77272 8.25668) scale(1.997326)">
   <title>七筒</title>
   <circle cx="43" cy="47" r="18" fill="none" stroke="#22463a" stroke-width="4.25"/>
   <circle cx="43" cy="47" r="10.8" fill="none" stroke="#22463a" stroke-width="3"/>
@@ -21,4 +23,5 @@
   <circle cx="107" cy="145" r="18" fill="none" stroke="#a81e25" stroke-width="4.25"/>
   <circle cx="107" cy="145" r="10.8" fill="none" stroke="#a81e25" stroke-width="3"/>
   <circle cx="107" cy="145" r="5.4" fill="#a81e25"/>
+  </g>
 </svg>

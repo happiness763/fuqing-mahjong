@@ -1,5 +1,6 @@
-<?xml version='1.0' encoding='utf-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300" height="400" viewBox="0 0 300 400">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(23.53274 31.37698) scale(0.843115)">
   <defs id="defs4">
     <linearGradient id="linearGradient10055">
       <stop style="stop-color:#000000;stop-opacity:1;" offset="0" id="stop10057" />
@@ -69,5 +70,6 @@
       <use height="100%" width="100%" transform="matrix(0.30901699,-0.95105652,0.95105652,0.30901699,-267.97075,775.88681)" id="use6051" xlink:href="#use6049" y="0" x="0" />
       <use height="100%" width="100%" transform="matrix(0.30901699,-0.95105652,0.95105652,0.30901699,-267.97075,775.88681)" id="use6053" xlink:href="#use6051" y="0" x="0" />
     </g>
+  </g>
   </g>
 </svg>

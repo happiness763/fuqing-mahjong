@@ -1,9 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(-89.27132 -67.17056) scale(2.837209)">
   <title>中</title>
   <g transform="translate(26 34) scale(1.18)">
     <path d="M18 29 L20 68" fill="none" stroke="#a81e25" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M19 33 Q49 27 81 28 L78 63" fill="none" stroke="#a81e25" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M21 64 L77 60" fill="none" stroke="#a81e25" stroke-width="7.4" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M51 10 L49 92" fill="none" stroke="#a81e25" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
   </g>
 </svg>

@@ -69,7 +69,7 @@ func run() -> void:
 	check(desk.human_buttons.size() == 17, "opening hand displays all seventeen cards")
 	var drawn = desk.human_buttons.back()
 	var previous = desk.human_buttons[-2]
-	check(drawn.size == Vector2(56, 85) and drawn.position.x - previous.position.x == 69,
+	check(drawn.size.is_equal_approx(Vector2(56, 56 / 0.75)) and drawn.position.x - previous.position.x == 69,
 		"full hand preserves touch target and drawn-tile gap")
 	check(drawn.mouse_filter == Control.MOUSE_FILTER_STOP, "drawn tile remains interactive")
 	check(desk.human_buttons[0].position.x >= 178 and drawn.get_rect().end.x <= 1246,
@@ -95,6 +95,7 @@ func run() -> void:
 		check(is_instance_valid(band), "each seat has a single meld strip")
 		if is_instance_valid(band):
 			check(is_equal_approx(band.rotation_degrees, float([0, 270, 180, 90][seat])), "melds face their owner")
+			check(is_equal_approx(band.scale.x, band.scale.y), "meld symbols are never stretched between axes")
 			var anchor: Vector2 = desk.local_group_layout(2, game.players[seat].melds, false).meld_origin if seat == 0 else Vector2.ZERO
 			var bounds: Rect2 = desk.meld_strip_layout(game.players[seat].melds, anchor, seat).bounds
 			check(Rect2(65, 75, 1181, 700).encloses(bounds), "all exposed melds remain on felt")
@@ -109,6 +110,10 @@ func run() -> void:
 				var card = group.get_node("MeldTile%d" % card_index)
 				check(is_equal_approx(card.rotation_degrees, 90.0 if card_index == sideways else 0.0),
 					"claim orientation is relative to the owning seat")
+				if card_index == sideways:
+					var footprint: Rect2 = card.get_transform() * Rect2(Vector2.ZERO, card.size)
+					check(card.pivot_offset == card.size * 0.5 and is_equal_approx(footprint.end.y, card.size.y),
+						"claimed tile rotates around its center and meets the local baseline")
 			if kinds[index] == "addedKong":
 				var added = group.get_node("AddedTile")
 				var claimed = group.get_node("MeldTile0")

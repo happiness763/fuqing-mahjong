@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(-30.67796 -5.34744) scale(2.084746)">
   <title>一條</title>
   <path d="M55 156 Q75 123 102 102 Q116 91 137 86 M59 148 Q57 134 53 124 L36 109 M99 101 L114 113 L131 110" fill="none" stroke="#22463a" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
   <circle cx="35" cy="106" r="5.5" fill="none" stroke="#22463a" stroke-width="3.2"/>
@@ -11,4 +13,5 @@
   <path d="M106 60 L122 69 L106 72Z" fill="#22463a"/>
   <path d="M85 53 L81 43 L94 50 L103 41" fill="none" stroke="#22463a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
   <circle cx="98" cy="61" r="4.2" fill="#a81e25"/>
+  </g>
 </svg>

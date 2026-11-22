@@ -1,5 +1,6 @@
-<?xml version='1.0' encoding='utf-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(0.53432 8.24490) scale(0.968460)">
   <g id="layer1" transform="translate(0,-652.36216)">
     <g id="g4173">
       <g transform="translate(1034.3429,648.88567)" id="g6031">
@@ -17,5 +18,6 @@
         <path style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" d="m 93.901577,699.2551 c -6.43699,1.43264 -9.591843,15.77707 0.387269,17.60976 34.313284,-0.0935 73.545784,-13.35894 112.423824,-18.66638 6.63976,-1.36439 7.75026,-14.50373 8.19395,-19.04081 1.47048,-7.12488 -3.42052,-9.17959 -9.24235,-7.88429 -38.85688,9.78523 -72.90583,22.04384 -111.762693,27.98172 z" id="path5580" />
       </g>
     </g>
+  </g>
   </g>
 </svg>

@@ -1,5 +1,6 @@
-<?xml version='1.0' encoding='utf-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(20.15875 28.39862) scale(0.855156)">
   <g id="layer1" transform="translate(0,-652.36216)">
     <g id="g4337" transform="matrix(0.95915654,0,0,0.95915654,6.1125962,26.803561)">
       <ellipse ry="19.097431" rx="24.680117" cy="680.42645" cx="135.05489" id="ellipse4339" style="opacity:1;fill:#004900;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:30;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
@@ -43,5 +44,6 @@
       <path id="path4319" d="m 140.22861,761.81761 c 4.22825,-6.44075 15.55968,-6.16314 19.11822,0" style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:10.42582703;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
       <path style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:10.42582703;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" d="m 140.22861,743.53117 c 4.22825,-6.44075 15.55968,-6.16314 19.11822,0" id="path4321" />
     </g>
+  </g>
   </g>
 </svg>

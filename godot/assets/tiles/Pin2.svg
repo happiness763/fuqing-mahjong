@@ -1,5 +1,6 @@
-<?xml version='1.0' encoding='utf-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300" height="400" viewBox="0 0 300 400">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(15.23643 20.31523) scale(0.898424)">
   <defs id="defs4">
     <linearGradient id="linearGradient10055">
       <stop style="stop-color:#000000;stop-opacity:1;" offset="0" id="stop10057" />
@@ -56,5 +57,6 @@
         <circle r="18.188499" cy="341.51578" cx="-472.93054" id="circle7577" style="opacity:1;fill:none;fill-opacity:1;fill-rule:nonzero;stroke:#ffffff;stroke-width:12.28584385;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
       </g>
     </g>
+  </g>
   </g>
 </svg>

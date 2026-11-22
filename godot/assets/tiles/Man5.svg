@@ -1,5 +1,6 @@
-<?xml version='1.0' encoding='utf-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(14.54626 23.21353) scale(0.928826)">
   <g id="layer1" transform="translate(0,-652.36216)">
     <g id="g6031" transform="translate(1034.3429,648.88567)">
       <path style="fill:#b93c3c;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" d="m -973.89996,230.33452 c 101.51009,10.77646 95.08642,-15.76217 180.06105,-18.57669 18.88461,-2.74566 17.63524,-17.45957 -0.44879,-16.01707 -90.36841,2.24313 -58.77943,34.93937 -177.69318,16.09165 -28.99732,-5.17596 -24.26375,14.56756 -1.91908,18.50211 z" id="path6014" />
@@ -20,5 +21,6 @@
       <path style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" d="m 210.5717,701.26372 c -2.78547,-0.46571 -10.74507,7.25181 -10.72639,10.04644 0.68906,24.48817 0.0838,48.42955 -2.14675,72.91772 -0.80858,11.46836 23.90304,2.38393 24.92498,-3.04856 3.43539,-25.63932 1.95788,-74.42799 -0.25808,-75.63801 -3.42035,-2.01357 -6.72578,-3.3576 -11.79376,-4.27759 z" id="path5728" />
       <path style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" d="m 112.95927,778.81549 c 109.31862,-31.08806 166.20953,-8.22783 169.39263,-2.25441 2.14803,3.27773 1.68381,10.10921 -0.57407,13.53111 -18.85836,25.07686 -119.62667,-39.36712 -165.06741,10.70831 z" id="path5730" />
     </g>
+  </g>
   </g>
 </svg>

@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 170 204" preserveAspectRatio="none">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300.0" height="400.0" viewBox="0.0 0.0 300.0 400.0">
+  <!-- normalized tile ink -->
+  <g transform="translate(-8.24402 30.75331) scale(1.941644)">
   <title>菊</title>
   <g transform="translate(15 25) scale(0.37)">
     <path d="M15 22 L84 18 M33 12 L37 28 M66 11 L62 26 M38 34 Q29 50 17 55 M32 43 L80 38 Q80 78 71 88 L64 87 M31 65 L66 60 M48 49 L47 87 M36 52 L41 57 M60 50 L55 56 M43 68 L26 84 M53 68 L64 79" fill="none" stroke="#181b1d" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -34,4 +36,5 @@
   <circle cx="92.47" cy="52.68" r="3.3" fill="none" stroke="#22463a" stroke-width="2.1"/>
   <circle cx="97.24" cy="49.05" r="3.3" fill="none" stroke="#22463a" stroke-width="2.1"/>
   <circle cx="98" cy="55" r="2.6" fill="#22463a"/>
+  </g>
 </svg>
