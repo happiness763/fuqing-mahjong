@@ -56,7 +56,7 @@ func run() -> void:
 	var desk = Desk.instantiate()
 	desk.preferences_root = OS.get_temp_dir().path_join("fuqing-desktop-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	root.add_child(desk)
-	check(ProjectSettings.get_setting("application/config/version") == "1.3.2", "project version")
+	check(ProjectSettings.get_setting("application/config/version") == "1.3.3a", "project version")
 	check(is_instance_valid(desk.action_font) and desk.action_font.has_char("胡".unicode_at(0)),
 		"action captions use the bundled display font")
 	check(is_instance_valid(desk.fx) and desk.effects in ["full", "simple", "off"],
@@ -72,12 +72,12 @@ func run() -> void:
 	desk.apply_saved_appearance()
 	check(desk.fx.mode == "full", "effects can be restored")
 	check(desk.game == null and desk.lobby.round_field.text == "25", "lobby defaults to 25 rounds")
-	check(Art.FRAME == Rect2(28, 16, 1224, 768) and Art.FELT == Rect2(41, 29, 1198, 742), "the wooden frame returns around the full tabletop")
+	check(Art.FRAME == Rect2(3, 3, 1274, 794) and Art.FRAME.encloses(Art.FELT), "the wooden frame runs around the viewport")
 	
-	check(Art.CENTER == Vector2(640, 400), "table center is recentered")
+	check(Art.CENTER == Vector2(640, 325), "the wind dial leaves room for the near discards and wall")
 	check(Art.RIVERS[0].position.y > Art.CENTER.y + 72 and Art.RIVERS[0].end.y < 615,
 		"bottom river fits between the dial and the hand controls")
-	check(is_instance_valid(desk.menu_button) and desk.menu_button.text == "菜单", "one menu button replaces the header row")
+	check(is_instance_valid(desk.menu_button) and desk.menu_button.tooltip_text == "菜单", "the corner icon opens the menu")
 	check(not desk.header.find_children("*", "Label", true, false).any(func(node): return node.text == "福清麻将"), "title block is removed")
 	check(desk.win_caption({"kind": "discard", "pattern": "sparrow"}) == "金雀", "win button names the big pattern")
 	check(desk.win_caption({"kind": "self", "pattern": "pengpeng"}) == "碰碰胡", "self-draw button names pengpeng")
@@ -134,7 +134,7 @@ func run() -> void:
 	desk.refresh(true)
 	await create_timer(0.68).timeout
 	check(desk.human_buttons.size() == 17, "17 starting tiles visible")
-	check(desk.human_buttons[0].size == Vector2(56, 76), "hand grows to 56x76")
+	check(desk.human_buttons[0].size == Vector2(56, 85), "the upright hand keeps a large click target")
 	check(desk.human_buttons.back().position.x + 56 <= 1280, "17 tiles fit the window width")
 	check(not desk.dynamic.find_children("*", "Label", true, false).any(func(node): return node.text in ["牌桌状态", "行牌动态", "本桌积分"]),
 		"the right sidebar is removed")
@@ -529,7 +529,7 @@ func test_waiting_presentation(desk) -> void:
 	check(desk.controls.is_empty(), "waiting on a claim has no action buttons")
 	var seat_panel := desk.dynamic.get_children().filter(func(node): return node is Panel)[0] as Panel
 	var style := seat_panel.get_theme_stylebox("panel") as StyleBoxFlat
-	check(style.border_color == Color("#678367"), "claim waiting does not highlight the responder")
+	check(style.border_color == desk.SEAT_IDLE_EDGE, "claim waiting does not highlight the responder")
 	view.phase = "opening"
 	view.opening = "grab"
 	desk.clear_board()
@@ -714,7 +714,9 @@ func test_multiple_chow(desk) -> void:
 	desk.perform(3, game.actions(3).front())
 	check(not desk.controls.has("chow"), "floating chow waits for higher priority AI")
 	desk.perform(2, game.actions(2).back())
-	check(desk.controls.chow.text == "吃" and desk.controls.chow.size.y >= 64, "one large chow button")
+	check(desk.controls.chow.text == "吃" and desk.controls.chow.size.y >= 54
+		and desk.controls.chow.size.x >= 110 and desk.controls.chow.position.y == desk.controls.pass.position.y,
+		"large chow and pass buttons share the horizontal action row")
 	await capture("floating.png")
 	click(desk.controls.chow)
 	check(is_instance_valid(desk.modal), "multiple chow choices open panel")

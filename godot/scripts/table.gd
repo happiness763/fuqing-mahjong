@@ -29,15 +29,24 @@ const DESIGN_SIZE := Vector2(1280, 800)
 const NAMES := ["你", "阿岚", "阿榕", "阿屿"]
 const MARKS := ["你", "岚", "榕", "屿"]
 const WINDS = OnlineTableView.WINDS
-const PORTRAITS := [Color("#d8ab70"), Color("#a2b38e"), Color("#87aa99"), Color("#bf9b8a")]
 const INK := Color("#f3e5cb")
 const MUTED := Color("#b0bd9e")
 const GOLD := Color("#edc780")
 const REDEAL_NOTICE := "首巡四家同牌 · 流局"
 const BUTTON := Color("#294638")
 const FONT_DARK := Color("#202e25")
-const GOLD_AREA := Rect2(71, 92, 176, 64)
-const SEAT_POSITIONS := [Vector2(154, 640), Vector2(1006, 290), Vector2(563, 40), Vector2(149, 290)]
+const GOLD_AREA := Rect2(156, 24, 151, 52)
+const SEAT_POSITIONS := [Vector2(10, 679), Vector2(1170, 234), Vector2(521, 12), Vector2(12, 234)]
+const HAND_Y := 683.0
+const HAND_SIZE := Vector2(56, 85)
+const HAND_STEP := 59.0
+const DRAW_GAP := 10.0
+const LOCAL_GROUP_WIDTH := 1066.0
+const LOCAL_GROUP_CENTER := 712.0
+const LOCAL_MELD_GAP := 22.0
+const LOCAL_MELD_SCALE := 1.83
+const PORTRAIT_ATLAS = preload("res://assets/portraits/tea_house.png")
+const SEAT_IDLE_EDGE := Color("#b38b4b")
 
 var game
 var action_font: FontVariation
@@ -147,6 +156,7 @@ var redeal_notice: Panel
 var audio: AudioStreamPlayer
 var sounds: Dictionary
 var sound_button: Button
+var quick_sound_button: Button
 var muted := false
 var log_lines: Array[String] = []
 var action_banner: Panel
@@ -189,7 +199,7 @@ func _ready() -> void:
 	add_child(wall_flights)
 	build_header()
 	fx = Effects.new()
-	fx.setup(self, action_font, session_font, SEAT_POSITIONS, Art.CENTER)
+	fx.setup(self, action_font, session_font, Art.CENTER)
 	add_child(fx)
 	configure_display()
 	apply_saved_appearance()
@@ -372,8 +382,14 @@ func build_header() -> void:
 	header = Control.new()
 	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(header)
-	menu_button = button(header, "菜单", Rect2(1148, 34, 90, 36), toggle_menu)
+	menu_button = floating_button("☰", Rect2(1208, 18, 49, 49), toggle_menu, false, "menu", header)
+	menu_button.tooltip_text = "菜单"
+	menu_button.add_theme_font_override("font", nickname_font)
 	menu_button.z_index = 20
+	quick_sound_button = floating_button("♪", Rect2(1147, 18, 49, 49),
+		toggle_sound, false, "menu", header)
+	quick_sound_button.add_theme_font_override("font", nickname_font)
+	quick_sound_button.z_index = 20
 	menu_panel = panel(header, Rect2(1088, 80, 150, 314), Color("#203a2e"), Color("#ab8852"), 12)
 	menu_panel.visible = false
 	menu_panel.z_index = 21
@@ -486,7 +502,13 @@ func toggle_sound() -> void:
 	muted = preferences.values.muted
 	if muted:
 		audio.stop()
+	update_sound_controls()
+
+
+func update_sound_controls() -> void:
 	sound_button.text = "声音  关" if muted else "声音  开"
+	quick_sound_button.tooltip_text = "开启声音" if muted else "关闭声音"
+	quick_sound_button.self_modulate = Color("#b2b2a9") if muted else Color.WHITE
 
 
 func save_preferences(changes: Dictionary) -> bool:
@@ -550,7 +572,7 @@ func apply_saved_appearance() -> void:
 	if is_instance_valid(board_art):
 		board_art.set_ambience(effects == "full")
 	muted = preferences.values.muted
-	sound_button.text = "声音  关" if muted else "声音  开"
+	update_sound_controls()
 	board_art.set_table_texture(preferences.table_texture(preferences.values.table_id))
 	if applied_skin != preferences.values.skin:
 		applied_skin = preferences.values.skin
@@ -1357,7 +1379,7 @@ func _wall_source(slot: int) -> Vector2:
 
 
 func _fly_wall_back(source: Vector2, seat: int, offset := Vector2.ZERO) -> void:
-	var destination: Vector2 = SEAT_POSITIONS[seat] + Vector2(27, 20) + offset
+	var destination := seat_portrait_rect(seat).get_center() + offset
 	var card := tile(wall_flights, -1, Rect2(source - Vector2(6, 8), Vector2(12, 16)), -1)
 	var flight := card.create_tween()
 	flight.tween_property(card, "position", destination, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -1524,7 +1546,7 @@ func cancel_flower_sequence() -> void:
 func pop_flower(seat: int, tile_number: int, source := Vector2.INF) -> void:
 	if tile_number < 0 or not is_instance_valid(flower_fx):
 		return
-	var positions := [Vector2(990, 700), Vector2(930, 355), Vector2(760, 80), Vector2(120, 355)]
+	var positions := [Vector2(990, 670), Vector2(1112, 372), Vector2(752, 29), Vector2(108, 372)]
 	var pos: Vector2 = positions[clampi(seat, 0, 3)]
 	var node := tile(flower_fx, tile_number, Rect2(pos, Vector2(52, 69)), int(board_view().get("gold", -1)))
 	node.z_index = 16
@@ -1824,7 +1846,7 @@ func show_action_banner() -> void:
 	var message: Dictionary = action_messages.pop_front()
 	var accent := Color("#ffe298") if message.win else Color("#cff7b9")
 	var fill := Color("#633023") if message.win else Color("#184734")
-	var banner := panel(self, Rect2(770, 40, 188, 54), fill, accent, 10)
+	var banner := panel(self, Rect2(828, 18, 188, 54), fill, accent, 10)
 	var style := banner.get_theme_stylebox("panel") as StyleBoxFlat
 	style.shadow_color = Color(0.02, 0.10, 0.07, 0.55)
 	style.shadow_size = 4
@@ -1925,16 +1947,18 @@ func _flip_wall_gold(card: Control, gold_display: Control) -> void:
 
 func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: bool) -> void:
 	winning_tile_rect = Rect2()
-	label(dynamic, "第 %02d / %02d 局" % [view.round, view.round_limit], Rect2(71, 40, 170, 27), 17, GOLD)
+	var info_width := 302.0 if intro_gold and Rules.gold_tiles(view.gold).size() > 1 else 224.0
+	panel(dynamic, Rect2(18, 17, info_width, 67), Color("#142a20ed"), Color("#ba9559"), 14)
+	label(dynamic, "第 %02d / %02d 局" % [view.round, view.round_limit], Rect2(33, 22, 121, 27), 19, INK)
 	var sea: Dictionary = view.get("sea", {})
 	if view.phase == "sea":
 		label(dynamic, "海底 %d/%d" % [int(sea.get("done", 0)), int(sea.get("total", Rules.SEA_COUNT))],
-			Rect2(71, 67, 135, 25), 14, GOLD)
+			Rect2(33, 49, 126, 26), 17, INK)
 	else:
 		var playable: int = view.remaining
 		if intro_active() or flower_active:
 			playable = maxi(0, wall_art.slots.size() - int(view.get("reserve", Rules.RESERVE)))
-		label(dynamic, "可摸 %d 张" % playable, Rect2(71, 67, 135, 25), 14, MUTED)
+		label(dynamic, "可摸 %d 张" % playable, Rect2(33, 49, 126, 26), 17, INK)
 	center_dial.visible = not intro_active() and view.phase != "redeal"
 	var public_turn: bool = view.phase == "turn" and not online_reconnecting
 	center_dial.set_seats(view.get("winds", WINDS), int(view.current) if public_turn else -1)
@@ -1945,7 +1969,7 @@ func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: b
 	if is_instance_valid(fx):
 		fx.set_active(int(view.current) if public_turn else -1)
 	if not online_view.is_empty():
-		room_notice_label = label(dynamic, "", Rect2(216, 30, 230, 30), 13, GOLD)
+		room_notice_label = label(dynamic, "", Rect2(331, 27, 180, 30), 13, GOLD)
 		room_notice_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		update_online_clock()
 	else:
@@ -1957,28 +1981,27 @@ func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: b
 		gold_display.size = GOLD_AREA.size
 		gold_display.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		dynamic.add_child(gold_display)
-		var gold_char := label(gold_display, "金", Rect2(0, 0, 56, 64), 46, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+		panel(gold_display, Rect2(0, 5, 31, 41), Color("#d6ad53"), Color("#ffe49a"), 6)
+		var gold_char := label(gold_display, "金", Rect2(0, 5, 31, 41), 24, Color("#2b2817"), HORIZONTAL_ALIGNMENT_CENTER)
 		gold_char.name = "GoldMark"
 		gold_char.add_theme_font_override("font", action_font)
-		gold_char.add_theme_color_override("font_outline_color", Color("#5e421c"))
-		gold_char.add_theme_constant_override("outline_size", 6)
 		var golds: Array = Rules.gold_tiles(view.gold)
 		if golds.size() == 1:
-			var card := tile(gold_display, golds[0], Rect2(58, 4, 34, 47), view.gold, Callable(), false, false)
+			var card := tile(gold_display, golds[0], Rect2(39, 4, 30, 43), view.gold, Callable(), false, false)
 			if golds[0] == view.indicator and wall_gold_from.is_finite():
 				_flip_wall_gold(card, gold_display)
 		else:
 			for index in range(golds.size()):
-				var card := tile(gold_display, golds[index], Rect2(58 + index * 28, 4, 26, 36),
+				var card := tile(gold_display, golds[index], Rect2(39 + index * 28, 4, 26, 36),
 					view.gold, Callable(), false, golds[index] == view.gold)
 				if golds[index] == view.indicator and wall_gold_from.is_finite():
 					_flip_wall_gold(card, gold_display)
 	var rob_tile: int = view.get("rob_tile", -1)
 	if view.phase == "robKong" and rob_tile >= 0 and moves.any(func(move): return move.type == "win"):
-		var offer := panel(dynamic, Rect2(695, 623, 130, 55), Color("#1a3d31"), GOLD, 10)
+		var offer := panel(dynamic, Rect2(916, 612, 50, 66), Color("#1a3d31"), GOLD, 10)
 		offer.name = "RobKongOffer"
-		label(offer, "可抢的补杠牌", Rect2(45, 0, 80, 55), 12, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-		tile(offer, rob_tile, Rect2(8, 5, 32, 44), view.gold, Callable(), false, true)
+		label(offer, "抢杠", Rect2(0, 0, 50, 20), 12, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+		tile(offer, rob_tile, Rect2(9, 22, 32, 44), view.gold, Callable(), false, true)
 
 	table_seat_records = []
 	if stats != null and not stats_table_id.is_empty():
@@ -1989,17 +2012,17 @@ func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: b
 	draw_hand(view, moves, deal)
 	if view.phase == "sea":
 		var event: Dictionary = view.get("latest", {})
-		var sea_notice := panel(dynamic, Rect2(480, 588, 320, 62), Color("#1a3d31"), GOLD, 12)
+		var sea_notice := panel(dynamic, Rect2(17, 578, 146, 90), Color("#1a3d31"), GOLD, 12)
 		sea_notice.name = "SeaNotice"
 		if event.get("type", "") == "sea" and int(event.get("tile", -1)) >= 0:
 			var sea_tile := int(event.tile)
 			var who := player_name(int(event.seat))
-			label(sea_notice, "海底 · " + who, Rect2(12, 6, 190, 20), 14, GOLD)
-			tile(sea_notice, sea_tile, Rect2(206, 10, 28, 38), view.gold)
+			label(sea_notice, "海底 · " + who, Rect2(7, 4, 132, 20), 14, GOLD)
+			tile(sea_notice, sea_tile, Rect2(12, 35, 28, 38), view.gold)
 			label(sea_notice, "花牌 · 不计花" if bool(event.get("flower", false)) else Rules.tile_name(sea_tile),
-				Rect2(242, 18, 70, 22), 13, INK)
+				Rect2(47, 40, 92, 25), 13, INK)
 		else:
-			label(sea_notice, "海底 · 等待摸牌", Rect2(0, 0, 320, 62), 16, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+			label(sea_notice, "海底 · 等待摸牌", Rect2(0, 0, 146, 93), 16, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	if view.phase == "redeal":
 		var bounds := Rect2(Art.CENTER - Vector2(90, 23), Vector2(180, 46))
 		redeal_notice = panel(dynamic, bounds, Color("#21392e"), GOLD, 12)
@@ -2009,14 +2032,18 @@ func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: b
 
 func draw_seat(view: Dictionary, seat: int, origin: Vector2) -> void:
 	var player: Dictionary = view.players[seat]
+	if seat == 2 and player.has("hand"):
+		origin.x = 332
 	var wide := seat in [0, 2]
-	var width := 154 if wide else 126
 	var active: bool = view.phase == "turn" and view.current == seat
-	panel(dynamic, Rect2(origin, Vector2(width, 39)), Color("#173b2e"),
-		Color("#d7b46a") if active else Color("#678367"))
-	var portrait := Rect2(origin + Vector2(5, 5), Vector2(29, 29))
+	var edge := Color("#ffe09a") if active else SEAT_IDLE_EDGE
+	var portrait := seat_portrait_rect(seat)
+	portrait.position = origin
+	var plate := Rect2(origin + (Vector2(49, 15) if wide else Vector2(-4, 69)),
+		Vector2(119, 58) if wide else Vector2(88, 58))
+	panel(dynamic, plate, Color("#132c22fa"), edge, 13)
+	draw_player_portrait(view, seat, portrait, edge)
 	interactions.portrait_rects[seat] = portrait
-	panel(dynamic, portrait, PORTRAITS[seat], PORTRAITS[seat])
 	if seat != 0 and view.phase not in ["result", "redeal"]:
 		var hitbox := Button.new()
 		hitbox.name = "InteractionSeat%d" % seat
@@ -2028,21 +2055,18 @@ func draw_seat(view: Dictionary, seat: int, origin: Vector2) -> void:
 		hitbox.tooltip_text = "互动 · " + player_name(seat)
 		hitbox.pressed.connect(interactions.open.bind(seat))
 		dynamic.add_child(hitbox)
-	set_player_font(label(dynamic, player_mark(seat), Rect2(origin + Vector2(5, 5), Vector2(29, 29)),
-		17, FONT_DARK, HORIZONTAL_ALIGNMENT_CENTER, true))
 	var record: Dictionary = table_seat_records[seat] if seat < table_seat_records.size() else {}
 	var record_text := "胡 %d · 点 %d" % [int(record.get("wins", 0)), int(record.get("deal_ins", 0))]
-	var record_label: Label
-	if seat == 2:
-		record_label = label(dynamic, record_text, Rect2(origin + Vector2(width + 8, 8), Vector2(110, 20)),
-			12, MUTED)
-	else:
-		record_label = label(dynamic, record_text, Rect2(origin + Vector2(0, -20), Vector2(width, 18)),
-			12, MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	var text_left := plate.position.x + (32.0 if wide else 3.0)
+	var text_width := plate.end.x - text_left - 3.0
+	var record_label := label(dynamic, record_text, Rect2(text_left, plate.position.y + 39, text_width, 16),
+		10, MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	record_label.name = "SeatRecord%d" % seat
 	set_player_font(record_label)
-	set_player_font(label(dynamic, player_name(seat),
-		Rect2(origin + Vector2(41, 2), Vector2(width - 42, 18)), 14, GOLD if active else INK))
+	var name_label := label(dynamic, player_name(seat), Rect2(text_left, plate.position.y + 2, text_width, 23),
+		19, GOLD if active else INK, HORIZONTAL_ALIGNMENT_CENTER)
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	set_player_font(name_label)
 	var flower_count: int = player.flowers.size() if intro_flowers else 0
 	var tags := PackedStringArray()
 	if seat == view.dealer:
@@ -2051,7 +2075,7 @@ func draw_seat(view: Dictionary, seat: int, origin: Vector2) -> void:
 	if seat == 0 and ai_delegate:
 		tags.append("托管")
 	var seat_caption := label(dynamic, " · ".join(tags),
-		Rect2(origin + Vector2(41, 20), Vector2(width - 42, 16)), 12, GOLD if seat == view.dealer else MUTED)
+		Rect2(text_left, plate.position.y + 23, text_width, 16), 13, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	seat_caption.name = "SeatWind%d" % seat
 	var gold_gap: Array = player.get("gold_gap", [])
 	if seat != 0 and player.has("hand"):
@@ -2062,24 +2086,29 @@ func draw_seat(view: Dictionary, seat: int, origin: Vector2) -> void:
 		values.sort()
 		if winning >= 0:
 			values.append(winning)
-		var columns := 17 if wide else 8
+		var strip := Control.new()
+		strip.name = "RevealedHand%d" % seat
+		strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var span := maxf(0.0, values.size() * 14.0 - 2.0)
+		strip.rotation_degrees = [0, 270, 180, 90][seat]
+		if seat == 2:
+			strip.position = Vector2(640 + span * 0.5, 79)
+		elif seat == 1:
+			strip.position = Vector2(1055, 290 + span)
+		else:
+			strip.position = Vector2(225, 290)
+		dynamic.add_child(strip)
 		for index in range(values.size()):
-			var items_in_row := mini(columns, values.size() - (index - index % columns))
-			var row: int = floori(float(index) / columns)
-			var left := origin.x + (width - items_in_row * 14) * 0.5
-			var bounds := Rect2(left + (index % columns) * 14, origin.y + 43 + row * 21, 12, 18)
-			tile(dynamic, values[index], bounds, view.gold)
+			var card := tile(strip, values[index], Rect2(index * 14, 0, 12, 18), view.gold)
+			card.name = "RevealedTile%d_%d" % [seat, index]
 			if winning >= 0 and index == values.size() - 1:
-				winning_tile_rect = bounds
-	if not player.melds.is_empty():
-		var anchor := origin + Vector2(width * 0.5, 61 if wide else 112)
-		if seat == 0:
-			anchor = Vector2(319, 615 if player.melds.size() > 3 else 648)
-		elif not wide and gold_gap.size() == 2 and player.has("hand"):
-			anchor.y += 17
-		draw_melds(player.melds, view.gold, anchor, seat)
+				winning_tile_rect = tile_canvas_rect(card)
+	# The local exposed groups are measured together with the actual visible hand
+	# in draw_hand; the other seats have a single strip along their own table edge.
+	if seat != 0 and not player.melds.is_empty():
+		draw_melds(player.melds, view.gold, Vector2.ZERO, seat)
 	if gold_gap.size() == 2:
-		var gap_origins := [Vector2(157, 594), Vector2(1007, 359), Vector2(735, 40), Vector2(150, 359)]
+		var gap_origins := [Vector2(179, 630), Vector2(1151, 567), Vector2(704, 25), Vector2(19, 533)]
 		var gap_origin: Vector2 = gap_origins[seat]
 		if not wide and player.has("hand"):
 			gap_origin.y += 14
@@ -2090,97 +2119,174 @@ func draw_seat(view: Dictionary, seat: int, origin: Vector2) -> void:
 			tile(gap, gold_gap[index], Rect2(47 + index * 28, 4, 23, 31), view.gold)
 
 
+func seat_portrait_rect(seat: int) -> Rect2:
+	var dimensions := Vector2(77, 77) if seat == 0 else Vector2(72, 72)
+	return Rect2(SEAT_POSITIONS[seat], dimensions)
+
+
+func draw_player_portrait(view: Dictionary, seat: int, bounds: Rect2, edge: Color) -> void:
+	var base := panel(dynamic, bounds.grow(2), Color("#574328"), edge, 42)
+	var frame := base.get_theme_stylebox("panel") as StyleBoxFlat
+	frame.shadow_color = Color(0.03, 0.08, 0.05, 0.58)
+	frame.shadow_size = 4
+	frame.shadow_offset = Vector2(1, 3)
+	var winds: Array = view.get("winds", WINDS)
+	var index := maxi(0, WINDS.find(winds[seat]))
+	var cell := PORTRAIT_ATLAS.get_size() * 0.5
+	var cell_center := (Vector2(index % 2, floori(float(index) / 2.0)) + Vector2(0.5, 0.5)) * cell
+	var picture := Polygon2D.new()
+	picture.position = bounds.get_center()
+	picture.texture = PORTRAIT_ATLAS
+	picture.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	var points := PackedVector2Array()
+	var uvs := PackedVector2Array()
+	for vertex in range(64):
+		var unit := Vector2.from_angle(TAU * vertex / 64.0)
+		points.append(unit * (bounds.size.x * 0.5 - 2.0))
+		uvs.append(cell_center + unit * cell * 0.43)
+	picture.polygon = points
+	picture.uv = uvs
+	dynamic.add_child(picture)
+
+
 func meld_width(meld: Dictionary) -> float:
 	var count: int = 3 if meld.type == "addedKong" else meld.tiles.size()
 	return count * 25.0 + (0.0 if meld.type == "concealedKong" else 8.0)
 
 
+func melds_width(melds: Array) -> float:
+	var span := 0.0
+	for meld in melds:
+		span += meld_width(meld)
+	return span + maxf(0.0, melds.size() - 1.0) * 8.0
+
+
+func local_group_layout(slot_count: int, melds: Array, separated: bool) -> Dictionary:
+	var hand_width := maxf(0.0, (slot_count - 1) * HAND_STEP + HAND_SIZE.x)
+	if separated and slot_count > 0:
+		hand_width += DRAW_GAP
+	var meld_scale := local_meld_scale(melds)
+	var exposed_width := melds_width(melds) * meld_scale
+	var gap := LOCAL_MELD_GAP if slot_count > 0 and not melds.is_empty() else 0.0
+	var span := hand_width + gap + exposed_width
+	var left := LOCAL_GROUP_CENTER - span * 0.5
+	return {"hand_origin": Vector2(left, HAND_Y), "hand_width": hand_width,
+		"meld_origin": Vector2(left + hand_width + gap, HAND_Y + HAND_SIZE.y - 33.0 * meld_scale),
+		"bounds": Rect2(left, HAND_Y - 9, span, HAND_SIZE.y + 9)}
+
+
+func local_meld_scale(melds: Array) -> float:
+	# Reserve the complete hand and draw gap so exposing or selecting a
+	# drawn tile never resizes a meld that is already on the table.
+	var max_slots := maxi(1, 17 - 3 * melds.size())
+	var hand_space := (max_slots - 1) * HAND_STEP + HAND_SIZE.x + DRAW_GAP
+	var available := LOCAL_GROUP_WIDTH - hand_space - LOCAL_MELD_GAP
+	if melds.is_empty():
+		return LOCAL_MELD_SCALE
+	return minf(LOCAL_MELD_SCALE, available / melds_width(melds))
+
+
+func meld_strip_layout(melds: Array, origin: Vector2, seat: int) -> Dictionary:
+	var span := melds_width(melds)
+	var factor := Vector2.ONE * local_meld_scale(melds) if seat == 0 else Vector2(1.27, 1.09)
+	if seat in [1, 3]:
+		factor = Vector2.ONE * minf(1.49, 375.0 / maxf(1.0, span))
+	var anchor := origin
+	if seat == 1:
+		anchor = Vector2(1010, 333 + span * factor.x * 0.5)
+	elif seat == 2:
+		anchor = Vector2(640 + span * factor.x * 0.5, 175)
+	elif seat == 3:
+		anchor = Vector2(270, 333 - span * factor.x * 0.5)
+	var angle := float([0, 270, 180, 90][seat])
+	var transform := Transform2D(deg_to_rad(angle), factor, 0.0, anchor)
+	return {"origin": anchor, "scale": factor, "angle": angle,
+		"bounds": transform * Rect2(0, 0, span, 33)}
+
+
+func tile_canvas_rect(card: Control) -> Rect2:
+	# Effect coordinates are in the table's design canvas, including any seat
+	# rotation, but excluding the whole table's responsive window scaling.
+	var transform := get_global_transform().affine_inverse() * card.get_global_transform()
+	return transform * Rect2(Vector2.ZERO, card.size)
+
+
 func draw_melds(melds: Array, gold: int, origin: Vector2, seat: int) -> void:
-	var columns := 3 if seat == 0 else (melds.size() if seat == 2 else 1)
-	for first in range(0, melds.size(), columns):
-		var row := floori(float(first) / columns)
-		var groups := melds.slice(first, first + columns)
-		var span := -8.0
-		for meld in groups:
-			span += meld_width(meld) + 8.0
-		var x := origin.x if seat == 0 else origin.x - span * 0.5
-		var y := origin.y + row * 34
-		for meld in groups:
-			draw_meld(meld, gold, Vector2(x, y), seat)
-			x += meld_width(meld) + 8.0
+	if melds.is_empty():
+		return
+	var layout := meld_strip_layout(melds, origin, seat)
+	var strip := Control.new()
+	strip.name = "MeldsSeat%d" % seat
+	strip.position = layout.origin
+	strip.rotation_degrees = layout.angle
+	strip.scale = layout.scale
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dynamic.add_child(strip)
+	var cursor := 0.0
+	for index in range(melds.size()):
+		var group := Control.new()
+		group.name = "Meld%d" % index
+		group.position = Vector2(cursor, 0)
+		group.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		strip.add_child(group)
+		draw_meld(melds[index], gold, Vector2.ZERO, seat, group)
+		cursor += meld_width(melds[index]) + 8.0
 
 
-func draw_meld(meld: Dictionary, gold: int, origin: Vector2, seat: int) -> void:
+func draw_meld(meld: Dictionary, gold: int, origin: Vector2, seat: int, parent: Control = null) -> void:
+	var holder := parent if parent != null else dynamic
 	var numbers: Array = meld.tiles.slice(0, 3) if meld.type == "addedKong" else meld.tiles
 	var sideways := -1
 	if meld.type == "chow":
 		sideways = numbers.find(meld.get("claimed", numbers[0]))
 	elif meld.type != "concealedKong":
-		var relative: int = posmod(meld.from - seat, 4)
+		var relative: int = posmod(meld.get("from", seat) - seat, 4)
 		sideways = 0 if relative == 3 else (1 if relative == 2 else numbers.size() - 1)
 	var x := origin.x
 	for index in range(numbers.size()):
-		var y := origin.y
+		var node: Control
 		if index == sideways:
-			if meld.type == "addedKong":
-				var added := tile(dynamic, meld.tiles[3], Rect2(x + 32, y + 1, 24, 32), gold)
-				added.rotation_degrees = 90
-				y += 7
-			var node := tile(dynamic, numbers[index], Rect2(x + 32, y + 8, 24, 32), gold)
+			node = tile(holder, numbers[index], Rect2(x + 32, origin.y + 8, 24, 32), gold)
 			node.rotation_degrees = 90
+			if meld.type == "addedKong":
+				var added := tile(holder, meld.tiles[3], Rect2(x + 32, origin.y, 24, 32), gold)
+				added.name = "AddedTile"
+				added.rotation_degrees = 90
 			x += 33
 		else:
-			tile(dynamic, numbers[index], Rect2(x, y, 24, 32), gold)
+			node = tile(holder, numbers[index], Rect2(x, origin.y, 24, 32), gold)
 			x += 25
-
-
-func river_common_width(size_rows: int) -> float:
-	var gap := 3.0
-	var best := 9999.0
-	for seat in range(4):
-		var region: Rect2 = Art.RIVERS[seat].grow(-4)
-		var side := seat in [1, 3]
-		var fit: float
-		if side:
-			fit = minf((region.size.y - gap * 5.0) / 6.0,
-				(region.size.x - gap * (size_rows - 1)) / size_rows / 1.36)
-		else:
-			fit = minf((region.size.x - gap * 5.0) / 6.0,
-				(region.size.y - gap * (size_rows - 1)) / size_rows / 1.36)
-		best = minf(best, fit)
-	return maxf(8.0, best)
+		node.name = "MeldTile%d" % index
 
 
 func river_slots(seat: int, count: int) -> Array[Rect2]:
 	var slots: Array[Rect2] = []
-	if count <= 0:
-		return slots
-	var region: Rect2 = Art.RIVERS[seat].grow(-4)
-	var side := seat in [1, 3]
-	var gap := 3.0
-	var width := river_common_width(3)
-	var height := width * 1.36
-	var along := width + gap
-	var depth := height + gap
+	var region: Rect2 = Art.RIVERS[seat]
+	var dimensions: Vector2 = [Vector2(43, 43), Vector2(29, 34), Vector2(36, 34), Vector2(29, 34)][seat]
 	for index in range(count):
-		var line := floori(float(index) / 6.0)
-		var place := index % 6
+		var row := floori(float(index) / 6.0)
+		var column := index % 6
 		var center: Vector2
-		if side:
-			var block_y := 6.0 * width + 5.0 * gap
-			var top := region.get_center().y - block_y * 0.5
-			var y := top + (place if seat == 1 else 5 - place) * along + width * 0.5
-			var near := region.position.x if seat == 1 else region.end.x
-			var x := near + (line * depth + height * 0.5) * (1.0 if seat == 1 else -1.0)
+		if seat in [1, 3]:
+			var step := dimensions.y + 2.0
+			var x := region.position.x + step * (0.5 + row) if seat == 1 else region.end.x - step * (0.5 + row)
+			var y := region.position.y + 16.0 + (column if seat == 1 else 5 - column) * (dimensions.x + 2.0)
 			center = Vector2(x, y)
 		else:
-			var block_x := 6.0 * width + 5.0 * gap
-			var left := region.get_center().x - block_x * 0.5
-			var x := left + (place if seat == 0 else 5 - place) * along + width * 0.5
-			var near := region.position.y if seat == 0 else region.end.y
-			var y := near + (line * depth + height * 0.5) * (1.0 if seat == 0 else -1.0)
+			# The near wings begin below the side rivers so dense rivers
+			# never collide. The initial rows keep their positions.
+			var rows := 3 if seat == 0 else 2
+			var step_x := dimensions.x + 2.0
+			var step_y := dimensions.y + 2.0
+			var extra_row := row - rows
+			var wing_offset := 0 if extra_row < 0 else (1 if extra_row < 2 else -1)
+			var x := 640.0 + (float(column if seat == 0 else 5 - column) - 2.5) * step_x + wing_offset * (step_x * 6 + 6)
+			var offset := float(row if extra_row < 0 else extra_row % 2) * step_y + dimensions.y * 0.5 + 1
+			var y := region.end.y - offset
+			if seat == 0:
+				y = region.position.y + offset if extra_row < 0 else region.end.y - offset
 			center = Vector2(x, y)
-		slots.append(Rect2(center - Vector2(width, height) * 0.5, Vector2(width, height)))
+		slots.append(Rect2(center - dimensions * 0.5, dimensions))
 	return slots
 
 
@@ -2238,16 +2344,20 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool) -> void:
 	var has_draw := separate >= 0
 	var reserve_draw_slot: bool = flower_hold_drawn and view.drawn >= 0
 	var slot_count := hand.size() + int(reserve_draw_slot)
-	var cursor := 640.0 - (slot_count * 59 - 3 + (10 if has_draw or reserve_draw_slot else 0)) * 0.5
+	var melds: Array = view.players[0].melds
+	var layout := local_group_layout(slot_count, melds, has_draw or reserve_draw_slot)
+	var cursor: float = layout.hand_origin.x
+	draw_melds(melds, view.gold, layout.meld_origin, 0)
 	for index in range(hand.size()):
 		var number: int = hand[index]
 		var chosen := selected_index == index
 		var drawn := has_draw and index == hand.size() - 1
 		if drawn:
-			cursor += 10
+			cursor += DRAW_GAP
 		var handler := choose_tile.bind(index, number) if playable.has(number) else Callable()
-		var node := tile(dynamic, number, Rect2(cursor, 700 - (9 if chosen else 0), 56, 76),
+		var node := tile(dynamic, number, Rect2(Vector2(cursor, HAND_Y - (9 if chosen else 0)), HAND_SIZE),
 			view.gold, handler, chosen, drawn)
+		node.upright = true
 		node.name = "HandTile%d" % index
 		human_buttons.append(node)
 		if winning >= 0 and index == hand.size() - 1:
@@ -2258,7 +2368,7 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool) -> void:
 			slide(node, Vector2(0, 18), index * 0.017)
 		elif drawn and wall_draw_from.is_finite():
 			slide(node, wall_draw_from - node.get_rect().get_center())
-		cursor += 59
+		cursor += HAND_STEP
 
 
 func points(value: int) -> String:
@@ -2387,12 +2497,13 @@ func render_actions(options: Array, moves: Array) -> void:
 		entries.append([caption, entry[1], entry[3], handler, group.any(is_swap)])
 	for option in options:
 		entries.append([option[0], option[3], "normal" if option[2] == "normal" else "primary", option[1], false])
-	var right := 1128.0
-	for index in range(entries.size() - 1, -1, -1):
+	var right := 1228.0
+	for index in range(entries.size()):
 		var entry: Array = entries[index]
-		var width := maxf(77.0, 24.0 * entry[0].length() + 30.0)
+		var width := 117.0 + 8.0 * maxi(0, String(entry[0]).length() - 3)
 		right -= width
-		var node := floating_button(entry[0], Rect2(right, 615, width, 64), entry[3], entry[4], entry[2])
+		var node := floating_button(entry[0], Rect2(right, 619, width, 55), entry[3], entry[4], entry[2])
+		right -= 15.0
 		controls[entry[1]] = node
 		if entry[1] == "discard":
 			node.disabled = not moves.any(func(move): return move.type == "discard" and move.tile == selected_tile)
@@ -2401,32 +2512,31 @@ func render_actions(options: Array, moves: Array) -> void:
 			if selected_declarations.is_empty():
 				node.disabled = true
 				node.tooltip_text = "所选牌无法报听。取消选择后可查看报听弃牌。"
-		right -= 9
 
 
-func floating_button(caption: String, rect: Rect2, handler: Callable, needs_selection: bool, style: String) -> Button:
-	var node := button(dynamic, caption, rect, handler)
+func floating_button(caption: String, rect: Rect2, handler: Callable, needs_selection: bool,
+		style: String, parent: Control = null) -> Button:
+	var node := button(parent if parent != null else dynamic, caption, rect, handler)
 	var colors: Array = {
-		"pass": [Color("#4b514e"), Color("#bfc5ba"), Color("#f2f0e8")],
+		"pass": [Color("#666562"), Color("#dbdad1"), Color("#f2f0e8")],
 		"normal": [Color("#3f5a4b"), Color("#aabda6"), Color("#f2f0e8")],
-		"meld": [Color("#28694c"), Color("#95c492"), Color("#edffe5")],
+		"meld": [Color("#16805a"), Color("#f3cb6c"), Color("#edffe5")],
 		"primary": [Color("#9a6a2e"), Color("#e0b86d"), Color("#fff2cf")],
 		"win": [Color("#a93d30"), Color("#efa073"), Color("#ffe0a3")],
+		"menu": [Color("#254637"), Color("#e5b86a"), Color("#fff1d7")],
 	}[style]
 	var base: Color = colors[0]
 	var border: Color = colors[1]
-	for state in ["normal", "hover", "pressed"]:
-		var fill := base if state == "normal" else (base.lightened(0.14) if state == "hover" else base.darkened(0.14))
-		var shape := Art.box(fill, border, 15, 2)
-		shape.shadow_color = Color(0.03, 0.08, 0.05, 0.8)
-		shape.shadow_size = 5
-		shape.shadow_offset = Vector2(0, 4)
-		node.add_theme_stylebox_override(state, shape)
+	node.add_theme_stylebox_override("normal", Art.capsule(rect.size, base, border))
+	node.add_theme_stylebox_override("hover", Art.capsule(rect.size, base.lightened(0.12), border.lightened(0.10)))
+	node.add_theme_stylebox_override("pressed", Art.capsule(rect.size, base.darkened(0.19), border.darkened(0.16)))
+	node.add_theme_stylebox_override("disabled", Art.capsule(rect.size, base.darkened(0.47), border.darkened(0.57)))
+	node.add_theme_stylebox_override("focus", Art.box(Color.TRANSPARENT, GOLD, floori(rect.size.y * 0.5), 2))
 	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		node.add_theme_color_override(state, colors[2])
 	node.add_theme_color_override("font_outline_color", base.darkened(0.55))
 	node.add_theme_constant_override("outline_size", 5)
-	node.add_theme_font_size_override("font_size", 25 if caption.length() > 1 else 35)
+	node.add_theme_font_size_override("font_size", mini(35, floori((rect.size.x - 22) / maxi(1, caption.length()))))
 	node.add_theme_font_override("font", action_font)
 	node.disabled = needs_selection and selected_tile < 0
 	return node

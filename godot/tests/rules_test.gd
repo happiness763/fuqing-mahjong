@@ -103,10 +103,13 @@ func _initialize() -> void:
 		var difficulty: String = ["easy", "normal", "hard"][seed % 3]
 		for round_number in range(1, 3):
 			var actions_taken := 0
+			var exposed_sea_flowers: Array = []
 			while game.phase != "result" and actions_taken < 300:
 				if game.phase == "sea":
 					var before_sea: int = game.sea_done
-					game.advance_sea()
+					var event: Dictionary = game.advance_sea()
+					if event.has("tile") and Rules.is_flower(event.tile, game.gold):
+						exposed_sea_flowers.append(event.tile)
 					check(game.sea_done > before_sea or game.phase == "result", "sea stage advances")
 					actions_taken += 1
 					continue
@@ -123,6 +126,7 @@ func _initialize() -> void:
 				actions_taken += 1
 			check(game.phase == "result" and actions_taken < 300, "round terminates")
 			var tiles: Array = game.wall.duplicate()
+			tiles.append_array(exposed_sea_flowers)
 			for player in game.players:
 				tiles.append_array(player.hand + player.flowers + player.river)
 				for meld in player.melds:

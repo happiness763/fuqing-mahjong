@@ -1,20 +1,15 @@
 extends Control
 
-const Art = preload("res://scripts/table_art.gd")
-
-const PANEL = preload("res://assets/effects/center_panel.png")
-const FRAME_SIZE := Vector2(184, 184)
+const DIAL_SURFACE = preload("res://assets/effects/compass_dial.gdshader")
+const FRAME_SIZE := Vector2(174, 152)
 const MIDPOINT := FRAME_SIZE * 0.5
-const TAB_CENTERS := [Vector2(21, 163), Vector2(163, 163), Vector2(163, 21), Vector2(21, 21)]
+const TAB_CENTERS := [Vector2(87, 123), Vector2(146, 71), Vector2(87, 25), Vector2(28, 71)]
 const TAB_SIZE := Vector2(34, 30)
-const WIND_ROTATIONS := [0, -90, 180, 90]
 const SCORE_SIZE := Vector2(58, 20)
-const SCORE_CENTERS := [Vector2(92, 136), Vector2(139, 92), Vector2(92, 44), Vector2(45, 92)]
-const SCORE_ROTATIONS := [0, 90, 180, 270]
-const INK := Color("#c9cedb")
+const SCORE_CENTERS := [Vector2(87, 108), Vector2(147, 91), Vector2(87, 43), Vector2(27, 91)]
+const INK := Color("#e9c47a")
 const ACTIVE_INK := Color("#fff0c9")
-const CYAN := Color("#7fe6d8")
-const GOLD := Color("#e8c15a")
+const CYAN := Color("#72f4ed")
 
 var winds: Array = []
 var active_seat := -1
@@ -28,6 +23,7 @@ var _score_labels: Array[Label] = []
 var _time := 0.0
 var wind_font: Font
 var number_font: FontVariation
+var surface_material: ShaderMaterial
 
 
 func setup(font: Font, score_font: Font = null) -> void:
@@ -36,6 +32,15 @@ func setup(font: Font, score_font: Font = null) -> void:
 	size = FRAME_SIZE
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_process(true)
+	var surface := ColorRect.new()
+	surface.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	surface.show_behind_parent = true
+	surface.size = Vector2(192, 174)
+	surface.position = MIDPOINT - surface.size * 0.5
+	surface_material = ShaderMaterial.new()
+	surface_material.shader = DIAL_SURFACE
+	surface.material = surface_material
+	add_child(surface)
 	number_font = FontVariation.new()
 	number_font.base_font = score_font if score_font != null else font
 	number_font.variation_embolden = 0.8
@@ -44,7 +49,6 @@ func setup(font: Font, score_font: Font = null) -> void:
 		var center: Vector2 = TAB_CENTERS[seat]
 		var direction := _label(font, Rect2(center - TAB_SIZE * 0.5, TAB_SIZE), 24, INK)
 		direction.pivot_offset = TAB_SIZE * 0.5
-		direction.rotation_degrees = WIND_ROTATIONS[seat]
 		direction.hide()
 		_labels.append(direction)
 	for seat in range(SCORE_CENTERS.size()):
@@ -53,17 +57,17 @@ func setup(font: Font, score_font: Font = null) -> void:
 		score.add_theme_color_override("font_outline_color", Color("#101820"))
 		score.add_theme_constant_override("outline_size", 3)
 		score.pivot_offset = score.size * 0.5
-		score.rotation_degrees = SCORE_ROTATIONS[seat]
 		score.modulate.a = 0.0
 		_score_labels.append(score)
-	round_label = _label(font, Rect2(65, 65, 54, 24), 12, CYAN)
+	round_label = _label(font, Rect2(51, 77, 72, 24), 11, CYAN)
 	round_label.name = "DialRound"
-	clock = _label(text_font, Rect2(65, 94, 54, 24), 20, CYAN)
+	round_label.hide()
+	clock = _label(text_font, Rect2(51, 54, 72, 36), 36, CYAN)
 	clock.name = "CenterCountdown"
 	clock.modulate.a = 0.0
 	clock.add_theme_color_override("font_shadow_color", Color("#0c1c26"))
 	clock.add_theme_constant_override("shadow_offset_y", 2)
-	fallback = _label(text_font, Rect2(65, 94, 54, 24), 13, CYAN)
+	fallback = _label(text_font, Rect2(51, 60, 72, 22), 21, CYAN)
 	fallback.name = "DialRemaining"
 	fallback.modulate.a = 0.0
 	set_countdown("")
@@ -97,6 +101,9 @@ func set_seats(directions: Array, active: int) -> void:
 		return
 	winds = directions
 	active_seat = active
+	var directions_on_screen := [Vector2.DOWN, Vector2.RIGHT, Vector2.UP, Vector2.LEFT]
+	surface_material.set_shader_parameter("active_direction",
+		directions_on_screen[active] if active in range(4) else Vector2.ZERO)
 	for seat in range(_labels.size()):
 		_labels[seat].text = winds[seat]
 	_refresh_colors()
@@ -113,7 +120,7 @@ func set_dealer(seat: int) -> void:
 
 func _refresh_colors() -> void:
 	for seat in range(_labels.size()):
-		var color := Color("#2a2016") if seat == dealer else (ACTIVE_INK if seat == active_seat else INK)
+		var color := CYAN if seat == active_seat else (ACTIVE_INK if seat == dealer else INK)
 		_labels[seat].add_theme_color_override("font_color", color)
 
 
@@ -141,7 +148,7 @@ func _process(delta: float) -> void:
 	if active_seat < 0:
 		return
 	_time += delta
-	queue_redraw()
+	surface_material.set_shader_parameter("light_phase", 0.86 + 0.14 * sin(_time * 4.2))
 
 
 func _label(font: Font, rect: Rect2, point_size: int, color: Color) -> Label:
@@ -161,44 +168,20 @@ func _label(font: Font, rect: Rect2, point_size: int, color: Color) -> Label:
 
 
 func _draw() -> void:
-	draw_texture_rect_region(PANEL, Rect2(Vector2.ZERO, FRAME_SIZE), Rect2(103, 109, 1051, 969))
-	if dealer >= 0:
-		var center: Vector2 = TAB_CENTERS[dealer]
-		var tab := Rect2(center - Vector2(17, 14), Vector2(34, 28))
-		draw_style_box(Art.box(Color("#e8c15a"), Color("#8a6a2a"), 6, 2), tab)
-		draw_style_box(Art.box(Color(1.0, 0.93, 0.72, 0.18), Color.TRANSPARENT, 5, 0), tab.grow(-2))
-	if active_seat >= 0:
-		_draw_lamp(active_seat)
 	for seat in range(_score_labels.size()):
 		var label := _score_labels[seat]
-		_draw_number(label.text, SCORE_CENTERS[seat], SCORE_ROTATIONS[seat], 18, label.get_theme_color("font_color"))
+		_draw_number(label.text, SCORE_CENTERS[seat], 0, 11,
+			Color("#a1c3ac") if label.text == "0" else label.get_theme_color("font_color"))
 	if is_instance_valid(clock):
-		_draw_number(clock.text if clock.visible else fallback.text, Vector2(92, 106), 0, 20, clock.get_theme_color("font_color"))
+		_draw_number(clock.text if clock.visible else fallback.text, MIDPOINT - Vector2(0, 2), 0,
+			36 if clock.visible else 23, CYAN)
 	for seat in range(winds.size()):
-		var ink := Color("#2a2016") if seat == dealer else INK
+		var ink := _labels[seat].get_theme_color("font_color")
 		var text: String = winds[seat]
-		var dimensions := wind_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22)
-		draw_set_transform(TAB_CENTERS[seat], deg_to_rad(WIND_ROTATIONS[seat]))
-		draw_string(wind_font, Vector2(-dimensions.x * 0.5, wind_font.get_ascent(22) - wind_font.get_height(22) * 0.5), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, ink)
-		draw_set_transform(Vector2.ZERO)
-
-
-func _draw_lamp(seat: int) -> void:
-	var centers := [Vector2(92, 155), Vector2(155, 92), Vector2(92, 29), Vector2(29, 92)]
-	var angles := [0.0, 90.0, 180.0, 270.0]
-	var center: Vector2 = centers[seat]
-	var pulse := 0.82 + 0.18 * sin(_time * 4.2)
-	draw_set_transform(center, deg_to_rad(angles[seat]), Vector2.ONE)
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(-34, -10), Vector2(34, -10), Vector2(24, 7), Vector2(-24, 7),
-	]), Color(1.0, 0.78, 0.28, 0.14 * pulse))
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(-29, -7), Vector2(29, -7), Vector2(20, 5), Vector2(-20, 5),
-	]), Color(1.0, 0.83, 0.38, 0.34 * pulse))
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(-24, -4), Vector2(24, -4), Vector2(16, 3), Vector2(-16, 3),
-	]), Color(GOLD, 0.95 * pulse))
-	draw_set_transform(Vector2.ZERO)
+		var dimensions := wind_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 23)
+		var at: Vector2 = TAB_CENTERS[seat] + Vector2(-dimensions.x * 0.5,
+			wind_font.get_ascent(23) - wind_font.get_height(23) * 0.5)
+		draw_string(wind_font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 23, ink)
 
 
 func _draw_number(text: String, center: Vector2, angle: float, point_size: int, ink: Color) -> void:

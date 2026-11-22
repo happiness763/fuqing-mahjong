@@ -30,9 +30,9 @@ func run() -> void:
 
 
 func test_wall_layout() -> void:
-	var footprints: Array[Rect2] = []
-	var dial := Rect2(548, 318, 184, 164)
-	var gold := Rect2(71, 92, 176, 72)
+	var face_footprints: Array[PackedVector2Array] = []
+	var dial := Rect2(553, 249, 174, 152)
+	var gold := Rect2(18, 17, 302, 67)
 	for seat in range(4):
 		var first := seat * 36
 		var wall := TableWall.slot_rect(first, 0)
@@ -43,32 +43,33 @@ func test_wall_layout() -> void:
 			0:
 				check(river.position.y > dial.end.y and river.end.y < 615,
 					"near river sits between the dial and the hand controls")
-				check(wall.end.y < 615, "near wall clears the hand and the action buttons")
+				check(wall.position.y > river.end.y and wall.end.y < 691,
+					"near wall sits below the river and clears the raised hand")
 			1:
 				check(river.position.x > dial.end.x and wall.position.x >= river.end.x - 1,
 					"right river is between the dial and the right wall")
-				check(wall.end.x < 1006, "right wall clears the right avatar")
+				check(wall.end.x < 1230, "right wall stays within the table edge")
 			2:
 				check(wall.end.y < river.position.y and river.end.y < dial.position.y,
 					"far river is between the dial and the far wall")
-				check(wall.position.y > 145, "far wall clears the far melds")
+				check(wall.end.y < 139, "far wall clears the far melds")
 			3:
 				check(river.end.x < dial.position.x and wall.end.x <= river.position.x + 1,
 					"left river is between the dial and the left wall")
-				check(wall.position.x > 275, "left wall clears the left avatar")
+				check(wall.position.x > 50, "left wall stays within the table edge")
 		if seat % 2 == 0:
-			check(wall.size.x >= 450 and wall.size.x <= 520, "horizontal wall spans the table")
+			check(wall.size.x >= 730 and wall.size.x <= 970, "horizontal wall spans the table")
 		else:
-			check(wall.size.y >= 360 and wall.size.y <= 430, "side wall spans the table")
+			check(wall.size.y >= 360 and wall.size.y <= 440, "side wall spans the table including both thick layers")
 		check(Art.FELT.encloses(wall) and not gold.intersects(wall), "wall stays on the felt clear of gold")
-		check(not footprints.any(func(area): return wall.grow(5).intersects(area)), "wall corners leave gaps")
-		footprints.append(wall)
+		for slot in range(first, first + 36, 2):
+			var face := TableWall.face_quad(slot, 0)
+			check(not face_footprints.any(func(other): return not Geometry2D.intersect_polygons(other, face).is_empty()),
+				"perspective faces leave the neighboring stacks and wall corners clear")
+			face_footprints.append(face)
 		var upper := TableWall.slot_rect(first, 0)
 		var lower := TableWall.slot_rect(first + 1, 0)
 		check(upper.intersects(lower) and upper.position != lower.position, "a stack has two visible layers")
-		for stack in range(first, first + 34, 2):
-			check(not TableWall.slot_rect(stack, 0).intersects(TableWall.slot_rect(stack + 2, 0)),
-				"neighboring stacks have distinct footprints")
 		check(TableWall.slot_rect(first, 1) == TableWall.slot_rect((first + 36) % 144, 0),
 			"changing perspective rotates the wall without reindexing its physical slots")
 
@@ -288,7 +289,7 @@ func test_dense_rivers(desk) -> void:
 	var view: Dictionary = desk.game.view(0)
 	# A full river of six-per-row tiles keeps the reference size.
 	var numbers: Array = []
-	for index in range(18):
+	for index in range(36):
 		numbers.append(index % 27)
 	check(desk.river_slots(0, 6)[0].size == desk.river_slots(0, 24)[0].size,
 		"discard tiles keep one size regardless of the river length")

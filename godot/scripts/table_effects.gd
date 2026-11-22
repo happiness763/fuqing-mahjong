@@ -24,7 +24,6 @@ const PARTICLES := {"top": 120, "big": 80, "mid": 50, "small": 18}
 var desk
 var action_font: Font
 var body_font: Font
-var seat_positions: Array = []
 var center := Vector2(640, 400)
 var mode := "full"
 var time := 0.0
@@ -52,11 +51,10 @@ var big_win_active := false
 var _rng := RandomNumberGenerator.new()
 
 
-func setup(table, action: Font, body: Font, positions: Array, dial_center: Vector2) -> void:
+func setup(table, action: Font, body: Font, dial_center: Vector2) -> void:
 	desk = table
 	action_font = action
 	body_font = body
-	seat_positions = positions
 	center = dial_center
 	size = Vector2(1280, 800)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -92,10 +90,10 @@ func style_for(result: Dictionary) -> Dictionary:
 
 
 func winner_center(seat: int) -> Vector2:
-	if seat < 0 or seat >= seat_positions.size():
+	if seat < 0 or seat >= 4:
 		return center
-	var width := 154.0 if seat in [0, 2] else 126.0
-	return seat_positions[seat] + Vector2(width * 0.5, 20)
+	var portrait: Rect2 = desk.interactions.portrait_rects.get(seat, desk.seat_portrait_rect(seat))
+	return portrait.get_center()
 
 
 func play_win(view: Dictionary, source := Rect2(), target := Rect2()) -> void:
@@ -159,7 +157,7 @@ func score_delta(seat: int, delta: int) -> void:
 	if mode == "off" or delta == 0:
 		return
 	score_floats.append({
-		"point": seat_positions[seat] + Vector2((154.0 if seat in [0, 2] else 126.0) * 0.5, 68),
+		"point": winner_center(seat) + Vector2(-35, 45),
 		"start": time,
 		"text": desk.points(delta),
 		"color": desk.score_color(delta),
@@ -269,13 +267,10 @@ func _draw() -> void:
 
 
 func _draw_active_ring() -> void:
-	var width := 154.0 if active_seat in [0, 2] else 126.0
-	var rect := Rect2(seat_positions[active_seat], Vector2(width, 39)).grow(2)
+	var portrait: Rect2 = desk.seat_portrait_rect(active_seat)
 	var pulse := 0.5 + 0.5 * sin(time * 3.2)
 	var color := Color(GOLD_RING.r, GOLD_RING.g, GOLD_RING.b, 0.28 + 0.32 * pulse)
-	draw_style_box(Art.box(Color.TRANSPARENT, color, 10, 2), rect)
-	draw_style_box(Art.box(Color(GOLD_RING.r, GOLD_RING.g, GOLD_RING.b, 0.05 + 0.05 * pulse),
-		Color.TRANSPARENT, 10, 0), rect.grow(3))
+	draw_arc(portrait.get_center(), portrait.size.x * 0.5 + 3, 0, TAU, 64, color, 3, true)
 
 
 const GOLD_RING := Color("#f0cf7a")
