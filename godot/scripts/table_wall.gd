@@ -174,7 +174,9 @@ func draw_tile(slot: int) -> void:
 		var a := outline[i]
 		var b := outline[(i + 1) % outline.size()]
 		var normal := Vector2(b.y - a.y, a.x - b.x).normalized()
-		if normal.dot(depth) <= 0:
+		# Edges parallel to the projection have no visible side. Reject
+		# subpixel slivers before the renderer attempts to triangulate them.
+		if normal.dot(depth) <= 0.24:
 			continue
 		var key := 0.64 + 0.36 * maxf(0, normal.dot(Vector2(-0.5, 0.87)))
 		var ivory := Color("#ece0bc") * Color(key, key, key)
