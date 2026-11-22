@@ -56,7 +56,7 @@ func run() -> void:
 	var desk = Desk.instantiate()
 	desk.preferences_root = OS.get_temp_dir().path_join("fuqing-desktop-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	root.add_child(desk)
-	check(ProjectSettings.get_setting("application/config/version") == "1.3.2", "project version")
+	check(ProjectSettings.get_setting("application/config/version") == "1.3.3", "project version")
 	check(is_instance_valid(desk.action_font) and desk.action_font.has_char("胡".unicode_at(0)),
 		"action captions use the bundled display font")
 	check(is_instance_valid(desk.fx) and desk.effects in ["full", "simple", "off"],

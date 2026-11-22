@@ -43,7 +43,8 @@ func test_wall_layout() -> void:
 			0:
 				check(river.position.y > dial.end.y and river.end.y < 615,
 					"near river sits between the dial and the hand controls")
-				check(wall.end.y < 615, "near wall clears the hand and the action buttons")
+				check(wall.position.y > river.end.y and wall.end.y < 691,
+					"near wall sits below the river and clears the raised hand")
 			1:
 				check(river.position.x > dial.end.x and wall.position.x >= river.end.x - 1,
 					"right river is between the dial and the right wall")

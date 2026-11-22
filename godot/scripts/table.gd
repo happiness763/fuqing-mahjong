@@ -36,8 +36,8 @@ const GOLD := Color("#edc780")
 const REDEAL_NOTICE := "首巡四家同牌 · 流局"
 const BUTTON := Color("#294638")
 const FONT_DARK := Color("#202e25")
-const GOLD_AREA := Rect2(71, 92, 176, 64)
-const SEAT_POSITIONS := [Vector2(154, 640), Vector2(1006, 290), Vector2(563, 40), Vector2(149, 290)]
+const GOLD_AREA := Rect2(120, 92, 176, 64)
+const SEAT_POSITIONS := [Vector2(154, 640), Vector2(1074, 290), Vector2(563, 40), Vector2(80, 290)]
 
 var game
 var action_font: FontVariation
@@ -1925,16 +1925,16 @@ func _flip_wall_gold(card: Control, gold_display: Control) -> void:
 
 func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: bool) -> void:
 	winning_tile_rect = Rect2()
-	label(dynamic, "第 %02d / %02d 局" % [view.round, view.round_limit], Rect2(71, 40, 170, 27), 17, GOLD)
+	label(dynamic, "第 %02d / %02d 局" % [view.round, view.round_limit], Rect2(120, 40, 170, 27), 17, GOLD)
 	var sea: Dictionary = view.get("sea", {})
 	if view.phase == "sea":
 		label(dynamic, "海底 %d/%d" % [int(sea.get("done", 0)), int(sea.get("total", Rules.SEA_COUNT))],
-			Rect2(71, 67, 135, 25), 14, GOLD)
+			Rect2(120, 67, 135, 25), 14, GOLD)
 	else:
 		var playable: int = view.remaining
 		if intro_active() or flower_active:
 			playable = maxi(0, wall_art.slots.size() - int(view.get("reserve", Rules.RESERVE)))
-		label(dynamic, "可摸 %d 张" % playable, Rect2(71, 67, 135, 25), 14, MUTED)
+		label(dynamic, "可摸 %d 张" % playable, Rect2(120, 67, 135, 25), 14, MUTED)
 	center_dial.visible = not intro_active() and view.phase != "redeal"
 	var public_turn: bool = view.phase == "turn" and not online_reconnecting
 	center_dial.set_seats(view.get("winds", WINDS), int(view.current) if public_turn else -1)
@@ -1975,10 +1975,10 @@ func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: b
 					_flip_wall_gold(card, gold_display)
 	var rob_tile: int = view.get("rob_tile", -1)
 	if view.phase == "robKong" and rob_tile >= 0 and moves.any(func(move): return move.type == "win"):
-		var offer := panel(dynamic, Rect2(695, 623, 130, 55), Color("#1a3d31"), GOLD, 10)
+		var offer := panel(dynamic, Rect2(1055, 608, 50, 71), Color("#1a3d31"), GOLD, 10)
 		offer.name = "RobKongOffer"
-		label(offer, "可抢的补杠牌", Rect2(45, 0, 80, 55), 12, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-		tile(offer, rob_tile, Rect2(8, 5, 32, 44), view.gold, Callable(), false, true)
+		label(offer, "抢杠", Rect2(0, 0, 50, 20), 12, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+		tile(offer, rob_tile, Rect2(9, 22, 32, 44), view.gold, Callable(), false, true)
 
 	table_seat_records = []
 	if stats != null and not stats_table_id.is_empty():
@@ -1989,17 +1989,17 @@ func render_board(view: Dictionary, moves: Array, deal: bool, animate_discard: b
 	draw_hand(view, moves, deal)
 	if view.phase == "sea":
 		var event: Dictionary = view.get("latest", {})
-		var sea_notice := panel(dynamic, Rect2(480, 588, 320, 62), Color("#1a3d31"), GOLD, 12)
+		var sea_notice := panel(dynamic, Rect2(70, 440, 146, 93), Color("#1a3d31"), GOLD, 12)
 		sea_notice.name = "SeaNotice"
 		if event.get("type", "") == "sea" and int(event.get("tile", -1)) >= 0:
 			var sea_tile := int(event.tile)
 			var who := player_name(int(event.seat))
-			label(sea_notice, "海底 · " + who, Rect2(12, 6, 190, 20), 14, GOLD)
-			tile(sea_notice, sea_tile, Rect2(206, 10, 28, 38), view.gold)
+			label(sea_notice, "海底 · " + who, Rect2(7, 4, 132, 20), 14, GOLD)
+			tile(sea_notice, sea_tile, Rect2(12, 35, 28, 38), view.gold)
 			label(sea_notice, "花牌 · 不计花" if bool(event.get("flower", false)) else Rules.tile_name(sea_tile),
-				Rect2(242, 18, 70, 22), 13, INK)
+				Rect2(47, 40, 92, 25), 13, INK)
 		else:
-			label(sea_notice, "海底 · 等待摸牌", Rect2(0, 0, 320, 62), 16, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+			label(sea_notice, "海底 · 等待摸牌", Rect2(0, 0, 146, 93), 16, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	if view.phase == "redeal":
 		var bounds := Rect2(Art.CENTER - Vector2(90, 23), Vector2(180, 46))
 		redeal_notice = panel(dynamic, bounds, Color("#21392e"), GOLD, 12)
@@ -2062,24 +2062,29 @@ func draw_seat(view: Dictionary, seat: int, origin: Vector2) -> void:
 		values.sort()
 		if winning >= 0:
 			values.append(winning)
-		var columns := 17 if wide else 8
+		var strip := Control.new()
+		strip.name = "RevealedHand%d" % seat
+		strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var span := maxf(0.0, values.size() * 14.0 - 2.0)
+		strip.rotation_degrees = [0, 270, 180, 90][seat]
+		if seat == 2:
+			strip.position = Vector2(640 + span * 0.5, 104)
+		elif seat == 1:
+			strip.position = Vector2(1066, 350 + span)
+		else:
+			strip.position = Vector2(214, 350)
+		dynamic.add_child(strip)
 		for index in range(values.size()):
-			var items_in_row := mini(columns, values.size() - (index - index % columns))
-			var row: int = floori(float(index) / columns)
-			var left := origin.x + (width - items_in_row * 14) * 0.5
-			var bounds := Rect2(left + (index % columns) * 14, origin.y + 43 + row * 21, 12, 18)
-			tile(dynamic, values[index], bounds, view.gold)
+			var card := tile(strip, values[index], Rect2(index * 14, 0, 12, 18), view.gold)
+			card.name = "RevealedTile%d_%d" % [seat, index]
 			if winning >= 0 and index == values.size() - 1:
-				winning_tile_rect = bounds
-	if not player.melds.is_empty():
-		var anchor := origin + Vector2(width * 0.5, 61 if wide else 112)
-		if seat == 0:
-			anchor = Vector2(319, 615 if player.melds.size() > 3 else 648)
-		elif not wide and gold_gap.size() == 2 and player.has("hand"):
-			anchor.y += 17
-		draw_melds(player.melds, view.gold, anchor, seat)
+				winning_tile_rect = tile_canvas_rect(card)
+	# The local exposed groups are measured together with the actual visible hand
+	# in draw_hand; the other seats have a single strip along their own table edge.
+	if seat != 0 and not player.melds.is_empty():
+		draw_melds(player.melds, view.gold, Vector2.ZERO, seat)
 	if gold_gap.size() == 2:
-		var gap_origins := [Vector2(157, 594), Vector2(1007, 359), Vector2(735, 40), Vector2(150, 359)]
+		var gap_origins := [Vector2(157, 594), Vector2(1080, 190), Vector2(735, 40), Vector2(80, 355)]
 		var gap_origin: Vector2 = gap_origins[seat]
 		if not wide and player.has("hand"):
 			gap_origin.y += 14
@@ -2095,43 +2100,93 @@ func meld_width(meld: Dictionary) -> float:
 	return count * 25.0 + (0.0 if meld.type == "concealedKong" else 8.0)
 
 
+func melds_width(melds: Array) -> float:
+	var span := 0.0
+	for meld in melds:
+		span += meld_width(meld)
+	return span + maxf(0.0, melds.size() - 1.0) * 8.0
+
+
+func local_group_layout(slot_count: int, melds: Array, separated: bool) -> Dictionary:
+	var hand_width := maxf(0.0, slot_count * 59.0 - 3.0) + (10.0 if separated and slot_count > 0 else 0.0)
+	var exposed_width := melds_width(melds)
+	var gap := 22.0 if slot_count > 0 and not melds.is_empty() else 0.0
+	var span := hand_width + gap + exposed_width
+	var left := 640.0 - span * 0.5
+	return {"hand_origin": Vector2(left, 700), "hand_width": hand_width,
+		"meld_origin": Vector2(left + hand_width + gap, 730),
+		"bounds": Rect2(left, 691, span, 85)}
+
+
+func meld_strip_layout(melds: Array, origin: Vector2, seat: int) -> Dictionary:
+	var span := melds_width(melds)
+	var factor := minf(1.0, 380.0 / maxf(1.0, span)) if seat in [1, 3] else 1.0
+	var anchor := origin
+	if seat == 1:
+		anchor = Vector2(1018, 420 + span * factor * 0.5)
+	elif seat == 2:
+		anchor = Vector2(640 + span * 0.5, 147)
+	elif seat == 3:
+		anchor = Vector2(262, 420 - span * factor * 0.5)
+	var angle := float([0, 270, 180, 90][seat])
+	var transform := Transform2D(deg_to_rad(angle), Vector2.ONE * factor, 0.0, anchor)
+	return {"origin": anchor, "scale": factor, "angle": angle,
+		"bounds": transform * Rect2(0, 0, span, 33)}
+
+
+func tile_canvas_rect(card: Control) -> Rect2:
+	# Effect coordinates are in the table's design canvas, including any seat
+	# rotation, but excluding the whole table's responsive window scaling.
+	var transform := get_global_transform().affine_inverse() * card.get_global_transform()
+	return transform * Rect2(Vector2.ZERO, card.size)
+
+
 func draw_melds(melds: Array, gold: int, origin: Vector2, seat: int) -> void:
-	var columns := 3 if seat == 0 else (melds.size() if seat == 2 else 1)
-	for first in range(0, melds.size(), columns):
-		var row := floori(float(first) / columns)
-		var groups := melds.slice(first, first + columns)
-		var span := -8.0
-		for meld in groups:
-			span += meld_width(meld) + 8.0
-		var x := origin.x if seat == 0 else origin.x - span * 0.5
-		var y := origin.y + row * 34
-		for meld in groups:
-			draw_meld(meld, gold, Vector2(x, y), seat)
-			x += meld_width(meld) + 8.0
+	if melds.is_empty():
+		return
+	var layout := meld_strip_layout(melds, origin, seat)
+	var strip := Control.new()
+	strip.name = "MeldsSeat%d" % seat
+	strip.position = layout.origin
+	strip.rotation_degrees = layout.angle
+	strip.scale = Vector2.ONE * float(layout.scale)
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dynamic.add_child(strip)
+	var cursor := 0.0
+	for index in range(melds.size()):
+		var group := Control.new()
+		group.name = "Meld%d" % index
+		group.position = Vector2(cursor, 0)
+		group.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		strip.add_child(group)
+		draw_meld(melds[index], gold, Vector2.ZERO, seat, group)
+		cursor += meld_width(melds[index]) + 8.0
 
 
-func draw_meld(meld: Dictionary, gold: int, origin: Vector2, seat: int) -> void:
+func draw_meld(meld: Dictionary, gold: int, origin: Vector2, seat: int, parent: Control = null) -> void:
+	var holder := parent if parent != null else dynamic
 	var numbers: Array = meld.tiles.slice(0, 3) if meld.type == "addedKong" else meld.tiles
 	var sideways := -1
 	if meld.type == "chow":
 		sideways = numbers.find(meld.get("claimed", numbers[0]))
 	elif meld.type != "concealedKong":
-		var relative: int = posmod(meld.from - seat, 4)
+		var relative: int = posmod(meld.get("from", seat) - seat, 4)
 		sideways = 0 if relative == 3 else (1 if relative == 2 else numbers.size() - 1)
 	var x := origin.x
 	for index in range(numbers.size()):
-		var y := origin.y
+		var node: Control
 		if index == sideways:
-			if meld.type == "addedKong":
-				var added := tile(dynamic, meld.tiles[3], Rect2(x + 32, y + 1, 24, 32), gold)
-				added.rotation_degrees = 90
-				y += 7
-			var node := tile(dynamic, numbers[index], Rect2(x + 32, y + 8, 24, 32), gold)
+			node = tile(holder, numbers[index], Rect2(x + 32, origin.y + 8, 24, 32), gold)
 			node.rotation_degrees = 90
+			if meld.type == "addedKong":
+				var added := tile(holder, meld.tiles[3], Rect2(x + 32, origin.y, 24, 32), gold)
+				added.name = "AddedTile"
+				added.rotation_degrees = 90
 			x += 33
 		else:
-			tile(dynamic, numbers[index], Rect2(x, y, 24, 32), gold)
+			node = tile(holder, numbers[index], Rect2(x, origin.y, 24, 32), gold)
 			x += 25
+		node.name = "MeldTile%d" % index
 
 
 func river_common_width(size_rows: int) -> float:
@@ -2238,7 +2293,10 @@ func draw_hand(view: Dictionary, moves: Array, deal: bool) -> void:
 	var has_draw := separate >= 0
 	var reserve_draw_slot: bool = flower_hold_drawn and view.drawn >= 0
 	var slot_count := hand.size() + int(reserve_draw_slot)
-	var cursor := 640.0 - (slot_count * 59 - 3 + (10 if has_draw or reserve_draw_slot else 0)) * 0.5
+	var melds: Array = view.players[0].melds
+	var layout := local_group_layout(slot_count, melds, has_draw or reserve_draw_slot)
+	var cursor: float = layout.hand_origin.x
+	draw_melds(melds, view.gold, layout.meld_origin, 0)
 	for index in range(hand.size()):
 		var number: int = hand[index]
 		var chosen := selected_index == index
@@ -2387,12 +2445,11 @@ func render_actions(options: Array, moves: Array) -> void:
 		entries.append([caption, entry[1], entry[3], handler, group.any(is_swap)])
 	for option in options:
 		entries.append([option[0], option[3], "normal" if option[2] == "normal" else "primary", option[1], false])
-	var right := 1128.0
-	for index in range(entries.size() - 1, -1, -1):
+	for index in range(entries.size()):
 		var entry: Array = entries[index]
-		var width := maxf(77.0, 24.0 * entry[0].length() + 30.0)
-		right -= width
-		var node := floating_button(entry[0], Rect2(right, 615, width, 64), entry[3], entry[4], entry[2])
+		var node := floating_button(entry[0], Rect2(1112, 335 + index * 68, 108, 64), entry[3], entry[4], entry[2])
+		var point_size := mini(35, floori(88.0 / maxi(1, String(entry[0]).length())))
+		node.add_theme_font_size_override("font_size", maxi(13, point_size))
 		controls[entry[1]] = node
 		if entry[1] == "discard":
 			node.disabled = not moves.any(func(move): return move.type == "discard" and move.tile == selected_tile)
@@ -2401,7 +2458,6 @@ func render_actions(options: Array, moves: Array) -> void:
 			if selected_declarations.is_empty():
 				node.disabled = true
 				node.tooltip_text = "所选牌无法报听。取消选择后可查看报听弃牌。"
-		right -= 9
 
 
 func floating_button(caption: String, rect: Rect2, handler: Callable, needs_selection: bool, style: String) -> Button:

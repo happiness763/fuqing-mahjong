@@ -10,6 +10,7 @@ const RIVERS := [
 ]
 const BRASS := Color("#c49a61")
 const DICE_RING_RADIUS := 62.0
+const FAR_EDGE_INSET := 66.0
 
 var dice := Vector2i.ZERO
 var table_texture: Texture2D
@@ -41,7 +42,8 @@ func _ready() -> void:
 	var grain := RandomNumberGenerator.new()
 	grain.seed = 811
 	for index in range(3300):
-		_flecks.append(FELT.position + Vector2(grain.randf_range(6, FELT.size.x - 6), grain.randf_range(6, FELT.size.y - 6)))
+		_flecks.append(surface_point(Vector2(grain.randf_range(6, FELT.size.x - 6),
+			grain.randf_range(6, FELT.size.y - 6)) / FELT.size))
 
 
 func set_dice(faces: Vector2i) -> void:
@@ -92,17 +94,32 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	gradient(background_area, Color("#253a30"), Color("#10231d"))
-	draw_style_box(box(Color("#0c1814"), Color("#0c1814"), 24), Rect2(FRAME.position + Vector2(0, 7), FRAME.size).grow(3))
-	draw_style_box(box(Color("#784830"), Color("#9d6946"), 23, 2), FRAME)
-	draw_style_box(box(Color("#815137"), Color("#b18151"), 20), FRAME.grow(-4))
-	draw_style_box(box(Color("#5b3829"), Color("#3e271e"), 17, 2), FRAME.grow(-8))
-	draw_style_box(box(Color("#23523f"), Color("#112c22"), 15, 2), FELT)
+	var shadow := table_polygon(Rect2(FRAME.position + Vector2(0, 7), FRAME.size).grow(3))
+	draw_colored_polygon(shadow, Color("#0c1814"))
+	draw_surface(FRAME, Color("#784830"), Color("#9d6946"), 2.0)
+	draw_surface(FRAME.grow(-4), Color("#815137"), Color("#b18151"))
+	draw_surface(FRAME.grow(-8), Color("#5b3829"), Color("#3e271e"), 2.0)
+	draw_surface(FELT, Color("#23523f"), Color("#112c22"), 2.0)
 	if table_texture:
 		var image_size := table_texture.get_size()
 		var scale := maxf(FELT.size.x / image_size.x, FELT.size.y / image_size.y)
 		var crop_size := FELT.size / scale
-		draw_texture_rect_region(table_texture, FELT, Rect2((image_size - crop_size) * 0.5, crop_size),
-			Color(0.83, 0.83, 0.83))
+		var uv_start := (image_size - crop_size) * 0.5 / image_size
+		var uv_size := crop_size / image_size
+		# Thin horizontal quads map the cropped cloth onto the tapered
+		# surface without a diagonal seam across a large custom image.
+		for strip in range(32):
+			var top := float(strip) / 32.0
+			var bottom := float(strip + 1) / 32.0
+			var uv := PackedVector2Array([Vector2(0, top), Vector2(1, top),
+				Vector2(1, bottom), Vector2(0, bottom)])
+			var points := PackedVector2Array()
+			var texture_uv := PackedVector2Array()
+			for point in uv:
+				points.append(surface_point(point))
+				texture_uv.append(uv_start + point * uv_size)
+			draw_polygon(points, PackedColorArray([Color(0.83, 0.83, 0.83)]),
+				texture_uv, table_texture)
 	else:
 		for ring in range(9, 0, -1):
 			var scale := ring / 9.0
@@ -114,13 +131,14 @@ func _draw() -> void:
 			var seed_x := float((index * 137) % 1180)
 			var seed_y := float((index * 223) % 700)
 			var drift := sin(_ambience_time * 0.32 + index * 1.7)
-			var point := FELT.position + Vector2(50 + seed_x,
-				40 + fmod(seed_y + _ambience_time * (4.0 + index % 3), 700.0))
+			var point := surface_point(Vector2(0.04 + seed_x / 1280.0,
+				0.04 + fmod(seed_y + _ambience_time * (4.0 + index % 3), 700.0) / 780.0))
 			point.x += drift * 9.0
 			draw_circle(point, 1.2 + float(index % 3) * 0.5,
 				Color(0.84, 0.92, 0.78, 0.035 + 0.025 * (0.5 + 0.5 * drift)))
-	draw_style_box(box(Color.TRANSPARENT, Color("#638064"), 11), FELT.grow(-6))
-	for corner in [Vector2(57, 45), Vector2(1223, 45), Vector2(57, 755), Vector2(1223, 755)]:
+	draw_polyline(closed_polygon(table_polygon(FELT.grow(-6))), Color("#638064"), 1.0, true)
+	for corner in [surface_point(Vector2(0.014, 0.022)), surface_point(Vector2(0.986, 0.022)),
+			surface_point(Vector2(0.014, 0.978)), surface_point(Vector2(0.986, 0.978))]:
 		var horizontal := -1.0 if corner.x > 500 else 1.0
 		var vertical := -1.0 if corner.y > 400 else 1.0
 		var points := PackedVector2Array()
@@ -143,3 +161,26 @@ func _draw() -> void:
 func gradient(rect: Rect2, top: Color, bottom: Color) -> void:
 	var points := PackedVector2Array([rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y)])
 	draw_polygon(points, PackedColorArray([top, top, bottom, bottom]))
+
+
+static func table_polygon(rect: Rect2) -> PackedVector2Array:
+	return PackedVector2Array([rect.position + Vector2(FAR_EDGE_INSET, 0),
+		Vector2(rect.end.x - FAR_EDGE_INSET, rect.position.y), rect.end,
+		Vector2(rect.position.x, rect.end.y)])
+
+
+static func surface_point(uv: Vector2) -> Vector2:
+	var inset := FAR_EDGE_INSET * (1.0 - uv.y)
+	return FELT.position + Vector2(inset + uv.x * (FELT.size.x - inset * 2.0), uv.y * FELT.size.y)
+
+
+static func closed_polygon(points: PackedVector2Array) -> PackedVector2Array:
+	var closed := points.duplicate()
+	closed.append(points[0])
+	return closed
+
+
+func draw_surface(rect: Rect2, fill: Color, edge: Color, width := 1.0) -> void:
+	var points := table_polygon(rect)
+	draw_colored_polygon(points, fill)
+	draw_polyline(closed_polygon(points), edge, width, true)
