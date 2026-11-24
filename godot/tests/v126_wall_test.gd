@@ -287,39 +287,35 @@ func test_table() -> void:
 
 func test_dense_rivers(desk) -> void:
 	var view: Dictionary = desk.game.view(0)
-	# A full river of six-per-row tiles keeps the reference size.
 	var numbers: Array = []
 	for index in range(36):
 		numbers.append(index % 27)
-	check(desk.river_slots(0, 6)[0] == desk.river_slots(0, 18)[0],
-		"the first three rows fill without shifting their existing positions")
-	check(desk.river_slots(0, 19)[0] == desk.river_slots(0, 24)[0]
+	check(desk.river_slots(0, 6)[0] == desk.river_slots(0, 12)[0],
+		"the first two rows fill without shifting their existing positions")
+	check(desk.river_slots(0, 13)[0] == desk.river_slots(0, 18)[0]
+		and desk.river_slots(0, 19)[0] == desk.river_slots(0, 24)[0]
 		and desk.river_slots(0, 31)[0] == desk.river_slots(0, 36)[0],
 		"compact positions stay fixed while each additional row fills")
-	check(desk.river_slots(0, 19)[0].get_center().x == desk.river_slots(0, 19)[18].get_center().x
-		and desk.river_slots(0, 19)[18].position.y > desk.river_slots(0, 19)[12].end.y,
+	var pose0: Transform3D = desk.TableLayout3D.river_pose(0, 0, 19)
+	var pose12: Transform3D = desk.TableLayout3D.river_pose(0, 12, 19)
+	var pose18: Transform3D = desk.TableLayout3D.river_pose(0, 18, 19)
+	check(is_equal_approx(pose0.origin.x, pose18.origin.x) and pose18.origin.z > pose12.origin.z,
 		"the nineteenth discard starts the next row rather than a disconnected wing")
-	var footprints: Array[Rect2] = []
+	var canvas := Rect2(0, 0, 1280, 800)
 	for seat in range(4):
-		var region: Rect2 = Art.RIVERS[seat]
 		view.players[seat].river = numbers
 		var first: int = desk.dynamic.get_child_count()
 		desk.draw_river(view, seat, false)
+		var expected_slots: Array[Rect2] = desk.river_slots(seat, numbers.size())
 		var rectangles: Array[Rect2] = []
 		for node in desk.dynamic.get_children().slice(first):
 			if node.get_script() != Tile:
 				continue
-			var center: Vector2 = node.position + node.size * 0.5
-			var size: Vector2 = node.size
-			var angle := int(node.rotation_degrees) % 360
-			if angle == 90 or angle == 270:
-				size = Vector2(node.size.y, node.size.x)
-			var footprint := Rect2(center - size * 0.5, size)
-			check(region.grow(2).encloses(footprint), "river tile fits its felt region")
-			check(not footprints.any(func(other): return other.intersects(footprint)),
-				"river tiles remain separate")
+			var footprint: Rect2 = node.get_rect()
+			check(canvas.encloses(footprint), "river tile fits the 3D table canvas")
+			check(footprint.is_equal_approx(expected_slots[rectangles.size()]),
+				"river tile matches projected 3D slot")
 			rectangles.append(footprint)
-			footprints.append(footprint)
 		check(rectangles.size() == numbers.size(), "a full river shows every discard")
 
 

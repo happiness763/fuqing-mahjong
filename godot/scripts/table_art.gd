@@ -2,6 +2,7 @@ extends Control
 
 const DiceRoll = preload("res://scripts/dice_roll.gd")
 const WALNUT_TABLE = preload("res://assets/table/walnut_table.png")
+const TEAHOUSE_BG = preload("res://assets/table/teahouse_bg.png")
 const FRAME := Rect2(3, 3, 1274, 794)
 const FELT := Rect2(14, 20, 1252, 760)
 const CENTER := Vector2(640, 325)
@@ -17,6 +18,7 @@ var dice := Vector2i.ZERO
 var table_texture: Texture2D
 var background_area := Rect2(0, 0, 1280, 800)
 var ambience_enabled := true
+var native_board := false
 var _ambience_time := 0.0
 var _ambience_accum := 0.0
 var _dice_roll: DiceRoll
@@ -114,6 +116,14 @@ func set_ambience(enabled: bool) -> void:
 	queue_redraw()
 
 
+func set_native_board(enabled: bool, center: Vector2) -> void:
+	if native_board == enabled:
+		return
+	native_board = enabled
+	_dice_roll.position = center - DiceRoll.DISPLAY_SIZE * 0.5
+	queue_redraw()
+
+
 func _process(delta: float) -> void:
 	if ambience_enabled:
 		_ambience_time += delta
@@ -124,6 +134,9 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
+	if native_board:
+		_draw_teahouse_backdrop()
+		return
 	gradient(background_area, Color("#253a30"), Color("#10231d"))
 	if not table_texture:
 		draw_texture_rect(WALNUT_TABLE, Rect2(0, 0, 1280, 800), false)
@@ -170,6 +183,18 @@ func _draw() -> void:
 		var length := 6 if index % 8 == 0 else 2
 		draw_line(center + vector * (DICE_RING_RADIUS - 3 - length),
 			center + vector * (DICE_RING_RADIUS - 3), Color("#82906c"), 1.0, true)
+
+
+func _draw_teahouse_backdrop() -> void:
+	var bg_size := TEAHOUSE_BG.get_size()
+	var area := background_area
+	var scale := maxf(area.size.x / bg_size.x, area.size.y / bg_size.y)
+	var crop_size := area.size / scale
+	var src := Rect2((bg_size - crop_size) * 0.5, crop_size)
+	draw_texture_rect_region(TEAHOUSE_BG, area, src, Color(0.92, 0.92, 0.92, 1.0))
+	# Subtle top/side vignette keeps top badges and side avatars high-contrast.
+	gradient(Rect2(area.position.x, area.position.y, area.size.x, 126.0),
+		Color(0.03, 0.06, 0.05, 0.42), Color(0.03, 0.06, 0.05, 0.0))
 
 
 func gradient(rect: Rect2, top: Color, bottom: Color) -> void:
