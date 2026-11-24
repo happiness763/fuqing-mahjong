@@ -35,12 +35,8 @@ func run() -> void:
 	desk.game = Game.new(43)
 	desk.skip_intro()
 	desk.ai_timer.stop()
-	if not desk.has_method("local_group_layout"):
-		check(false, "local hand and melds share a measured layout")
-		desk.free()
-		quit(failures)
-		return
 	var kinds := ["chow", "pong", "kong", "concealedKong", "addedKong"]
+	var canvas := Rect2(0, 0, 1280, 800)
 	# Exhaust every reachable mix of the five meld types, including five kongs.
 	for count in range(6):
 		for combination in range(int(pow(kinds.size(), count))):
@@ -49,13 +45,17 @@ func run() -> void:
 			for index in range(count):
 				melds.append(make_meld(kinds[code % kinds.size()], 0, index % 3 + 1))
 				code = floori(float(code) / kinds.size())
-			var layout: Dictionary = desk.local_group_layout(17 - 3 * count, melds, true)
-			check(layout.bounds.position.x >= 178 and layout.bounds.end.x <= 1246,
-				"reachable local group fits between the player badge and the right rail")
+			var layout: Dictionary = desk.TableLayout3D.hand_group(17 - 3 * count, true, melds)
+			var first_hand: Rect2 = desk.native_table.project_rect(layout.hand[0])
+			var last_hand: Rect2 = desk.native_table.project_rect(layout.hand.back())
+			check(first_hand.position.x >= 95 and last_hand.end.x <= 1255,
+				"reachable local hand fits inside the lower rail")
 			if count > 0:
-				check(layout.meld_origin.x >= layout.hand_origin.x + layout.hand_width + 16,
-					"melds stay to the right of the whole hand")
-	# A full 17-tile hand keeps its original target sizes and a separated draw.
+				var first_meld: Rect2 = desk.native_table.project_rect(layout.melds[0][0])
+				var last_meld: Rect2 = desk.native_table.project_rect(layout.melds.back().back())
+				check(first_meld.position.x >= last_hand.end.x - 4 and last_meld.end.x <= 1255,
+					"melds stay to the right of the whole hand and within the rail")
+	# A full 17-tile hand keeps a large click target and a separated draw.
 	var game = desk.game
 	game.phase = "turn"
 	game.current = 0
@@ -69,10 +69,12 @@ func run() -> void:
 	check(desk.human_buttons.size() == 17, "opening hand displays all seventeen cards")
 	var drawn = desk.human_buttons.back()
 	var previous = desk.human_buttons[-2]
-	check(drawn.size.is_equal_approx(Vector2(56, 56 / 0.75)) and drawn.position.x - previous.position.x == 69,
+	var prev_step: float = previous.get_rect().get_center().x - desk.human_buttons[-3].get_rect().get_center().x
+	var draw_step: float = drawn.get_rect().get_center().x - previous.get_rect().get_center().x
+	check(drawn.size.x >= 44.0 and drawn.size.y >= 54.0 and draw_step > prev_step + 12.0,
 		"full hand preserves touch target and drawn-tile gap")
 	check(drawn.mouse_filter == Control.MOUSE_FILTER_STOP, "drawn tile remains interactive")
-	check(desk.human_buttons[0].position.x >= 178 and drawn.get_rect().end.x <= 1246,
+	check(desk.human_buttons[0].position.x >= 95 and drawn.get_rect().end.x <= 1255,
 		"seventeen tile opening remains within felt")
 	desk.dynamic.free()
 	desk.human_buttons.clear()
@@ -94,11 +96,8 @@ func run() -> void:
 		var band = desk.dynamic.get_node_or_null("MeldsSeat%d" % seat)
 		check(is_instance_valid(band), "each seat has a single meld strip")
 		if is_instance_valid(band):
-			check(is_equal_approx(band.rotation_degrees, float([0, 270, 180, 90][seat])), "melds face their owner")
-			check(is_equal_approx(band.scale.x, band.scale.y), "meld symbols are never stretched between axes")
-			var anchor: Vector2 = desk.local_group_layout(2, game.players[seat].melds, false).meld_origin if seat == 0 else Vector2.ZERO
-			var bounds: Rect2 = desk.meld_strip_layout(game.players[seat].melds, anchor, seat).bounds
-			check(Rect2(65, 75, 1181, 700).encloses(bounds), "all exposed melds remain on felt")
+			for card in band.find_children("*", "Button", true, false):
+				check(canvas.encloses(card.get_rect()), "all exposed melds remain on the 3D table canvas")
 	# Claimed tiles are horizontal relative to their owner; an added kong
 	# places a fourth tile directly above the original claimed tile.
 	for seat in range(4):
@@ -106,19 +105,21 @@ func run() -> void:
 		for index in range(kinds.size()):
 			var group = strip.get_node("Meld%d" % index)
 			var sideways := 1 if kinds[index] == "chow" else (0 if kinds[index] != "concealedKong" else -1)
+			var normal_index := 0 if sideways != 0 else 1
+			var normal_face: PackedVector2Array = group.get_node("MeldTile%d" % normal_index).projected_face
+			var normal_axis := (normal_face[1] - normal_face[0]).normalized()
 			for card_index in range(4 if kinds[index] in ["kong", "concealedKong"] else 3):
 				var card = group.get_node("MeldTile%d" % card_index)
-				check(is_equal_approx(card.rotation_degrees, 90.0 if card_index == sideways else 0.0),
+				var face: PackedVector2Array = card.projected_face
+				var axis := (face[1] - face[0]).normalized()
+				var alignment := absf(axis.dot(normal_axis))
+				check(alignment < 0.35 if card_index == sideways else alignment > 0.85,
 					"claim orientation is relative to the owning seat")
-				if card_index == sideways:
-					var footprint: Rect2 = card.get_transform() * Rect2(Vector2.ZERO, card.size)
-					check(card.pivot_offset == card.size * 0.5 and is_equal_approx(footprint.end.y, card.size.y),
-						"claimed tile rotates around its center and meets the local baseline")
 			if kinds[index] == "addedKong":
 				var added = group.get_node("AddedTile")
 				var claimed = group.get_node("MeldTile0")
-				check(added.position.x == claimed.position.x and added.position.y < claimed.position.y,
-					"added kong remains stacked on the claimed tile")
+				check(added.get_rect().get_center().y < claimed.get_rect().get_center().y,
+					"added kong remains stacked above the claimed tile")
 	var winner = desk.dynamic.get_node_or_null("RevealedHand1/RevealedTile1_1")
 	check(is_instance_valid(winner), "settlement hand is rotated with its seat")
 	if is_instance_valid(winner):

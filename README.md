@@ -5,12 +5,12 @@
 <p align="center">
   <a href="https://github.com/happiness763/fuqing-mahjong/releases/latest"><strong>下载 Windows 版</strong></a>
   · <a href="#玩法速览">玩法速览</a>
-  · <a href="release/联机说明-v1.3.3b.md">联机说明</a>
+  · <a href="release/联机说明-v1.3.3e.md">联机说明</a>
   · <a href="#参与开发">参与开发</a>
 </p>
 
 <p align="center">
-  <img src="docs/images/gameplay.png" width="1000" alt="融城茶馆实机牌桌，桌心显示四座方位，左上角显示本局金牌，桌边有双层牌墙和自己的手牌">
+  <img src="docs/images/gameplay.png" width="1000" alt="融城茶馆 3D 牌桌实机画面，四家牌河围绕圆形风盘，桌沿有双层牌墙，本家手牌立在桌前">
 </p>
 
 ## 快速开桌
@@ -22,7 +22,7 @@
 | **单机** | 从首页点「开始游戏」进入开桌设置，选局数（默认 25）、AI 难度和运气，再点「开始游戏」。三档难度为简单、普通、困难。 |
 | **联机** | 房主开房并分享「地址:端口」。朋友填昵称、粘贴地址后加入，在大厅选东、南、西、北的空座。房主可加 AI 补齐四席，再开始游戏。 |
 
-联机请使用同一版本。房主可设置 15 秒、30 秒、60 秒或不限时，默认 60 秒。跨网络开房需转发 UDP 端口，具体步骤见 [联机说明](release/联机说明-v1.3.3b.md)。
+联机请统一使用 v1.3.3e。房主可设置 15 秒、30 秒、60 秒或不限时，默认 60 秒。跨网络开房需转发 UDP 端口，具体步骤见 [联机说明](release/联机说明-v1.3.3e.md)。
 
 首页「数据统计」和对局菜单里的「数据统计」可查看本机累计战绩、单局详情、最近 100 局历史和成就；数据只保存在本机。整桌结算会列出每位牌手的胡牌次数和点炮次数。
 
@@ -35,6 +35,12 @@ v1.3.3 重排玩家视角。双层牌墙沿透视桌边摆放，圆形风盘居�
 v1.3.3a 放大远端舍牌和常见副露，调整四家间距，本家手牌与吃碰杠牌底边对齐。
 
 v1.3.3b 统一牌张规格及两套牌面的留白，校正金标和副露，四家舍牌连续排布。
+
+v1.3.3c 将 Godot 对局重制为 3D 牌桌。双层牌墙沿木边摆放，四家牌河围绕圆形风盘，每六张换行。本家手牌立在桌前，摸入牌单独留缝，吃碰杠牌排在手牌右侧。
+
+v1.3.3d 统一副露与牌山、舍牌的立体厚度，支持高分辨率（2K）全屏原生清晰渲染并全面开启各向异性过滤，调整牌墙与外家间距以消除对家及侧边副露被牌墙遮挡的问题。
+
+v1.3.3e 放大并重绘左上角单金与花金显示，去除冗余小角标大幅提升辨识度；同时开启 3D 透明牌桌并加入新中式“融城茶馆”沉浸式全景背景。
 
 ### 键鼠操作
 
@@ -127,4 +133,4 @@ godot --headless --path godot --script res://tests/online_room_test.gd
 
 </details>
 
-[更新说明](release/更新说明-v1.3.3b.md) · [数据统计与首页设计](docs/superpowers/specs/2026-11-17-godot-mahjong-v1.2.9-design.md) · [牌面来源](godot/assets/tiles/CREDITS.md) · [第三方许可](release/licenses/)
+[更新说明](release/更新说明-v1.3.3e.md) · [牌桌重制设计](docs/superpowers/specs/2026-11-23-godot-mahjong-v1.3.3c-design.md) · [清晰度与遮挡修复设计](docs/superpowers/specs/2026-11-24-godot-mahjong-v1.3.3d-design.md) · [金牌与茶馆背景设计](docs/superpowers/specs/2026-11-24-godot-mahjong-v1.3.3e-design.md) · [数据统计与首页设计](docs/superpowers/specs/2026-11-17-godot-mahjong-v1.2.9-design.md) · [牌面来源](godot/assets/tiles/CREDITS.md) · [第三方许可](release/licenses/)

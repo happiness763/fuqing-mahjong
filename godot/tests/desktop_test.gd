@@ -56,7 +56,7 @@ func run() -> void:
 	var desk = Desk.instantiate()
 	desk.preferences_root = OS.get_temp_dir().path_join("fuqing-desktop-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	root.add_child(desk)
-	check(ProjectSettings.get_setting("application/config/version") == "1.3.3b", "project version")
+	check(ProjectSettings.get_setting("application/config/version") == "1.3.3e", "project version")
 	check(is_instance_valid(desk.action_font) and desk.action_font.has_char("胡".unicode_at(0)),
 		"action captions use the bundled display font")
 	check(is_instance_valid(desk.fx) and desk.effects in ["full", "simple", "off"],
@@ -134,8 +134,10 @@ func run() -> void:
 	desk.refresh(true)
 	await create_timer(0.68).timeout
 	check(desk.human_buttons.size() == 17, "17 starting tiles visible")
-	check(desk.human_buttons[0].size.is_equal_approx(Vector2(56, 56 / 0.75)), "the upright hand keeps the common proportion and a large click target")
-	check(desk.human_buttons.back().position.x + 56 <= 1280, "17 tiles fit the window width")
+	check(desk.human_buttons[0].size.x >= 44.0 and desk.human_buttons[0].size.y >= 54.0
+		and desk.human_buttons[0].projected_face.size() == 4,
+		"the upright hand keeps a projected face and a large click target")
+	check(desk.human_buttons.back().get_rect().end.x <= 1280, "17 tiles fit the window width")
 	check(not desk.dynamic.find_children("*", "Label", true, false).any(func(node): return node.text in ["牌桌状态", "行牌动态", "本桌积分"]),
 		"the right sidebar is removed")
 	check(not desk.dynamic.find_children("*", "Label", true, false).any(func(node): return node.text == "出牌操作"),
@@ -148,7 +150,7 @@ func run() -> void:
 	for index in range(desk.faces.size()):
 		var face = desk.faces[index]
 		check(face != null and face.get_image().get_used_rect().has_area(), "tile has visible artwork %d" % index)
-	var honor: Button = desk.tile(desk, 27, Rect2(Vector2.ZERO, desk.HAND_SIZE), 26)
+	var honor: Button = desk.tile(desk, 27, Rect2(Vector2.ZERO, desk.Metrics.HAND_SIZE), 26)
 	check(not honor.find_children("*", "Label", false, false).size(), "honor tiles do not fall back to text")
 	honor.queue_free()
 	test_gold_display(desk)
@@ -584,7 +586,8 @@ func test_win_effect(desk) -> void:
 	check(int(game.result.get("tile", -1)) == 22, "a discard win publishes the winning tile")
 	check("win_source" in desk.fx and "win_target" in desk.fx, "the win effect uses both card anchors")
 	if "win_source" in desk.fx and "win_target" in desk.fx:
-		check(Art.RIVERS[3].encloses(desk.fx.win_source) and desk.fx.win_target.position.y < 125,
+		var expected_source: Rect2 = desk.river_slots(3, game.players[3].river.size() + 1).back()
+		check(desk.fx.win_source.is_equal_approx(expected_source) and desk.fx.win_target.position.y < 220,
 			"discard light starts at the claimed river slot and ends at the winning hand")
 	await create_timer(0.22).timeout
 	await capture("win-trail.png")
@@ -732,7 +735,7 @@ func test_multiple_chow(desk) -> void:
 	click(first)
 	check(game.players[0].melds[0].tiles == [2, 3, 4], "choice claims intended sequence")
 	var rotated: Array = desk.dynamic.find_children("*", "Button", true, false).filter(
-		func(node): return node.get_script() == Tile and is_equal_approx(node.rotation_degrees, 90))
+		func(node): return node.get_script() == Tile and node.name.begins_with("MeldTile") and node.size.x > node.size.y)
 	check(rotated.size() == 1 and rotated[0].number == 4, "claimed tile lies sideways")
 	var banner: Panel = desk.action_banner
 	check(is_instance_valid(banner) and banner.get_node("Caption").text == "吃", "accepted chow appears as a large table prompt")
@@ -856,13 +859,12 @@ func test_dense_board(desk) -> void:
 	var tiles: Array = desk.dynamic.find_children("*", "Button", true, false).filter(
 		func(node): return node.get_script() == Tile)
 	for seat in range(4):
-		var region: Rect2 = Art.RIVERS[seat]
+		var expected_slots: Array[Rect2] = desk.river_slots(seat, game.players[seat].river.size())
 		var prefix := "RiverTile%d_" % seat
-		var shown: Array = tiles.filter(func(node): return node.name.begins_with(prefix)).filter(func(node):
-			var center: Vector2 = node.position + node.size * 0.5
-			var footprint_size: Vector2 = node.size
-			var angle := int(node.rotation_degrees) % 360
-			if angle == 90 or angle == 270:
-				footprint_size = Vector2(node.size.y, node.size.x)
-			return region.grow(2).encloses(Rect2(center - footprint_size * 0.5, footprint_size)))
-		check(shown.size() == game.players[seat].river.size(), "long river fits region %d" % seat)
+		var shown: Array = tiles.filter(func(node): return node.name.begins_with(prefix))
+		var inside := true
+		for index in range(shown.size()):
+			var rect: Rect2 = shown[index].get_rect()
+			if not Rect2(0, 0, 1280, 800).encloses(rect) or not rect.is_equal_approx(expected_slots[index]):
+				inside = false
+		check(shown.size() == game.players[seat].river.size() and inside, "long river fits 3D table %d" % seat)

@@ -50,8 +50,12 @@ func test_local(desk: Control) -> void:
 	check(has_draw_notice(desk), "local redeal shows the first-cycle draw notice")
 	var notice: Control = desk.dynamic.get_node_or_null("RedealNotice")
 	if is_instance_valid(notice):
-		check(Art.RIVERS.all(func(river): return not notice.get_rect().intersects(river)),
-			"the draw notice leaves all four rivers visible")
+		var clears_rivers := true
+		for seat in range(4):
+			for slot_rect in desk.river_slots(seat, desk.game.players[seat].river.size()):
+				if notice.get_rect().intersects(slot_rect):
+					clears_rivers = false
+		check(clears_rivers, "the draw notice leaves all four rivers visible")
 	check(not is_instance_valid(desk.modal) and desk.controls.is_empty() and desk.local_moves().is_empty(),
 		"local redeal has no settlement dialog or actions")
 	check(desk.selected_index == -1 and not is_instance_valid(desk.action_banner),
