@@ -85,8 +85,8 @@ static func hand_group(count: int, separated: bool, melds: Array) -> Dictionary:
 		var offset := (index + 0.5) * pitch
 		if index == count - 1:
 			offset += draw_gap
-		var point := Vector3(left + offset * fit, 0.605 * fit, 7.05)
-		hand.append(tile_pose(point, 0.0, deg_to_rad(51.0), LOCAL_HAND_SCALE * fit))
+		var point := Vector3(left + offset * fit, 0.505 * fit, 7.05)
+		hand.append(tile_pose(point, 0.0, deg_to_rad(36.0), LOCAL_HAND_SCALE * fit))
 	return {"hand": hand, "melds": _meld_poses(melds, 0, left + (hand_span + gap) * fit, 7.1, LOCAL_MELD_SCALE * fit)}
 
 

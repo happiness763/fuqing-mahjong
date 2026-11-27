@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/happiness763/fuqing-mahjong/releases/latest"><strong>下载 Windows 版</strong></a>
   · <a href="#玩法速览">玩法速览</a>
-  · <a href="release/联机说明-v1.3.3e.md">联机说明</a>
+  · <a href="release/联机说明-v1.3.4a.md">联机说明</a>
   · <a href="#参与开发">参与开发</a>
 </p>
 
@@ -22,7 +22,7 @@
 | **单机** | 从首页点「开始游戏」进入开桌设置，选局数（默认 25）、AI 难度和运气，再点「开始游戏」。三档难度为简单、普通、困难。 |
 | **联机** | 房主开房并分享「地址:端口」。朋友填昵称、粘贴地址后加入，在大厅选东、南、西、北的空座。房主可加 AI 补齐四席，再开始游戏。 |
 
-联机请统一使用 v1.3.3e。房主可设置 15 秒、30 秒、60 秒或不限时，默认 60 秒。跨网络开房需转发 UDP 端口，具体步骤见 [联机说明](release/联机说明-v1.3.3e.md)。
+联机请统一使用 v1.3.4a。房主可设置 15 秒、30 秒、60 秒或不限时，默认 60 秒。跨网络开房需转发 UDP 端口，具体步骤见 [联机说明](release/联机说明-v1.3.4a.md)。
 
 首页「数据统计」和对局菜单里的「数据统计」可查看本机累计战绩、单局详情、最近 100 局历史和成就；数据只保存在本机。整桌结算会列出每位牌手的胡牌次数和点炮次数。
 
@@ -41,6 +41,8 @@ v1.3.3c 将 Godot 对局重制为 3D 牌桌。双层牌墙沿木边摆放，四�
 v1.3.3d 统一副露与牌山、舍牌的立体厚度，支持高分辨率（2K）全屏原生清晰渲染并全面开启各向异性过滤，调整牌墙与外家间距以消除对家及侧边副露被牌墙遮挡的问题。
 
 v1.3.3e 放大并重绘左上角单金与花金显示，去除冗余小角标大幅提升辨识度；同时开启 3D 透明牌桌并加入新中式“融城茶馆”沉浸式全景背景。
+
+v1.3.4a 以 v1.3.3e 的稳定构图与 2K 清晰度为基准，将本家手牌倾角由 51° 向桌面方向调整至 36°（正对 56° 俯视视线）并同步贴合桌布底边，修正打牌时的手牌视角观感。
 
 ### 键鼠操作
 
@@ -133,4 +135,4 @@ godot --headless --path godot --script res://tests/online_room_test.gd
 
 </details>
 
-[更新说明](release/更新说明-v1.3.3e.md) · [牌桌重制设计](docs/superpowers/specs/2026-11-23-godot-mahjong-v1.3.3c-design.md) · [清晰度与遮挡修复设计](docs/superpowers/specs/2026-11-24-godot-mahjong-v1.3.3d-design.md) · [金牌与茶馆背景设计](docs/superpowers/specs/2026-11-24-godot-mahjong-v1.3.3e-design.md) · [数据统计与首页设计](docs/superpowers/specs/2026-11-17-godot-mahjong-v1.2.9-design.md) · [牌面来源](godot/assets/tiles/CREDITS.md) · [第三方许可](release/licenses/)
+[更新说明](release/更新说明-v1.3.4a.md) · [牌桌重制设计](docs/superpowers/specs/2026-11-23-godot-mahjong-v1.3.3c-design.md) · [清晰度与遮挡修复设计](docs/superpowers/specs/2026-11-24-godot-mahjong-v1.3.3d-design.md) · [金牌与茶馆背景设计](docs/superpowers/specs/2026-11-24-godot-mahjong-v1.3.3e-design.md) · [数据统计与首页设计](docs/superpowers/specs/2026-11-17-godot-mahjong-v1.2.9-design.md) · [牌面来源](godot/assets/tiles/CREDITS.md) · [第三方许可](release/licenses/)

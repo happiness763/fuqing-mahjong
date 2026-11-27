@@ -117,7 +117,7 @@ func test_groups() -> void:
 	check(separated.size() == 17 and separated[16].origin.x - separated[15].origin.x >
 		plain[16].origin.x - plain[15].origin.x + 0.25, "drawn tile is the last tile with a visible gap")
 	for pose: Transform3D in separated:
-		check(pose.basis.y.normalized().dot(Vector3.BACK) > 0.6, "local hand leans toward the viewer")
+		check(pose.basis.y.normalized().dot(Vector3.BACK) > 0.55, "local hand leans toward the viewer")
 		check(Rect2(100.0, 595.0, 1080.0, 205.0).encloses(screen_bounds(pose)), "17-tile hand fits in the lower rail")
 	for seat in range(4):
 		var across: Vector3 = RIGHT[seat]
